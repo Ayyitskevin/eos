@@ -18,12 +18,14 @@ MLS/marketing usage rights apply as described in the photography services agreem
 
 
 def _find_or_create_client(name: str, email: str, phone: str) -> int:
+    from . import portal
     email = email.strip().lower()
     row = db.one(
         "SELECT id FROM clients WHERE studio_id=? AND lower(email)=?",
         (STUDIO_ID, email),
     )
     if row:
+        portal.ensure_token(row["id"])
         return row["id"]
     return clients.create_client(name, email=email, phone=phone, client_type="agent")
 

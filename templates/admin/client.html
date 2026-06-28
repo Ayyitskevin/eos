@@ -7,6 +7,14 @@
     <nav><a href="/admin/clients">← Clients</a></nav>
   </header>
 
+  {% if portal_link %}
+  <section class="card">
+    <h2>Agent portal</h2>
+    <p class="muted">Share this link for order history and re-downloads:</p>
+    <p><code class="slug">{{ portal_link }}</code></p>
+  </section>
+  {% endif %}
+
   <form method="post" action="/admin/clients/{{ c.id }}" class="form-grid card">
     <label>Name <input name="name" value="{{ c.name }}" required></label>
     <label>Type

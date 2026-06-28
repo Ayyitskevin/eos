@@ -65,9 +65,18 @@ Eos inherits the best patterns from two sibling projects:
 - Booking confirmation page at `/booking/{token}`
 - Studio admin — package editor, booking hours/buffers, order inbox
 
+### Phase 7 (shipped)
+
+- Agent portal at `/portal/{token}` — delivery history, gallery links, pay invoice
+- Pay-to-download — lock ZIP/originals until listing invoice is paid
+- Watermarked gallery previews until paid
+- Rich media embeds per listing (Matterport, YouTube, Vimeo) on gallery page
+- Auto-email gallery link on publish (optional, Studio settings)
+- Portal link on client detail page
+
 ### Still deferred
 
-Phases 7–10: agent portal, property sites, ops reporting, full SaaS multi-tenant.
+Phases 8–10: property microsites, ops reporting, full SaaS multi-tenant.
 
 ## Quick start
 

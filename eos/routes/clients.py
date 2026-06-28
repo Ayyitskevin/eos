@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import brand_kits, clients, security
+from .. import brand_kits, clients, portal, security
 from ..render import templates
 from ..vocab import CLIENT_TYPES
 
@@ -43,6 +43,7 @@ async def client_detail(request: Request, client_id: int):
         "SELECT * FROM listings WHERE client_id=? ORDER BY created_at DESC",
         (client_id,),
     )
+    portal_link = portal.portal_url(client_id) if c["email"] else None
     return templates.TemplateResponse(
         request, "admin/client.html",
         {
@@ -52,6 +53,7 @@ async def client_detail(request: Request, client_id: int):
             "all_clients": clients.list_clients(),
             "client_types": CLIENT_TYPES,
             "brand_kit": brand_kits.get_kit(client_id),
+            "portal_link": portal_link,
         },
     )
 

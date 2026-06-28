@@ -80,6 +80,7 @@ async def gallery_settings(
     if published and not old["published"]:
         n = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,))
         automations.on_gallery_published(lid or old["listing_id"], n["n"] if n else 0)
+        automations.on_gallery_published_email(gallery_id)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

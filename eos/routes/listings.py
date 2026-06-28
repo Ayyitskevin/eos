@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, config, contracts, galleries, invoices, listings, proposals, questionnaires, security
+from .. import clients, config, contracts, galleries, invoices, listing_media, listings, proposals, questionnaires, security
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -84,6 +84,8 @@ async def listing_detail(request: Request, listing_id: int):
             "proposal_presets": proposals.package_presets(),
             "questionnaires": questionnaires.list_for_listing(listing_id),
             "base_url": config.BASE_URL,
+            "media_embeds": listing_media.list_for_listing(listing_id),
+            "media_kinds": listing_media.KINDS,
         },
     )
 
@@ -135,6 +137,24 @@ async def shot_toggle(listing_id: int, shot_id: int, done: bool = Form(False)):
 async def task_toggle(listing_id: int, task_id: int, done: bool = Form(False)):
     listings.toggle_task(task_id, done)
     return RedirectResponse(f"/admin/listings/{listing_id}#tasks", status_code=303)
+
+
+@router.post("/listings/{listing_id}/media")
+async def listing_add_media(
+    listing_id: int,
+    kind: str = Form("url"),
+    label: str = Form(""),
+    embed_url: str = Form(...),
+):
+    listings.get_listing(listing_id)
+    listing_media.add_embed(listing_id, kind=kind, label=label, embed_url=embed_url)
+    return RedirectResponse(f"/admin/listings/{listing_id}#media", status_code=303)
+
+
+@router.post("/listings/{listing_id}/media/{embed_id}/delete")
+async def listing_delete_media(listing_id: int, embed_id: int):
+    listing_media.delete_embed(embed_id, listing_id)
+    return RedirectResponse(f"/admin/listings/{listing_id}#media", status_code=303)
 
 
 @router.post("/listings/{listing_id}/gallery")

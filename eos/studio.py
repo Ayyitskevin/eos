@@ -38,6 +38,7 @@ def update_profile(**fields) -> None:
         "headline", "about", "service_area", "published",
         "booking_enabled", "min_notice_hours", "buffer_minutes", "slot_minutes",
         "day_start_min", "day_end_min", "book_weekdays",
+        "pay_to_download", "watermark_until_paid", "auto_deliver_email",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -47,7 +48,7 @@ def update_profile(**fields) -> None:
         parts.append(f"{k}=?")
         if k == "published":
             params.append(1 if v else 0)
-        elif k == "booking_enabled":
+        elif k in ("booking_enabled", "pay_to_download", "watermark_until_paid", "auto_deliver_email"):
             params.append(1 if v else 0)
         else:
             params.append(v)

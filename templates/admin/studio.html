@@ -24,6 +24,10 @@
     <label>Day starts (min from midnight) <input name="day_start_min" type="number" value="{{ profile.day_start_min or 480 }}"></label>
     <label>Day ends (min from midnight) <input name="day_end_min" type="number" value="{{ profile.day_end_min or 1080 }}"></label>
     <label>Weekdays (0=Mon … 6=Sun) <input name="book_weekdays" value="{{ profile.book_weekdays or '0,1,2,3,4,5' }}"></label>
+    <h2>Delivery</h2>
+    <label class="checkbox"><input type="checkbox" name="pay_to_download" value="true" {% if profile.pay_to_download %}checked{% endif %}> Lock downloads until invoice paid</label>
+    <label class="checkbox"><input type="checkbox" name="watermark_until_paid" value="true" {% if profile.watermark_until_paid %}checked{% endif %}> Watermark gallery previews until paid</label>
+    <label class="checkbox"><input type="checkbox" name="auto_deliver_email" value="true" {% if profile.auto_deliver_email %}checked{% endif %}> Auto-email gallery link on publish (Gmail required)</label>
     <button type="submit">Save</button>
   </form>
 

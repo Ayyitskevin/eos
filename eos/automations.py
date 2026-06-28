@@ -39,6 +39,14 @@ def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
         _trigger("listing.delivered", listing_id)
 
 
+def on_gallery_published_email(gallery_id: int) -> None:
+    try:
+        from . import delivery_notify
+        delivery_notify.maybe_send_gallery_email(gallery_id)
+    except Exception:
+        log.exception("auto gallery email failed for %s", gallery_id)
+
+
 def on_proposal_sent(listing_id: int) -> None:
     _trigger("proposal.sent", listing_id)
 

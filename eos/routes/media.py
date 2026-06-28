@@ -4,9 +4,9 @@ import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
-from .. import config, db, security
+from .. import config, db, imaging, paywall, security
 from ..galleries import get_gallery_by_slug
 
 router = APIRouter()
@@ -60,4 +60,7 @@ async def public_media(request: Request, slug: str, variant: str, asset_id: int)
     path = _asset_path(g["id"], a, variant)
     if not path.is_file():
         raise HTTPException(status_code=404)
+    if paywall.payment_required(g["listing_id"]) and paywall.watermark_previews():
+        data = imaging.apply_preview_watermark(path)
+        return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"})
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})

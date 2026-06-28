@@ -57,12 +57,14 @@ def create_client(
     notes: str = "",
     parent_id: int | None = None,
 ) -> int:
+    from . import security
     cid = db.run(
         """INSERT INTO clients
-           (studio_id, parent_id, client_type, name, company, email, phone, license_number, notes)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+           (studio_id, parent_id, client_type, name, company, email, phone, license_number, notes, portal_token)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
         (STUDIO_ID, parent_id, client_type, name.strip(), company.strip(),
-         email.strip(), phone.strip(), license_number.strip(), notes.strip()),
+         email.strip(), phone.strip(), license_number.strip(), notes.strip(),
+         security.new_token()),
     )
     db.audit("admin", "client.create", f"id={cid} name={name.strip()}")
     return cid

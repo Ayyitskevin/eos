@@ -51,6 +51,9 @@ async def studio_update(
     day_start_min: int = Form(480),
     day_end_min: int = Form(1080),
     book_weekdays: str = Form("0,1,2,3,4,5"),
+    pay_to_download: bool = Form(False),
+    watermark_until_paid: bool = Form(False),
+    auto_deliver_email: bool = Form(False),
 ):
     studio.update_studio(name=name, contact_email=contact_email)
     studio.update_profile(
@@ -59,6 +62,8 @@ async def studio_update(
         buffer_minutes=buffer_minutes, slot_minutes=slot_minutes,
         day_start_min=day_start_min, day_end_min=day_end_min,
         book_weekdays=book_weekdays.strip(),
+        pay_to_download=pay_to_download, watermark_until_paid=watermark_until_paid,
+        auto_deliver_email=auto_deliver_email,
     )
     return RedirectResponse("/admin/studio", status_code=303)
 

@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** through phase 6 — smart booking, add-ons, deposit checkout, scheduling slots, package admin.
+**Shipped:** through phase 7 — agent portal, pay-to-download, watermarked previews, listing embeds.
 
-**Out of scope:** agent portal (phase 7), property microsites (phase 8), full SaaS multi-tenant (phase 10).
+**Out of scope:** property microsites (phase 8), full SaaS multi-tenant (phase 10).

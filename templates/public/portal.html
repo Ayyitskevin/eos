@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Your deliveries · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <p class="brand-mark">Eos</p>
+    <h1>Hi {{ client.name }}</h1>
+    <p class="muted">Your listing deliveries and invoices</p>
+  </header>
+
+  {% if deliveries %}
+  <table class="list">
+    <tr><th>Listing</th><th>Status</th><th>Gallery</th><th>Payment</th></tr>
+    {% for d in deliveries %}
+    <tr>
+      <td>
+        <strong>{{ d.title }}</strong>
+        {% if d.address_line1 %}<span class="muted listing-sub">{{ d.address_line1 }}</span>{% endif %}
+      </td>
+      <td>{{ d.status }}</td>
+      <td>
+        {% if d.gallery_published %}
+        <a href="{{ base_url }}/g/{{ d.gallery_slug }}" target="_blank">View gallery</a>
+        <span class="muted">PIN {{ d.gallery_pin }}</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>
+        {% if d.unpaid_invoice_slug and payments_on %}
+        <a href="{{ base_url }}/i/{{ d.unpaid_invoice_slug }}">Pay invoice</a>
+        {% elif d.unpaid_invoice_slug %}<span class="muted">Invoice sent</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No listings yet — book your next shoot at <a href="/book">/book</a>.</p>
+  {% endif %}
+</main>
+{% endblock %}

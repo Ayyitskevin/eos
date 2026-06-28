@@ -2,8 +2,9 @@
 
 import io
 import logging
+from pathlib import Path
 
-from PIL import Image, ImageCms, ImageFilter, ImageOps
+from PIL import Image, ImageCms, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 try:
     import pillow_heif
@@ -103,3 +104,27 @@ def make_derivatives(src_path: str, web_path: str, thumb_path: str,
         im.thumbnail((thumb_max, thumb_max), Image.LANCZOS)
         im.save(thumb_path, "JPEG", quality=quality, progressive=True, optimize=True)
     return w, h
+
+
+def apply_preview_watermark(path: Path, text: str = "PREVIEW") -> bytes:
+    """Return JPEG bytes with a light diagonal watermark for unpaid previews."""
+    path = Path(path)
+    with Image.open(path) as im:
+        im = im.convert("RGBA")
+        overlay = Image.new("RGBA", im.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(overlay)
+        w, h = im.size
+        font_size = max(18, min(w, h) // 12)
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        except OSError:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        for y in range(-h, h * 2, th * 3):
+            for x in range(-w, w * 2, tw * 2):
+                draw.text((x, y), text, fill=(255, 255, 255, 70), font=font)
+        out = Image.alpha_composite(im, overlay).convert("RGB")
+        buf = io.BytesIO()
+        out.save(buf, "JPEG", quality=82, optimize=True)
+        return buf.getvalue()

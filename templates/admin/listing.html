@@ -148,6 +148,33 @@
       </form>
     </section>
 
+    <section class="card" id="media">
+      <h2>Rich media (tours &amp; video)</h2>
+      {% if media_embeds %}
+      <ul class="pkg-list">
+        {% for e in media_embeds %}
+        <li>{{ e.label or e.kind }} — <a href="{{ e.embed_url }}" target="_blank">link</a>
+          <form method="post" action="/admin/listings/{{ l.id }}/media/{{ e.id }}/delete" class="inline-form">
+            <button type="submit" class="link">Remove</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/media" class="form-grid compact">
+        <label>Kind
+          <select name="kind">
+            {% for k in media_kinds %}
+            <option value="{{ k }}">{{ k }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Label <input name="label" placeholder="3D tour"></label>
+        <label>Embed URL <input name="embed_url" required placeholder="https://…"></label>
+        <button type="submit">Add embed</button>
+      </form>
+    </section>
+
     <section class="card">
       <h2>Galleries</h2>
       {% if galleries %}

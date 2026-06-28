@@ -7,9 +7,32 @@
     <p class="brand-mark light">Eos</p>
     <h1>{{ g.title }}</h1>
     {% if g.client_name %}<p>{{ g.client_name }}</p>{% endif %}
+    {% if payment_locked %}
+    <p class="alert-banner">Downloads locked until invoice is paid.{% if pay_url and payments_on %} <a href="{{ pay_url }}">Pay now</a>{% endif %}</p>
+    {% else %}
     <a class="btn" href="/g/{{ g.slug }}/download">Download all</a>
+    {% endif %}
   </div>
 </header>
+
+{% if embeds %}
+<section class="gallery-embeds">
+  {% for e in embeds %}
+  <div class="embed-card">
+    <h2>{{ e.label or e.kind }}</h2>
+    {% if e.kind == 'youtube' %}
+    <iframe src="{{ e.embed_url }}" title="{{ e.label }}" allowfullscreen loading="lazy"></iframe>
+    {% elif e.kind == 'vimeo' %}
+    <iframe src="{{ e.embed_url }}" title="{{ e.label }}" allowfullscreen loading="lazy"></iframe>
+    {% elif e.kind == 'matterport' %}
+    <iframe src="{{ e.embed_url }}" title="{{ e.label }}" allowfullscreen loading="lazy"></iframe>
+    {% else %}
+    <p><a href="{{ e.embed_url }}" target="_blank" rel="noopener">{{ e.embed_url }}</a></p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
 
 <main class="gallery-main">
   {% for s in sections %}
@@ -19,9 +42,13 @@
         {% for a in by_section[s.id] %}
         {% if a.status == 'ready' %}
         <figure class="tile">
+          {% if payment_locked %}
+          <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+          {% else %}
           <a href="/g/{{ g.slug }}/download/asset/{{ a.id }}">
             <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
           </a>
+          {% endif %}
         </figure>
         {% endif %}
         {% endfor %}
@@ -34,9 +61,13 @@
       {% for a in unsectioned %}
       {% if a.status == 'ready' %}
       <figure class="tile">
+        {% if payment_locked %}
+        <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+        {% else %}
         <a href="/g/{{ g.slug }}/download/asset/{{ a.id }}">
           <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
         </a>
+        {% endif %}
       </figure>
       {% endif %}
       {% endfor %}
