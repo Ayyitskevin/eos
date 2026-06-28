@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, config, db, galleries, jobs, listings, security, studio
+from .. import automations, config, db, galleries, jobs, listings, microsites, security, studio
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -78,9 +78,14 @@ async def gallery_settings(
         listing_id=lid,
     )
     if published and not old["published"]:
+        listing_id = lid or old["listing_id"]
         n = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,))
-        automations.on_gallery_published(lid or old["listing_id"], n["n"] if n else 0)
+        automations.on_gallery_published(listing_id, n["n"] if n else 0)
         automations.on_gallery_published_email(gallery_id)
+        if listing_id:
+            microsites.ensure_site_slug(listing_id)
+            microsites.maybe_auto_publish(listing_id)
+            jobs.enqueue("gallery_exports", {"gallery_id": gallery_id})
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

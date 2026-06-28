@@ -28,6 +28,7 @@
     <label class="checkbox"><input type="checkbox" name="pay_to_download" value="true" {% if profile.pay_to_download %}checked{% endif %}> Lock downloads until invoice paid</label>
     <label class="checkbox"><input type="checkbox" name="watermark_until_paid" value="true" {% if profile.watermark_until_paid %}checked{% endif %}> Watermark gallery previews until paid</label>
     <label class="checkbox"><input type="checkbox" name="auto_deliver_email" value="true" {% if profile.auto_deliver_email %}checked{% endif %}> Auto-email gallery link on publish (Gmail required)</label>
+    <label class="checkbox"><input type="checkbox" name="auto_publish_site" value="true" {% if profile.auto_publish_site %}checked{% endif %}> Auto-publish property site when gallery goes live</label>
     <button type="submit">Save</button>
   </form>
 

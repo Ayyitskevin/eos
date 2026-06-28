@@ -95,11 +95,27 @@ def _h_gallery_exports(p: dict) -> None:
         _h_exports({"asset_id": row["id"]})
 
 
+def _h_bundle(p: dict) -> None:
+    from . import bundles
+    bundles.build_bundle(p["listing_id"], p["kind"])
+
+
+def _h_marketing_kit(p: dict) -> None:
+    from . import marketing_kit
+    try:
+        marketing_kit.build_kit(p["listing_id"])
+    except Exception as e:
+        marketing_kit.mark_failed(p["listing_id"], str(e))
+        raise
+
+
 HANDLERS = {
     "image_derivatives": _h_image,
     "export_crops": _h_exports,
     "gallery_exports": _h_gallery_exports,
     "zip_build": _h_zip,
+    "bundle_build": _h_bundle,
+    "marketing_kit": _h_marketing_kit,
 }
 
 

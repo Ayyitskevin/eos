@@ -133,6 +133,7 @@ def check_admin_password(password: str) -> bool:
 
 
 INQUIRY_BUCKET_BOOK = -3
+INQUIRY_BUCKET_SITE = -4
 INQUIRY_WINDOW_SEC = 3600
 INQUIRY_MAX_PER_WINDOW = 3
 

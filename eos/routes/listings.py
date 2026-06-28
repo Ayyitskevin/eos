@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, config, contracts, galleries, invoices, listing_media, listings, proposals, questionnaires, security
+from .. import clients, config, contracts, galleries, invoices, listing_media, listings, marketing_kit, microsites, proposals, questionnaires, security
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -86,6 +86,9 @@ async def listing_detail(request: Request, listing_id: int):
             "base_url": config.BASE_URL,
             "media_embeds": listing_media.list_for_listing(listing_id),
             "media_kinds": listing_media.KINDS,
+            "site_slug": row["site_slug"] or microsites.ensure_site_slug(listing_id),
+            "site_url": microsites.site_url(listing_id),
+            "marketing_kit": marketing_kit.get_status(listing_id),
         },
     )
 
@@ -155,6 +158,28 @@ async def listing_add_media(
 async def listing_delete_media(listing_id: int, embed_id: int):
     listing_media.delete_embed(embed_id, listing_id)
     return RedirectResponse(f"/admin/listings/{listing_id}#media", status_code=303)
+
+
+@router.post("/listings/{listing_id}/site")
+async def listing_site_settings(
+    listing_id: int,
+    site_description: str = Form(""),
+    site_published: bool = Form(False),
+    site_lead_capture: bool = Form(False),
+):
+    microsites.update_site(
+        listing_id,
+        published=site_published,
+        description=site_description,
+        lead_capture=site_lead_capture,
+    )
+    return RedirectResponse(f"/admin/listings/{listing_id}#site", status_code=303)
+
+
+@router.post("/listings/{listing_id}/marketing-kit")
+async def listing_build_marketing_kit(listing_id: int):
+    marketing_kit.enqueue_build(listing_id)
+    return RedirectResponse(f"/admin/listings/{listing_id}#site", status_code=303)
 
 
 @router.post("/listings/{listing_id}/gallery")

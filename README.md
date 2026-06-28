@@ -74,9 +74,18 @@ Eos inherits the best patterns from two sibling projects:
 - Auto-email gallery link on publish (optional, Studio settings)
 - Portal link on client detail page
 
+### Phase 8 (shipped)
+
+- Property microsite per listing at `/l/{slug}` — hero, specs, agent branding, tour embeds
+- MLS download center — one-click MLS, Zillow, and full-res ZIP bundles
+- Marketing kit job queue — IG square/story graphics and printable flyer PDF
+- Social share meta (OG tags) for agent link sharing
+- Optional lead-capture form on property site
+- Auto-publish property site when gallery goes live (Studio settings)
+
 ### Still deferred
 
-Phases 8–10: property microsites, ops reporting, full SaaS multi-tenant.
+Phases 9–10: ops reporting, full SaaS multi-tenant.
 
 ## Quick start
 

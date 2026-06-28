@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}{{ address or listing.title }} · {{ studio.name }}{% endblock %}
+{% block head %}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ address or listing.title }}">
+<meta property="og:description" content="{{ listing.site_description or address }}">
+{% if cover_url %}<meta property="og:image" content="{{ base_url }}{{ cover_url }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="{{ site_url }}">
+{% endblock %}
+{% block bodyclass %}site-body property-site{% endblock %}
+{% block content %}
+<header class="property-hero"{% if cover_url %} style="background-image:url('{{ cover_url }}')"{% endif %}>
+  <div class="property-hero-inner">
+    <p class="brand-mark light">{{ studio.name }}</p>
+    <h1>{{ address or listing.title }}</h1>
+    {% if listing.site_description %}<p class="lead">{{ listing.site_description }}</p>{% endif %}
+    <div class="property-specs">
+      {% if listing.beds %}<span>{{ listing.beds }} bed</span>{% endif %}
+      {% if listing.baths %}<span>{{ listing.baths }} bath</span>{% endif %}
+      {% if listing.sqft %}<span>{{ "{:,}".format(listing.sqft) }} sqft</span>{% endif %}
+      {% if listing.mls_id %}<span>MLS {{ listing.mls_id }}</span>{% endif %}
+    </div>
+    {% if client %}
+    <p class="agent-line">Listed by {{ client.name }}{% if client.company %} · {{ client.company }}{% endif %}</p>
+    {% endif %}
+  </div>
+</header>
+
+<main class="property-main">
+  {% if payment_locked %}
+  <p class="alert-banner">Downloads locked until invoice is paid.{% if pay_url and payments_on %} <a href="{{ pay_url }}">Pay now</a>{% endif %}</p>
+  {% endif %}
+
+  {% if embeds %}
+  <section class="property-section">
+    <h2>Tours &amp; video</h2>
+    <div class="gallery-embeds">
+      {% for e in embeds %}
+      <div class="embed-card">
+        <h3>{{ e.label or e.kind }}</h3>
+        {% if e.kind in ('youtube', 'vimeo', 'matterport') %}
+        <iframe src="{{ e.embed_url }}" title="{{ e.label }}" allowfullscreen loading="lazy"></iframe>
+        {% else %}
+        <p><a href="{{ e.embed_url }}" target="_blank" rel="noopener">{{ e.embed_url }}</a></p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if assets %}
+  <section class="property-section">
+    <h2>Gallery</h2>
+    <div class="grid">
+      {% for a in assets %}
+      <figure class="tile">
+        <img src="/l/{{ listing.site_slug }}/photo/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+      </figure>
+      {% endfor %}
+    </div>
+    {% if gallery %}
+    <p class="muted center" style="margin-top:1rem">PIN-protected full gallery: <a href="/g/{{ gallery.slug }}">view delivery</a></p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="property-section download-center">
+    <h2>Download center</h2>
+    <p class="muted">MLS-ready crops, Zillow hero sizes, and full-resolution originals.</p>
+    <div class="download-grid">
+      <a class="btn" href="/l/{{ listing.site_slug }}/download/mls">MLS bundle</a>
+      <a class="btn" href="/l/{{ listing.site_slug }}/download/zillow">Zillow bundle</a>
+      <a class="btn btn-accent" href="/l/{{ listing.site_slug }}/download/fullres">Full-res ZIP</a>
+    </div>
+  </section>
+
+  <section class="property-section">
+    <h2>Marketing kit</h2>
+    {% if kit.status == 'ready' %}
+    <div class="download-grid">
+      <a class="btn" href="/l/{{ listing.site_slug }}/marketing/ig_square">IG square</a>
+      <a class="btn" href="/l/{{ listing.site_slug }}/marketing/ig_story">IG story</a>
+      <a class="btn" href="/l/{{ listing.site_slug }}/marketing/flyer">Print flyer (PDF)</a>
+    </div>
+    {% elif kit.status == 'building' %}
+    <p class="muted">Marketing graphics are being prepared — refresh in a moment.</p>
+    {% else %}
+    <p class="muted">Ask your photographer to generate the marketing kit from the studio admin.</p>
+    {% endif %}
+  </section>
+
+  {% if lead_capture %}
+  <section class="property-section card">
+    <h2>Interested in this property?</h2>
+    {% if thanks %}
+    <p class="ok">Thanks — we'll be in touch shortly.</p>
+    {% else %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/l/{{ listing.site_slug }}/inquire" class="form-grid compact">
+      <label>Name <input name="name" required></label>
+      <label>Email <input name="email" type="email" required></label>
+      <label>Phone <input name="phone" type="tel"></label>
+      <label>Message <textarea name="message" rows="3" placeholder="I'd like to schedule a showing…"></textarea></label>
+      <button type="submit">Send inquiry</button>
+    </form>
+    {% endif %}
+  </section>
+  {% endif %}
+</main>
+
+<footer class="property-footer muted">
+  <p>Photography by <a href="/">{{ studio.name }}</a></p>
+</footer>
+{% endblock %}

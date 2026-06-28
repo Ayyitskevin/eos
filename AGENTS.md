@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** through phase 7 — agent portal, pay-to-download, watermarked previews, listing embeds.
+**Shipped:** through phase 8 — property microsites, MLS bundles, marketing kit graphics.
 
-**Out of scope:** property microsites (phase 8), full SaaS multi-tenant (phase 10).
+**Out of scope:** ops reporting (phase 9), full SaaS multi-tenant (phase 10).

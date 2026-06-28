@@ -10,7 +10,7 @@
 
   {% if deliveries %}
   <table class="list">
-    <tr><th>Listing</th><th>Status</th><th>Gallery</th><th>Payment</th></tr>
+    <tr><th>Listing</th><th>Status</th><th>Site</th><th>Gallery</th><th>Payment</th></tr>
     {% for d in deliveries %}
     <tr>
       <td>
@@ -18,6 +18,11 @@
         {% if d.address_line1 %}<span class="muted listing-sub">{{ d.address_line1 }}</span>{% endif %}
       </td>
       <td>{{ d.status }}</td>
+      <td>
+        {% if d.site_published and d.site_slug %}
+        <a href="{{ base_url }}/l/{{ d.site_slug }}" target="_blank">Property site</a>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
       <td>
         {% if d.gallery_published %}
         <a href="{{ base_url }}/g/{{ d.gallery_slug }}" target="_blank">View gallery</a>

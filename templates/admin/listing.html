@@ -148,6 +148,23 @@
       </form>
     </section>
 
+    <section class="card" id="site">
+      <h2>Property site</h2>
+      <p><code class="slug">{{ site_url }}</code></p>
+      <form method="post" action="/admin/listings/{{ l.id }}/site" class="form-grid compact">
+        <label>Marketing blurb <textarea name="site_description" rows="2" placeholder="Stunning lakefront retreat…">{{ l.site_description }}</textarea></label>
+        <label class="checkbox"><input type="checkbox" name="site_published" value="true" {% if l.site_published %}checked{% endif %}> Publish at /l/{{ site_slug }}</label>
+        <label class="checkbox"><input type="checkbox" name="site_lead_capture" value="true" {% if l.site_lead_capture %}checked{% endif %}> Show lead-capture form on property site</label>
+        <button type="submit">Save site settings</button>
+      </form>
+      <p class="muted">Marketing kit: <strong>{{ marketing_kit.status }}</strong>
+        {% if marketing_kit.status == 'ready' %} — IG + flyer ready on property site{% endif %}
+      </p>
+      <form method="post" action="/admin/listings/{{ l.id }}/marketing-kit" class="inline-form">
+        <button type="submit">Build marketing kit</button>
+      </form>
+    </section>
+
     <section class="card" id="media">
       <h2>Rich media (tours &amp; video)</h2>
       {% if media_embeds %}

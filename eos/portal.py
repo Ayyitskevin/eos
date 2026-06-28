@@ -28,6 +28,7 @@ def get_client_by_token(token: str):
 def deliveries(client_id: int) -> list:
     return db.all_(
         """SELECT l.id AS listing_id, l.title, l.status, l.address_line1, l.created_at,
+                  l.site_slug, l.site_published,
                   g.id AS gallery_id, g.slug AS gallery_slug, g.title AS gallery_title,
                   g.published AS gallery_published, g.pin AS gallery_pin,
                   (SELECT slug FROM invoices i WHERE i.listing_id=l.id AND i.status='sent'

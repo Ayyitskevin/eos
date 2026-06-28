@@ -71,6 +71,9 @@ BOOTSTRAP_EMAIL = os.environ.get("EOS_BOOTSTRAP_EMAIL", "")
 SEQUENCE_TICK_SECONDS = int(os.environ.get("EOS_SEQUENCE_TICK_SECONDS", "60"))
 
 
+MARKETING_DIR = DATA_DIR / "marketing"
+
+
 def ensure_dirs() -> None:
-    for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, BRAND_DIR):
+    for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, BRAND_DIR, MARKETING_DIR):
         d.mkdir(parents=True, exist_ok=True)

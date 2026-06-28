@@ -230,6 +230,29 @@ button.link:hover { transform: none; text-decoration: underline; }
 .doc-actions { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
 .sign-form { max-width: 400px; }
 
+/* Property microsite */
+.property-hero {
+  min-height: 48vh; display: flex; align-items: flex-end;
+  background: linear-gradient(135deg, #1a2332, #4a6fa5) center/cover no-repeat; color: #fff;
+}
+.property-hero-inner {
+  width: 100%; padding: 3rem 5vw 2.5rem;
+  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+}
+.property-hero h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+.property-hero .lead { max-width: 640px; opacity: 0.92; }
+.property-specs { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0; }
+.property-specs span {
+  background: rgba(255,255,255,0.15); padding: 0.35rem 0.75rem; border-radius: 999px;
+  font-size: 0.85rem; font-weight: 500;
+}
+.agent-line { opacity: 0.85; margin: 0.5rem 0 0; }
+.property-main { max-width: 1100px; margin: 0 auto; padding: 2rem 5vw 4rem; }
+.property-section { margin-bottom: 2.5rem; }
+.property-section h2 { font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.download-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
+.property-footer { text-align: center; padding: 2rem 5vw 3rem; border-top: 1px solid var(--line); }
+
 @media (max-width: 640px) {
   .admin-bar { flex-direction: column; align-items: flex-start; }
   .admin-nav { margin-left: 0; }
