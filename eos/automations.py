@@ -50,3 +50,31 @@ def on_invoice_paid(listing_id: int | None) -> None:
         "UPDATE listing_tasks SET done=1 WHERE listing_id=? AND label LIKE '%invoice%'",
         (listing_id,),
     )
+
+
+def on_deposit_paid(inquiry_id: int, listing_id: int | None) -> None:
+    db.run(
+        "UPDATE inquiries SET status='confirmed' WHERE id=? AND status='pending_payment'",
+        (inquiry_id,),
+    )
+    if not listing_id:
+        return
+    inq = db.one("SELECT appointment_id FROM inquiries WHERE id=?", (inquiry_id,))
+    if inq and inq.get("appointment_id"):
+        db.run(
+            "UPDATE appointments SET status='confirmed' WHERE id=?",
+            (inq["appointment_id"],),
+        )
+    db.run(
+        "UPDATE listings SET status='booked', updated_at=datetime('now') WHERE id=?",
+        (listing_id,),
+    )
+    prop = db.one(
+        "SELECT id FROM proposals WHERE listing_id=? AND status='draft' ORDER BY id DESC LIMIT 1",
+        (listing_id,),
+    )
+    if prop:
+        from . import proposals
+        proposals.mark_sent(prop["id"])
+    else:
+        on_listing_booked(listing_id)

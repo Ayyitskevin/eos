@@ -44,6 +44,11 @@ async def pay_invoice(slug: str):
     if not config.STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="online payment is not configured")
     client = db.one("SELECT email FROM clients WHERE id=?", (inv["client_id"],)) if inv["client_id"] else None
+    success = f"{config.BASE_URL}/i/{slug}?thanks=1"
+    if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
+        inq = db.one("SELECT order_token FROM inquiries WHERE id=?", (inv["inquiry_id"],))
+        if inq and inq.get("order_token"):
+            success = f"{config.BASE_URL}/booking/{inq['order_token']}?thanks=1"
     session = stripe.checkout.Session.create(
         api_key=config.STRIPE_SECRET_KEY,
         mode="payment",
@@ -58,7 +63,7 @@ async def pay_invoice(slug: str):
         }],
         customer_email=client["email"] if client and client["email"] else None,
         metadata={"invoice_id": str(inv["id"])},
-        success_url=f"{config.BASE_URL}/i/{slug}?thanks=1",
+        success_url=success,
         cancel_url=f"{config.BASE_URL}/i/{slug}",
     )
     db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, inv["id"]))
@@ -80,9 +85,15 @@ async def stripe_webhook(request: Request):
         sess = event["data"]["object"]
         iid = sess.get("metadata", {}).get("invoice_id")
         if iid:
-            inv = db.one("SELECT listing_id FROM invoices WHERE id=?", (int(iid),))
+            inv = db.one(
+                "SELECT listing_id, invoice_kind, inquiry_id FROM invoices WHERE id=?",
+                (int(iid),),
+            )
             invoices.mark_paid(int(iid))
             if inv:
-                automations.on_invoice_paid(inv["listing_id"])
+                if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
+                    automations.on_deposit_paid(inv["inquiry_id"], inv["listing_id"])
+                else:
+                    automations.on_invoice_paid(inv["listing_id"])
             log.info("invoice %s paid via stripe", iid)
     return {"ok": True}

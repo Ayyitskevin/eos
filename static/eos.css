@@ -95,6 +95,9 @@ button.link:hover { transform: none; text-decoration: underline; }
 .list th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--dawn); }
 .list tr:last-child td { border-bottom: 0; }
 .list.compact td, .list.compact th { padding: 0.45rem 0.6rem; font-size: 0.9rem; }
+.small { font-size: 0.85rem; }
+.radio-card { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.6rem 0; cursor: pointer; }
+.radio-card input { margin-top: 0.25rem; }
 .listing-title { font-weight: 600; display: block; }
 .listing-sub { display: block; font-size: 0.85rem; }
 .mls-tag { font-size: 0.75rem; margin-top: 0.2rem; display: inline-block; }

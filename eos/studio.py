@@ -34,22 +34,65 @@ def update_studio(**fields) -> None:
 
 
 def update_profile(**fields) -> None:
-    allowed = {"headline", "about", "service_area", "published"}
+    allowed = {
+        "headline", "about", "service_area", "published",
+        "booking_enabled", "min_notice_hours", "buffer_minutes", "slot_minutes",
+        "day_start_min", "day_end_min", "book_weekdays",
+    }
     parts = ["updated_at=datetime('now')"]
     params: list = []
     for k, v in fields.items():
         if k not in allowed:
             continue
         parts.append(f"{k}=?")
-        params.append(1 if k == "published" and v else (0 if k == "published" else v))
+        if k == "published":
+            params.append(1 if v else 0)
+        elif k == "booking_enabled":
+            params.append(1 if v else 0)
+        else:
+            params.append(v)
     params.append(STUDIO_ID)
     db.run(f"UPDATE studio_profiles SET {', '.join(parts)} WHERE studio_id=?", tuple(params))
     db.audit("admin", "studio.profile", None)
 
 
-def list_packages():
+def list_packages(*, active_only: bool = False):
+    sql = "SELECT * FROM service_packages WHERE studio_id=?"
+    if active_only:
+        sql += " AND active=1"
+    sql += " ORDER BY position"
+    return db.all_(sql, (STUDIO_ID,))
+
+
+def list_addons(*, active_only: bool = False):
+    sql = "SELECT * FROM service_addons WHERE studio_id=?"
+    if active_only:
+        sql += " AND active=1"
+    sql += " ORDER BY position"
+    return db.all_(sql, (STUDIO_ID,))
+
+
+def update_package(
+    package_id: int,
+    *,
+    name: str,
+    description: str,
+    price_cents: int,
+    deposit_cents: int,
+    turnaround_hours: int,
+    active: bool,
+) -> None:
+    db.run(
+        """UPDATE service_packages SET name=?, description=?, price_cents=?, deposit_cents=?,
+           turnaround_hours=?, active=? WHERE id=? AND studio_id=?""",
+        (name.strip(), description.strip(), price_cents, deposit_cents,
+         turnaround_hours, 1 if active else 0, package_id, STUDIO_ID),
+    )
+
+
+def list_promo_codes():
     return db.all_(
-        "SELECT * FROM service_packages WHERE studio_id=? ORDER BY position",
+        "SELECT * FROM promo_codes WHERE studio_id=? ORDER BY code",
         (STUDIO_ID,),
     )
 

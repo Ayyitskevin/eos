@@ -15,7 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import bootstrap, config, db, jobs, scheduler
 from .render import ROOT, templates
 from .routes import (
-    activity, appointments, auth, brand_kits, clients, contracts_admin, dashboard,
+    activity, appointments, auth, booking, brand_kits, clients, contracts_admin, dashboard,
     delivery, docs, downloads, emails, galleries_admin, invoices_admin, listings,
     media, pay, proposals_admin, questionnaires, sequences_admin, site, studio_admin,
     today, uploads,
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Eos", version="0.5.0", lifespan=lifespan,
+    title="Eos", version="0.6.0", lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -81,7 +81,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "jobs_pending": jobs.pending_count(),
     }
 
@@ -93,6 +93,6 @@ for r in (
     invoices_admin.router, pay.router, appointments.router,
     proposals_admin.router, contracts_admin.router, docs.router, emails.router,
     questionnaires.admin, questionnaires.router, studio_admin.router, today.router,
-    activity.router, sequences_admin.router, site.router,
+    activity.router, sequences_admin.router, booking.router, site.router,
 ):
     app.include_router(r)

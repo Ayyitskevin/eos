@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** through phase 5 — operator auth, email drip sequences, sequences admin, bootstrap owner, production systemd unit.
+**Shipped:** through phase 6 — smart booking, add-ons, deposit checkout, scheduling slots, package admin.
 
-**Out of scope:** full multi-tenant billing, per-studio DB isolation.
+**Out of scope:** agent portal (phase 7), property microsites (phase 8), full SaaS multi-tenant (phase 10).

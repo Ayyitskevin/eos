@@ -50,19 +50,14 @@ async def test_questionnaire_merges_and_advances(app_env):
 
 
 @pytest.mark.asyncio
-async def test_book_inquiry(app_env):
+async def test_book_page_shows_packages(app_env):
+    import eos.scheduling as scheduling
+    import eos.studio as studio
+    importlib.reload(studio)
+    studio.update_profile(booking_enabled=True, min_notice_hours=0)
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        r = await client.post(
-            "/book",
-            data={
-                "name": "Agent Smith",
-                "email": "agent@example.com",
-                "property_address": "1 Main St",
-                "message": "Need twilight",
-            },
-        )
+        r = await client.get("/book")
         assert r.status_code == 200
-        assert "Thanks" in r.text
-    row = db.one("SELECT name FROM inquiries WHERE email=?", ("agent@example.com",))
-    assert row["name"] == "Agent Smith"
+        assert "Standard Listing" in r.text
+        assert scheduling.open_slots()

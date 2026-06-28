@@ -37,18 +37,43 @@ def create_invoice(
     client_id: int | None = None,
     line_items: list | None = None,
     notes: str = "",
+    invoice_kind: str = "full",
+    inquiry_id: int | None = None,
 ) -> int:
     iid = db.run(
         """INSERT INTO invoices
-           (studio_id, listing_id, client_id, slug, title, amount_cents, line_items, notes)
-           VALUES (?,?,?,?,?,?,?,?)""",
+           (studio_id, listing_id, client_id, slug, title, amount_cents, line_items, notes,
+            invoice_kind, inquiry_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
         (
             STUDIO_ID, listing_id, client_id, security.new_slug(), title.strip(),
             amount_cents, json.dumps(line_items or []), notes.strip(),
+            invoice_kind, inquiry_id,
         ),
     )
     db.audit("admin", "invoice.create", f"id={iid} listing_id={listing_id}")
     return iid
+
+
+def create_deposit_invoice(
+    listing_id: int,
+    *,
+    amount_cents: int,
+    client_id: int | None = None,
+    line_items: list | None = None,
+    title: str = "Booking deposit",
+    inquiry_id: int | None = None,
+) -> int:
+    return create_invoice(
+        listing_id,
+        title=title,
+        amount_cents=amount_cents,
+        client_id=client_id,
+        line_items=line_items,
+        notes="Deposit due to confirm your shoot slot.",
+        invoice_kind="deposit",
+        inquiry_id=inquiry_id,
+    )
 
 
 def update_invoice(invoice_id: int, **fields) -> None:

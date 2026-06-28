@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Booking confirmed · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="center-card wide">
+  <p class="brand-mark">Eos</p>
+  {% if thanks or order.status == 'confirmed' %}
+  <p class="ok">You're booked!</p>
+  {% elif order.status == 'pending_payment' %}
+  <p class="alert-banner">Deposit required to confirm your slot.</p>
+  {% endif %}
+
+  <h1>{{ listing.title if listing else order.property_address }}</h1>
+  {% if package_name %}<p>{{ package_name }}</p>{% endif %}
+  {% if order.scheduled_at %}<p class="muted">Shoot: {{ order.scheduled_at[:16] }}</p>{% endif %}
+  <p class="muted">Signed by {{ order.signer_name }}</p>
+
+  {% if order.deposit_cents and order.status == 'pending_payment' and invoice and payments_on %}
+  <p>Deposit due: <strong>${{ "%.2f"|format(order.deposit_cents / 100) }}</strong></p>
+  <form method="post" action="/i/{{ invoice.slug }}/pay">
+    <button type="submit" class="btn btn-accent">Pay deposit</button>
+  </form>
+  {% elif order.status == 'confirmed' %}
+  <p class="muted">We'll send pre-shoot intake details before your appointment.</p>
+  {% endif %}
+</main>
+{% endblock %}

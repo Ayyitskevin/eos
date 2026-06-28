@@ -8,19 +8,58 @@
   <h1>Book a listing shoot</h1>
   {% if profile.service_area %}<p class="muted">Serving {{ profile.service_area }}</p>{% endif %}
 
-  {% if thanks %}
-  <p class="ok">Thanks — we'll be in touch shortly.</p>
-  {% else %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if not slots %}<p class="muted">Online scheduling is temporarily unavailable — contact us directly.</p>{% endif %}
+
   <form method="post" action="/book" class="form-grid card">
+    <h2>Package</h2>
+    {% for p in packages %}
+    <label class="radio-card">
+      <input type="radio" name="package_id" value="{{ p.id }}" required {% if loop.first %}checked{% endif %}>
+      <span><strong>{{ p.name }}</strong> — ${{ "%.0f"|format(p.price_cents / 100) }}
+        {% if p.deposit_cents %}<span class="muted">(${{ "%.0f"|format(p.deposit_cents / 100) }} deposit)</span>{% endif %}
+        <br><span class="muted">{{ p.description }}</span>
+      </span>
+    </label>
+    {% endfor %}
+
+    {% if addons %}
+    <h2>Add-ons</h2>
+    {% for a in addons %}
+    <label class="checkbox"><input type="checkbox" name="addon_ids" value="{{ a.id }}"> {{ a.name }} (+${{ "%.0f"|format(a.price_cents / 100) }})</label>
+    {% endfor %}
+    {% endif %}
+
+    <h2>Property &amp; contact</h2>
     <label>Name <input name="name" required></label>
     <label>Email <input name="email" type="email" required></label>
     <label>Phone <input name="phone" type="tel"></label>
-    <label>Property address <input name="property_address" placeholder="123 Oak St, Austin TX"></label>
-    <label>Notes <textarea name="message" rows="4" placeholder="MLS deadline, package preference, twilight interest…"></textarea></label>
-    <button type="submit" class="btn btn-accent">Request booking</button>
+    <label>Property address <input name="property_address" required placeholder="123 Oak St, Austin TX"></label>
+    <label>Square feet <input name="sqft" type="number" min="0" placeholder="Optional"></label>
+    <label>Promo code <input name="promo_code" placeholder="Optional"></label>
+    <label>Notes <textarea name="message" rows="3" placeholder="Gate code, MLS deadline…"></textarea></label>
+
+    <h2>Shoot time</h2>
+    {% if slots %}
+    <label>Available slot
+      <select name="scheduled_at" required>
+        {% for s in slots %}
+        <option value="{{ s.value }}">{{ s.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% else %}
+    <input type="hidden" name="scheduled_at" value="">
+    {% endif %}
+
+    <h2>Agreement</h2>
+    <p class="muted small">{{ terms }}</p>
+    <label>Type your full name to sign <input name="signer_name" required placeholder="Jane Agent"></label>
+
+    <button type="submit" class="btn btn-accent" {% if not slots %}disabled{% endif %}>
+      {% if payments_on %}Book &amp; pay deposit{% else %}Confirm booking{% endif %}
+    </button>
   </form>
-  {% endif %}
   <p><a href="/">← Back</a></p>
 </main>
 {% endblock %}

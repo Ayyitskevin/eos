@@ -57,9 +57,17 @@ Eos inherits the best patterns from two sibling projects:
 - Bootstrap owner from `EOS_BOOTSTRAP_EMAIL` + `EOS_ADMIN_PASSWORD`
 - Production deploy unit — `deploy/eos.service` for systemd + nginx reverse proxy
 
+### Phase 6 (shipped)
+
+- Self-serve booking at `/book` — package picker, add-ons, live availability slots
+- Typed e-sign at checkout; auto-creates client, listing, appointment, proposal
+- Deposit invoices via Stripe Checkout; slot held until deposit paid
+- Booking confirmation page at `/booking/{token}`
+- Studio admin — package editor, booking hours/buffers, order inbox
+
 ### Still deferred
 
-Full multi-tenant billing, per-studio isolation beyond `studio_id`.
+Phases 7–10: agent portal, property sites, ops reporting, full SaaS multi-tenant.
 
 ## Quick start
 
