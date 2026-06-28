@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .. import commerce, config, db
+from .. import commerce, db, stripe_checkout
 from ..render import templates
 
 router = APIRouter()
@@ -36,7 +36,7 @@ async def booking_confirm(request: Request, token: str):
             "package_name": pkg["name"] if pkg else "",
             "listing": listing,
             "invoice": inv,
-            "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "payments_on": stripe_checkout.payments_configured(),
             "thanks": request.query_params.get("thanks"),
         },
     )

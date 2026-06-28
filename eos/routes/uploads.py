@@ -31,6 +31,9 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
             section_id = first["id"]
     if _free_gb() < config.MIN_FREE_GB:
         raise HTTPException(status_code=507, detail="low disk space — upload refused")
+    from .. import usage
+
+    usage.enforce_storage_limit()
 
     from .. import media_paths
 

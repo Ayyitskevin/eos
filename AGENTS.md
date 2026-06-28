@@ -2,9 +2,9 @@
 
 ## What this is
 
-Eos is a **real estate photography** studio OS: listing pipeline, RE shot lists, room-section galleries, MLS export presets, multi-tenant SaaS.
+Eos is a **multi-tenant RE photography SaaS** (Aryeo competitor): signup, subdomain tenants, platform billing, Stripe Connect client payments, DNS domain verification, platform admin ops.
 
-Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL, port **8410**. Current version: **1.5.0**.
+Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL, port **8410**. Current version: **1.6.0**.
 
 ## Key paths
 
@@ -41,6 +41,22 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 Repo: https://github.com/Ayyitskevin/eos — **push to `main` after every shipped change**. Never commit `.env` or `data/`. CI runs ruff, pytest+coverage, bandit. If workflow push fails, use GitHub MCP or `gh auth refresh -s workflow`.
 
-## Shipped (v1.5)
+## SaaS production env
 
-Phases 1–15. Phase 15: drive-time scheduling, video delivery, homeowner booking, Google admin OAuth, platform impersonation, demo sandbox, QuickBooks export, Sentry hook. See CHANGELOG.md.
+```bash
+EOS_SAAS_MODE=true
+EOS_SIGNUP_ENABLED=true
+EOS_BASE_DOMAIN=yourdomain.com
+EOS_BILLING_ENFORCE=true
+EOS_STRIPE_PLATFORM_SECRET_KEY=sk_live_...
+EOS_STRIPE_PLATFORM_WEBHOOK_SECRET=whsec_...
+EOS_STRIPE_PRICE_STARTER=price_...
+EOS_STRIPE_PRICE_PRO=price_...
+EOS_PLATFORM_ADMIN_EMAILS=you@company.com
+```
+
+Use `deploy/Caddyfile` for `*.yourdomain.com` wildcard TLS. Studios connect Stripe at `/admin/stripe/connect`.
+
+## Shipped (v1.6)
+
+Phase 16 SaaS pivot: Stripe Connect, DNS domain verification, platform admin v2 (suspend/plan override), per-tenant storage metering + seat limits, marketing landing. Phases 1–15 prior. See CHANGELOG.md.

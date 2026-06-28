@@ -11,6 +11,8 @@ LIMITS: dict[str, dict] = {
         "api_tokens": 5,
         "webhooks": 5,
         "custom_domain": True,
+        "team_seats": None,
+        "storage_gb": None,
         "label": "Solo",
     },
     "trial": {
@@ -18,6 +20,8 @@ LIMITS: dict[str, dict] = {
         "api_tokens": 1,
         "webhooks": 1,
         "custom_domain": False,
+        "team_seats": 1,
+        "storage_gb": 5,
         "label": "Trial",
     },
     "starter": {
@@ -25,6 +29,8 @@ LIMITS: dict[str, dict] = {
         "api_tokens": 2,
         "webhooks": 2,
         "custom_domain": False,
+        "team_seats": 1,
+        "storage_gb": 25,
         "label": "Starter",
     },
     "pro": {
@@ -32,6 +38,8 @@ LIMITS: dict[str, dict] = {
         "api_tokens": 10,
         "webhooks": 10,
         "custom_domain": True,
+        "team_seats": 5,
+        "storage_gb": 100,
         "label": "Pro",
     },
 }
@@ -77,4 +85,22 @@ def check_custom_domain() -> None:
         raise HTTPException(
             status_code=403,
             detail="Custom domains are available on Pro. Upgrade in Billing.",
+        )
+
+
+def check_team_seat(*, current_count: int) -> None:
+    cap = limits_for()["team_seats"]
+    if cap is not None and current_count >= cap:
+        raise HTTPException(status_code=403, detail=_upgrade_message("Team seat"))
+
+
+def check_storage(*, current_bytes: int) -> None:
+    cap_gb = limits_for()["storage_gb"]
+    if cap_gb is None:
+        return
+    cap_bytes = int(cap_gb * 1024 * 1024 * 1024)
+    if current_bytes >= cap_bytes:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Storage limit reached ({cap_gb} GB on {limits_for()['label']}). Upgrade in Billing.",
         )

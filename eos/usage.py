@@ -38,13 +38,18 @@ def snapshot(*, period: str | None = None) -> dict:
         (STUDIO_ID, p),
     )
     limits = plan_limits.limits_for()
+    storage = studio_storage_bytes()
     return {
         "period": p,
         "listings_created": row["listings_created"],
         "listings_cap": limits["listings_month"],
-        "storage_bytes": row["storage_bytes"],
+        "storage_bytes": storage,
+        "storage_gb": round(storage / (1024**3), 2),
+        "storage_cap_gb": limits["storage_gb"],
         "api_calls": row["api_calls"],
         "plan_tier": plan_limits.current_tier(),
+        "team_seats": limits["team_seats"],
+        "team_count": team_member_count(),
     }
 
 
@@ -58,30 +63,48 @@ def listings_created_this_month() -> int:
     return row["n"] if row else 0
 
 
-def refresh_storage_bytes() -> int:
+def studio_storage_bytes(*, studio_id: str | None = None) -> int:
+    sid = studio_id or str(STUDIO_ID)
     total = 0
-    base = config.MEDIA_DIR
-    if not base.is_dir():
-        bump("storage_bytes", 0)
-        return 0
-    for path in base.rglob("*"):
-        if path.is_file():
-            try:
-                total += path.stat().st_size
-            except OSError:
-                pass
-    row = db.one(
-        "SELECT storage_bytes FROM studio_usage WHERE studio_id=? AND period=?",
-        (STUDIO_ID, current_period()),
-    )
-    prev = row["storage_bytes"] if row else 0
-    delta = max(0, total - prev)
-    if delta:
-        bump("storage_bytes", delta)
-    elif not row:
-        _ensure_row()
-        db.run(
-            "UPDATE studio_usage SET storage_bytes=? WHERE studio_id=? AND period=?",
-            (total, STUDIO_ID, current_period()),
-        )
+    studio_dir = config.MEDIA_DIR / sid
+    if studio_dir.is_dir():
+        for path in studio_dir.rglob("*"):
+            if path.is_file():
+                try:
+                    total += path.stat().st_size
+                except OSError:
+                    pass
+    legacy_dir = config.MEDIA_DIR
+    if sid == "default" and legacy_dir.is_dir():
+        for path in legacy_dir.iterdir():
+            if path.is_dir() and path.name.isdigit():
+                for f in path.rglob("*"):
+                    if f.is_file():
+                        try:
+                            total += f.stat().st_size
+                        except OSError:
+                            pass
     return total
+
+
+def team_member_count(*, studio_id: str | None = None) -> int:
+    sid = studio_id or str(STUDIO_ID)
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM users WHERE studio_id=? AND active=1",
+        (sid,),
+    )
+    return row["n"] if row else 0
+
+
+def refresh_storage_bytes() -> int:
+    total = studio_storage_bytes()
+    _ensure_row()
+    db.run(
+        "UPDATE studio_usage SET storage_bytes=? WHERE studio_id=? AND period=?",
+        (total, STUDIO_ID, current_period()),
+    )
+    return total
+
+
+def enforce_storage_limit() -> None:
+    plan_limits.check_storage(current_bytes=studio_storage_bytes())

@@ -1,6 +1,6 @@
 # Eos
 
-Real estate photography OS for **solo operators** who want **SaaS-quality** delivery — listing-centric pipeline, room-based galleries, MLS export presets, and agent client hierarchy.
+**Multi-tenant SaaS** for real estate photography studios — booking, listing pipeline, branded delivery, agent portals, and Stripe Connect payments. Competes with Aryeo-class platforms; also runs as a single-studio install.
 
 Port **8410** (Mise=8400, Hestia=8500).
 

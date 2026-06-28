@@ -3,7 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, galleries, listing_media, paywall, security, studio
+from .. import config, db, galleries, listing_media, paywall, security, stripe_checkout, studio
 from ..render import templates
 
 router = APIRouter()
@@ -90,7 +90,7 @@ async def gallery_view(request: Request, slug: str):
             "assets": galleries.gallery_assets(g["id"]),
             "payment_locked": locked,
             "pay_url": f"/i/{inv_slug}" if inv_slug else None,
-            "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "payments_on": stripe_checkout.payments_configured(),
             "embeds": embeds,
             "upsell": upsell_banner,
             "upsell_addons": upsell_addons,

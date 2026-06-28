@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Eos — Real estate photography platform{% endblock %}
+{% block bodyclass %}site-body marketing-body{% endblock %}
+{% block content %}
+<main class="site-main marketing">
+  <header class="marketing-hero">
+    <p class="brand-mark">Eos</p>
+    <h1>The RE photography platform built to compete.</h1>
+    <p class="lede">Booking, shoot pipeline, branded delivery, agent portals, and client payments — multi-tenant SaaS for solo shooters and growing studios.</p>
+    {% if signup_enabled %}
+    <p class="cta-row">
+      <a href="/signup" class="btn btn-accent">Start free trial</a>
+      <a href="/demo" class="btn secondary">Live demo</a>
+    </p>
+    {% if base_domain %}
+    <p class="muted small">Your studio at <strong>yourname.{{ base_domain }}</strong> — custom domain on Pro.</p>
+    {% endif %}
+    {% endif %}
+  </header>
+
+  <section class="marketing-grid card">
+    <article>
+      <h2>Book &amp; get paid</h2>
+      <p>Self-serve booking, deposits, proposals, and Stripe Connect so every studio collects revenue on their own account.</p>
+    </article>
+    <article>
+      <h2>Deliver like a pro</h2>
+      <p>Room-based galleries, property microsites, agent portals, MLS export presets, and delivery upsells.</p>
+    </article>
+    <article>
+      <h2>Run the studio</h2>
+      <p>Listing pipeline, calendar sync, team roles, automations, and usage-based plan limits that scale with you.</p>
+    </article>
+  </section>
+
+  <section class="marketing-compare card">
+    <h2>Why studios switch</h2>
+    <ul class="check-list">
+      <li>Listing-centric workflow — not a generic CRM bolted onto delivery</li>
+      <li>Stripe Connect — your clients pay you, not a shared platform wallet</li>
+      <li>White-label subdomains + verified custom domains</li>
+      <li>Transparent plans: Trial → Starter → Pro with real enforcement</li>
+    </ul>
+  </section>
+
+  <footer class="marketing-foot muted">
+    <a href="/admin/login">Studio login</a>
+    {% if signup_enabled %} · <a href="/signup">Create account</a>{% endif %}
+  </footer>
+</main>
+{% endblock %}

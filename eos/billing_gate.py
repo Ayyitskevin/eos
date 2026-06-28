@@ -14,8 +14,21 @@ _ADMIN_PUBLIC = {"/admin/login", "/admin/logout", "/admin/verify-pending"}
 
 def check_access(request: Request) -> RedirectResponse | None:
     path = request.url.path
+    sid = tenant.get_studio_id()
+    if sid != "default":
+        active_row = db.one("SELECT active FROM studio WHERE id=?", (sid,))
+        if active_row and not active_row["active"]:
+            from .render import templates
+
+            if path.startswith("/admin") and path not in _ADMIN_PUBLIC:
+                return RedirectResponse("/admin/login?suspended=1", status_code=303)
+            return templates.TemplateResponse(
+                request,
+                "public/error.html",
+                {"message": "This studio is temporarily unavailable."},
+                status_code=403,
+            )
     if path.startswith("/admin") and path not in _ADMIN_PUBLIC:
-        sid = tenant.get_studio_id()
         if sid != "default" and signup_verify.needs_verification(sid):
             return RedirectResponse("/admin/verify-pending", status_code=303)
     if not config.BILLING_ENFORCE:

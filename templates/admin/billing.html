@@ -4,7 +4,7 @@
 <main class="admin-main narrow">
   <header class="admin-bar">
     <h1>Studio billing</h1>
-    <nav><a href="/admin/studio">Studio</a> · <a href="/admin">Pipeline</a></nav>
+    <nav><a href="/admin/studio">Studio</a> · <a href="/admin/stripe/connect">Client payments</a> · <a href="/admin">Pipeline</a></nav>
   </header>
 
   {% if thanks %}
@@ -37,9 +37,10 @@
       <dt>Listings created</dt>
       <dd>{{ usage.listings_created }}{% if usage.listings_cap %} / {{ usage.listings_cap }}{% else %} (unlimited){% endif %}</dd>
       <dt>API calls</dt><dd>{{ usage.api_calls }}</dd>
-      <dt>Storage tracked</dt><dd>{{ "%.1f"|format(usage.storage_bytes / 1048576) }} MB</dd>
+      <dt>Storage</dt><dd>{{ usage.storage_gb }} GB{% if usage.storage_cap_gb %} / {{ usage.storage_cap_gb }} GB{% endif %}</dd>
+      <dt>Team seats</dt><dd>{{ usage.team_count }}{% if usage.team_seats %} / {{ usage.team_seats }}{% else %} (unlimited){% endif %}</dd>
     </dl>
-    <p class="muted small">Starter plans cap monthly listings; Pro unlocks custom domains and higher API limits.</p>
+    <p class="muted small">Starter caps listings and storage; Pro unlocks custom domains, more seats, and higher API limits.</p>
   </section>
 
   {% if configured %}

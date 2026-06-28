@@ -29,7 +29,7 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 
 HOST = os.environ.get("EOS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EOS_PORT", "8410"))
@@ -96,6 +96,7 @@ STRIPE_PLATFORM_SECRET_KEY = os.environ.get("EOS_STRIPE_PLATFORM_SECRET_KEY", ""
 STRIPE_PLATFORM_WEBHOOK_SECRET = os.environ.get("EOS_STRIPE_PLATFORM_WEBHOOK_SECRET", "")
 STRIPE_PRICE_STARTER = os.environ.get("EOS_STRIPE_PRICE_STARTER", "")
 STRIPE_PRICE_PRO = os.environ.get("EOS_STRIPE_PRICE_PRO", "")
+STRIPE_APPLICATION_FEE_PERCENT = float(os.environ.get("EOS_STRIPE_APPLICATION_FEE_PERCENT", "0"))
 
 TOKEN_ENCRYPTION_KEY = os.environ.get("EOS_TOKEN_ENCRYPTION_KEY", "") or SECRET_KEY
 

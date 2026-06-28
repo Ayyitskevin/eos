@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Payments · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>Client payments</h1>
+    <nav><a href="/admin/studio">Studio</a> · <a href="/admin/billing">Platform billing</a></nav>
+  </header>
+
+  {% if request.query_params.get('thanks') %}
+  <p class="ok">Stripe account updated — refresh status if payouts aren't enabled yet.</p>
+  {% endif %}
+  {% if request.query_params.get('error') == 'not_configured' %}
+  <p class="error">Stripe Connect is not configured on this server.</p>
+  {% endif %}
+
+  <section class="card">
+    <h2>Stripe Connect</h2>
+    <p class="muted">Connect your Stripe account so booking deposits, invoices, and delivery upsells go directly to you.</p>
+
+    {% if not status.connect_configured %}
+    <p class="warn">Platform operator must set <code>EOS_STRIPE_PLATFORM_SECRET_KEY</code> to enable Connect.</p>
+    {% elif status.charges_enabled %}
+    <p class="ok">Payments active{% if status.account_id %} — {{ status.account_id }}{% endif %}</p>
+    <form method="post" action="/admin/stripe/connect/dashboard" class="inline-form"><button type="submit" class="btn">Open Stripe dashboard</button></form>
+    <form method="post" action="/admin/stripe/connect/disconnect" class="inline-form"><button type="submit" class="link">Disconnect</button></form>
+    {% elif status.connected %}
+    <p class="warn">Stripe connected — finish onboarding to accept payments.</p>
+    <form method="post" action="/admin/stripe/connect/start"><button type="submit" class="btn">Continue onboarding</button></form>
+    <form method="post" action="/admin/stripe/connect/refresh"><button type="submit" class="btn secondary">Refresh status</button></form>
+    {% else %}
+    <form method="post" action="/admin/stripe/connect/start"><button type="submit" class="btn btn-accent">Connect Stripe</button></form>
+    {% endif %}
+  </section>
+
+  <section class="card compact">
+    <h2>Checkout surfaces</h2>
+    <p class="small muted">When Connect is active, these accept card payments: <code>/book</code> deposits, invoice links, delivery upsells, pay-to-download.</p>
+    <p class="small">Status: {% if payments_on %}<span class="ok">ready</span>{% else %}<span class="warn">not configured</span>{% endif %}</p>
+  </section>
+</main>
+{% endblock %}

@@ -81,6 +81,10 @@ def studio_id_for_slug(slug: str) -> str | None:
     return row["id"] if row else None
 
 
+def studio_row_for_slug(slug: str):
+    return db.one("SELECT id, active FROM studio WHERE slug=?", (slug,))
+
+
 def studio_id_for_custom_domain(host: str | None) -> str | None:
     if not host:
         return None
@@ -110,9 +114,9 @@ def resolve_tenant(request: Request) -> str:
         return custom
     sub = subdomain_from_host(host)
     if sub:
-        sid = studio_id_for_slug(sub)
-        if sid:
-            return sid
+        row = studio_row_for_slug(sub)
+        if row:
+            return row["id"]
     if host and host.split(":")[0].lower() == "demo" and not config.BASE_DOMAIN:
         from . import demo_sandbox
 

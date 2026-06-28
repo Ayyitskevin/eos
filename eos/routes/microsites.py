@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import bundles, config, db, marketing_kit, microsites, paywall, security, studio
+from .. import bundles, config, db, marketing_kit, microsites, paywall, security, stripe_checkout, studio
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -21,7 +21,7 @@ def _pay_context(listing_id: int) -> dict:
     return {
         "payment_locked": locked,
         "pay_url": f"/i/{inv_slug}" if inv_slug else None,
-        "payments_on": bool(config.STRIPE_SECRET_KEY),
+        "payments_on": stripe_checkout.payments_configured(),
     }
 
 

@@ -5,7 +5,9 @@ from .. import (
     api_tokens,
     config,
     db,
+    domain_verify,
     integration_events,
+    payments,
     plan_limits,
     platform_billing,
     referrals,
@@ -24,11 +26,19 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 
 @router.get("/studio", response_class=HTMLResponse)
 async def studio_settings(request: Request):
+    studio_row = studio.get_studio()
+    domain_instr = None
+    if studio_row and studio_row["custom_domain"]:
+        domain_instr = domain_verify.verification_instructions(
+            domain=studio_row["custom_domain"],
+            slug=studio_row["slug"] or "",
+            token=studio_row["domain_verify_token"] or "",
+        )
     return templates.TemplateResponse(
         request,
         "admin/studio.html",
         {
-            "studio": studio.get_studio(),
+            "studio": studio_row,
             "profile": studio.get_profile(),
             "packages": studio.list_packages(),
             "presets": studio.list_crop_presets(),
@@ -51,6 +61,8 @@ async def studio_settings(request: Request):
             "billing": platform_billing.studio_billing(),
             "usage": usage.snapshot(),
             "plan_limits": plan_limits.limits_for(),
+            "payments": payments.connect_status(),
+            "domain_instructions": domain_instr,
             "integration_events": integration_events.list_recent(15),
             "dropbox_log": db.all_(
                 """SELECT * FROM dropbox_ingest_log WHERE studio_id=?
@@ -138,11 +150,19 @@ async def studio_domain(custom_domain: str = Form("")):
             raise HTTPException(
                 status_code=400, detail="Enter hostname only, e.g. photos.yourstudio.com"
             )
-    studio.update_studio(
-        custom_domain=domain or None,
-        custom_domain_verified=1 if domain else 0,
-    )
-    return RedirectResponse("/admin/studio", status_code=303)
+        domain_verify.save_pending_domain(domain)
+    else:
+        domain_verify.save_pending_domain("")
+    return RedirectResponse("/admin/studio#domain", status_code=303)
+
+
+@router.post("/studio/domain/verify")
+async def studio_domain_verify():
+    plan_limits.check_custom_domain()
+    ok, msg = domain_verify.try_verify_saved()
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return RedirectResponse("/admin/studio#domain", status_code=303)
 
 
 @router.post("/studio/packages/{package_id}")

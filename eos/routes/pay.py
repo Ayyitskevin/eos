@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, config, db, invoices
+from .. import automations, db, invoices, stripe_checkout
 from ..render import templates
 
 log = logging.getLogger("eos.routes.pay")
@@ -33,7 +33,7 @@ async def view_invoice(request: Request, slug: str):
             "client": client,
             "listing": listing,
             "items": json.loads(inv["line_items"] or "[]"),
-            "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "payments_on": stripe_checkout.payments_configured(),
             "thanks": request.query_params.get("thanks"),
         },
     )
@@ -44,36 +44,27 @@ async def pay_invoice(slug: str):
     inv = invoices.get_invoice_by_slug(slug)
     if inv["status"] == "paid":
         raise HTTPException(status_code=400, detail="already paid")
-    if not config.STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="online payment is not configured")
+    from .. import tenant
+
     client = (
         db.one("SELECT email FROM clients WHERE id=?", (inv["client_id"],))
         if inv["client_id"]
         else None
     )
-    success = f"{config.BASE_URL}/i/{slug}?thanks=1"
+    base = tenant.get_base_url()
+    success = f"{base}/i/{slug}?thanks=1"
     if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
         inq = db.one("SELECT order_token FROM inquiries WHERE id=?", (inv["inquiry_id"],))
         if inq and inq.get("order_token"):
-            success = f"{config.BASE_URL}/booking/{inq['order_token']}?thanks=1"
-    session = stripe.checkout.Session.create(
-        api_key=config.STRIPE_SECRET_KEY,
-        mode="payment",
-        payment_method_types=["card"],
-        line_items=[
-            {
-                "quantity": 1,
-                "price_data": {
-                    "currency": "usd",
-                    "unit_amount": inv["amount_cents"],
-                    "product_data": {"name": inv["title"]},
-                },
-            }
-        ],
+            success = f"{base}/booking/{inq['order_token']}?thanks=1"
+    session = stripe_checkout.create_payment_session(
+        amount_cents=inv["amount_cents"],
+        title=inv["title"],
         customer_email=client["email"] if client and client["email"] else None,
         metadata={"invoice_id": str(inv["id"])},
         success_url=success,
-        cancel_url=f"{config.BASE_URL}/i/{slug}",
+        cancel_url=f"{base}/i/{slug}",
+        existing_session_id=inv.get("stripe_session_id"),
     )
     db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, inv["id"]))
     log.info("invoice %s checkout %s", inv["id"], session.id)

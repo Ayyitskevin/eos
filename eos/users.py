@@ -72,6 +72,19 @@ def create_user(
     if role not in ("owner", "operator", "scheduler", "editor", "accountant"):
         raise HTTPException(status_code=400, detail="invalid role")
     sid = studio_id or str(STUDIO_ID)
+    from . import plan_limits, usage
+
+    if sid == str(STUDIO_ID):
+        plan_limits.check_team_seat(current_count=usage.team_member_count())
+    else:
+        from . import tenant
+
+        prev = tenant.get_studio_id()
+        tenant.set_studio(sid)
+        try:
+            plan_limits.check_team_seat(current_count=usage.team_member_count(studio_id=sid))
+        finally:
+            tenant.set_studio(prev)
     uid = db.run(
         """INSERT INTO users (studio_id, email, password_hash, name, role)
            VALUES (?,?,?,?,?)""",

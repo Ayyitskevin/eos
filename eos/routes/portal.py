@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import brokerage_portal as bp
-from .. import config, portal, reschedule, scheduling, studio
+from .. import portal, reschedule, scheduling, stripe_checkout, studio, tenant
 from ..render import templates
 
 router = APIRouter()
@@ -23,8 +23,8 @@ async def agent_portal(request: Request, token: str):
             "deliveries": rows,
             "upcoming": upcoming,
             "portal_token": token,
-            "base_url": config.BASE_URL,
-            "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "base_url": tenant.get_base_url(),
+            "payments_on": stripe_checkout.payments_configured(),
             "upsell": studio.delivery_upsell(),
             "rescheduled": request.query_params.get("rescheduled"),
         },
@@ -79,6 +79,6 @@ async def brokerage_portal_view(request: Request, token: str):
             "totals": data["totals"],
             "statement_rows": data["statement_rows"],
             "deliveries": data["deliveries"],
-            "base_url": config.BASE_URL,
+            "base_url": tenant.get_base_url(),
         },
     )

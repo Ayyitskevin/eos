@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, upsell
+from .. import db, stripe_checkout, upsell
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -25,7 +25,7 @@ async def upsell_confirm(request: Request, token: str):
         "public/upsell.html",
         {
             "order": row,
-            "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "payments_on": stripe_checkout.payments_configured(),
         },
     )
 

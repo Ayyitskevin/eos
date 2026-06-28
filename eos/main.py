@@ -76,6 +76,9 @@ from .routes import (
     platform_billing as platform_billing_routes,
 )
 from .routes import (
+    stripe_connect as stripe_connect_routes,
+)
+from .routes import (
     portal as portal_routes,
 )
 from .routes import (
@@ -221,6 +224,7 @@ for r in (
     upsell_routes.router,
     onboarding_routes.router,
     platform_admin_routes.router,
+    stripe_connect_routes.router,
     demo_routes.router,
     oauth_admin_routes.router,
     site.router,

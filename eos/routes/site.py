@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import commerce, config, scheduling, security, studio
+from .. import commerce, config, scheduling, security, stripe_checkout, studio, tenant
 from ..render import templates
 
 router = APIRouter()
@@ -27,7 +27,7 @@ def _book_context(error: str | None = None, thanks: bool = False):
         "day_slots": day_slots,
         "twilight_slots": twilight_only,
         "terms": commerce.BOOKING_TERMS.format(site_name=config.SITE_NAME),
-        "payments_on": bool(config.STRIPE_SECRET_KEY),
+        "payments_on": stripe_checkout.payments_configured(),
         "error": error,
         "thanks": thanks,
     }
@@ -35,6 +35,15 @@ def _book_context(error: str | None = None, thanks: bool = False):
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    if config.SAAS_MODE and tenant.get_studio_id() == "default":
+        return templates.TemplateResponse(
+            request,
+            "site/marketing.html",
+            {
+                "signup_enabled": config.SIGNUP_ENABLED,
+                "base_domain": config.BASE_DOMAIN,
+            },
+        )
     profile = studio.get_profile()
     packages = studio.list_packages(active_only=True)
     return templates.TemplateResponse(
@@ -107,7 +116,7 @@ async def book_submit(
             status_code=e.status_code,
         )
 
-    if result["pay_slug"] and config.STRIPE_SECRET_KEY:
+    if result["pay_slug"] and stripe_checkout.payments_configured():
         return RedirectResponse(f"/i/{result['pay_slug']}", status_code=303)
     return RedirectResponse(f"/booking/{result['order_token']}", status_code=303)
 
@@ -165,6 +174,6 @@ async def book_homeowner_submit(
             _book_context(error=detail),
             status_code=e.status_code,
         )
-    if result["pay_slug"] and config.STRIPE_SECRET_KEY:
+    if result["pay_slug"] and stripe_checkout.payments_configured():
         return RedirectResponse(f"/i/{result['pay_slug']}", status_code=303)
     return RedirectResponse(f"/booking/{result['order_token']}", status_code=303)

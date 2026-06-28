@@ -3,23 +3,70 @@
 {% block content %}
 <main class="admin-main">
   <h1>Platform studios</h1>
+
+  {% if stats %}
+  <p class="muted small">
+    Active: {{ stats.active_studios }} · Trialing: {{ stats.trialing }} · Paid: {{ stats.paid }} · Listings: {{ stats.total_listings }}
+  </p>
+  {% endif %}
+
   {% if impersonating %}
   <p class="warn">Impersonating <strong>{{ impersonating }}</strong> (viewing as {{ current_studio }})</p>
   <form method="post" action="/admin/platform/impersonate/clear"><button type="submit" class="btn secondary">Stop impersonating</button></form>
   {% endif %}
+
   <table class="data-table">
-    <thead><tr><th>Studio</th><th>Plan</th><th>Listings</th><th>Users</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th>Studio</th>
+        <th>Plan</th>
+        <th>Usage</th>
+        <th>Payments</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
     <tbody>
     {% for s in studios %}
-    <tr>
-      <td><strong>{{ s.name }}</strong><br><span class="muted">{{ s.slug or s.id }}{% if s.is_demo %} · demo{% endif %}</span></td>
-      <td>{{ s.plan_tier }} / {{ s.billing_status }}</td>
-      <td>{{ s.n_listings }}</td>
-      <td>{{ s.n_users }}</td>
+    <tr class="{% if not s.active %}muted{% endif %}">
       <td>
-        {% if s.id != current_studio or impersonating %}
-        <form method="post" action="/admin/platform/impersonate"><input type="hidden" name="studio_id" value="{{ s.id }}"><button type="submit" class="btn small">View as</button></form>
+        <strong>{{ s.name }}</strong><br>
+        <span class="muted small">{{ s.slug or s.id }}{% if s.is_demo %} · demo{% endif %}{% if not s.active %} · suspended{% endif %}</span>
+        {% if s.custom_domain %}<br><span class="small">{{ s.custom_domain }}{% if s.custom_domain_verified %} ✓{% endif %}</span>{% endif %}
+      </td>
+      <td>{{ s.plan_tier }} / {{ s.billing_status }}</td>
+      <td class="small">{{ s.n_listings }} listings · {{ s.n_users }} users · {{ s.storage_gb }} GB</td>
+      <td>{% if s.stripe_connect_charges_enabled %}Connect{% else %}—{% endif %}</td>
+      <td class="action-cell">
+        {% if s.active and (s.id != current_studio or impersonating) %}
+        <form method="post" action="/admin/platform/impersonate" class="inline-form">
+          <input type="hidden" name="studio_id" value="{{ s.id }}">
+          <button type="submit" class="btn small">View as</button>
+        </form>
         {% endif %}
+        {% if s.active and not s.is_demo %}
+        <form method="post" action="/admin/platform/studios/{{ s.id }}/suspend" class="inline-form">
+          <button type="submit" class="link small">Suspend</button>
+        </form>
+        {% elif not s.active %}
+        <form method="post" action="/admin/platform/studios/{{ s.id }}/reactivate" class="inline-form">
+          <button type="submit" class="btn small secondary">Reactivate</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/admin/platform/studios/{{ s.id }}/plan" class="inline-form stack">
+          <select name="plan_tier">
+            <option value="trial" {% if s.plan_tier == 'trial' %}selected{% endif %}>trial</option>
+            <option value="starter" {% if s.plan_tier == 'starter' %}selected{% endif %}>starter</option>
+            <option value="pro" {% if s.plan_tier == 'pro' %}selected{% endif %}>pro</option>
+          </select>
+          <select name="billing_status">
+            <option value="">—</option>
+            <option value="trialing" {% if s.billing_status == 'trialing' %}selected{% endif %}>trialing</option>
+            <option value="active" {% if s.billing_status == 'active' %}selected{% endif %}>active</option>
+            <option value="past_due" {% if s.billing_status == 'past_due' %}selected{% endif %}>past_due</option>
+            <option value="canceled" {% if s.billing_status == 'canceled' %}selected{% endif %}>canceled</option>
+          </select>
+          <button type="submit" class="btn small">Set plan</button>
+        </form>
       </td>
     </tr>
     {% endfor %}

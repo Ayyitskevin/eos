@@ -6,7 +6,7 @@ import stripe
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, plan_limits, platform_billing, security, usage
+from .. import config, plan_limits, platform_billing, security, stripe_connect, usage
 from ..render import templates
 
 log = logging.getLogger("eos.routes.platform_billing")
@@ -61,6 +61,9 @@ async def platform_webhook(request: Request):
         )
     except Exception:
         raise HTTPException(status_code=400)
-    platform_billing.handle_webhook_event(event)
+    if event["type"] == "account.updated":
+        stripe_connect.handle_account_updated(event["data"]["object"])
+    else:
+        platform_billing.handle_webhook_event(event)
     log.info("platform webhook %s", event["type"])
     return {"ok": True}

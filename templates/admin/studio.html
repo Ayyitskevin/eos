@@ -42,20 +42,42 @@
     <button type="submit">Save</button>
   </form>
 
-  <form method="post" action="/admin/studio/domain" class="card form-grid compact">
+  <form method="post" action="/admin/studio/domain" class="card form-grid compact" id="domain">
     <h2>Custom domain (Pro)</h2>
-    <p class="muted small">Point a CNAME to this server, then enter your hostname. Requests resolve to this studio when verified.</p>
+    <p class="muted small">Save your hostname, add DNS, then verify. Requests resolve only after verification.</p>
     <label>Hostname <input name="custom_domain" value="{{ studio.custom_domain or '' }}" placeholder="photos.yourstudio.com"></label>
     {% if studio.custom_domain_verified and studio.custom_domain %}
     <p class="ok small">Verified — {{ studio.custom_domain }}</p>
+    {% elif studio.custom_domain and domain_instructions %}
+    <p class="warn small">Pending verification:</p>
+    <ul class="small muted">
+      <li>CNAME <code>{{ domain_instructions.cname_host }}</code> → <code>{{ domain_instructions.cname_target }}</code></li>
+      <li>or TXT <code>{{ domain_instructions.txt_host }}</code> → <code>{{ domain_instructions.txt_value }}</code></li>
+    </ul>
+    <button type="submit" formaction="/admin/studio/domain/verify" class="btn secondary">Check DNS &amp; verify</button>
     {% endif %}
     <button type="submit">Save domain</button>
   </form>
+
+  <section class="card compact">
+    <h2>Client payments</h2>
+    <p class="small muted">Stripe Connect — deposits, invoices, and upsells go to your account.</p>
+    {% if payments.charges_enabled %}
+    <p class="ok small">Connected and accepting payments.</p>
+    {% elif payments.connected %}
+    <p class="warn small">Onboarding incomplete.</p>
+    {% else %}
+    <p class="muted small">Not connected yet.</p>
+    {% endif %}
+    <a href="/admin/stripe/connect" class="btn small">Payment settings</a>
+  </section>
 
   {% if usage %}
   <section class="card compact">
     <h2>Plan usage ({{ usage.period }})</h2>
     <p class="small">Listings: {{ usage.listings_created }}{% if usage.listings_cap %} / {{ usage.listings_cap }}{% endif %}
+      · Storage: {{ usage.storage_gb }} GB{% if usage.storage_cap_gb %} / {{ usage.storage_cap_gb }}{% endif %}
+      · Team: {{ usage.team_count }}{% if usage.team_seats %} / {{ usage.team_seats }}{% endif %}
       · API calls: {{ usage.api_calls }}</p>
   </section>
   {% endif %}

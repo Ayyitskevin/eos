@@ -2,6 +2,15 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## 1.6.0 — Phase 16 (SaaS pivot)
+
+- Stripe Connect — per-tenant client payments (deposits, invoices, upsells)
+- DNS custom domain verification (CNAME or TXT) before routing
+- Platform admin v2 — suspend/reactivate, plan override, usage stats, audit log
+- Per-tenant storage metering with plan caps; team seat limits
+- SaaS marketing landing on apex; signup copy updated for hosted platform
+- Inactive studio subdomain returns 403 on public routes
+
 ## 1.5.0 — Phase 15 (low priority + ops)
 
 - Drive-time aware scheduling with geocoding

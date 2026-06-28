@@ -3,10 +3,9 @@
 import json
 import logging
 
-import stripe
 from fastapi import HTTPException
 
-from . import config, db, invoices, security
+from . import db, invoices, security, stripe_checkout, tenant
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.upsell")
@@ -88,41 +87,22 @@ def checkout_url(order_token: str) -> str:
     if not row["invoice_id"]:
         raise HTTPException(status_code=400, detail="invoice missing")
     inv = invoices.get_invoice(row["invoice_id"])
+    base = tenant.get_base_url()
     if inv["status"] == "paid":
-        return f"{config.BASE_URL}/i/{inv['slug']}?thanks=1"
-    if not config.STRIPE_SECRET_KEY:
-        return f"{config.BASE_URL}/i/{inv['slug']}"
-    if inv.get("stripe_session_id"):
-        try:
-            session = stripe.checkout.Session.retrieve(
-                inv["stripe_session_id"],
-                api_key=config.STRIPE_SECRET_KEY,
-            )
-            if session.url:
-                return session.url
-        except Exception:
-            pass
+        return f"{base}/i/{inv['slug']}?thanks=1"
+    if not stripe_checkout.payments_configured():
+        return f"{base}/i/{inv['slug']}"
     client = None
     if inv["client_id"]:
         client = db.one("SELECT email FROM clients WHERE id=?", (inv["client_id"],))
-    session = stripe.checkout.Session.create(
-        api_key=config.STRIPE_SECRET_KEY,
-        mode="payment",
-        payment_method_types=["card"],
-        line_items=[
-            {
-                "quantity": 1,
-                "price_data": {
-                    "currency": "usd",
-                    "unit_amount": inv["amount_cents"],
-                    "product_data": {"name": inv["title"]},
-                },
-            }
-        ],
+    session = stripe_checkout.create_payment_session(
+        amount_cents=inv["amount_cents"],
+        title=inv["title"],
         customer_email=client["email"] if client and client["email"] else None,
         metadata={"invoice_id": str(inv["id"]), "upsell_order_id": str(row["id"])},
-        success_url=f"{config.BASE_URL}/i/{inv['slug']}?thanks=1",
-        cancel_url=f"{config.BASE_URL}/upsell/{order_token}",
+        success_url=f"{base}/i/{inv['slug']}?thanks=1",
+        cancel_url=f"{base}/upsell/{order_token}",
+        existing_session_id=inv.get("stripe_session_id"),
     )
     db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, inv["id"]))
     db.run(
