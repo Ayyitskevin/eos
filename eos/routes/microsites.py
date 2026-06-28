@@ -32,7 +32,8 @@ async def listing_site(request: Request, slug: str):
     kit = marketing_kit.get_status(listing["id"])
     upsell = studio.delivery_upsell() if listing["status"] == "delivered" else None
     return templates.TemplateResponse(
-        request, "public/listing_site.html",
+        request,
+        "public/listing_site.html",
         {
             **ctx,
             "kit": kit,
@@ -63,7 +64,8 @@ async def listing_inquire(
     email = email.strip().lower()
     if not _EMAIL.match(email):
         return templates.TemplateResponse(
-            request, "public/listing_site.html",
+            request,
+            "public/listing_site.html",
             {
                 **microsites.site_context(listing),
                 "kit": marketing_kit.get_status(listing["id"]),
@@ -104,13 +106,16 @@ async def listing_hero(slug: str):
     if not asset:
         raise HTTPException(status_code=404)
     from .. import media_paths
+
     base = media_paths.gallery_dir(gal["id"])
     path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
         path = base / "original" / asset["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+    return FileResponse(
+        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"}
+    )
 
 
 @router.get("/l/{slug}/photo/{asset_id}")
@@ -126,11 +131,14 @@ async def listing_photo(slug: str, asset_id: int):
     if not asset:
         raise HTTPException(status_code=404)
     from .. import media_paths
+
     base = media_paths.gallery_dir(gal["id"])
     path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+    return FileResponse(
+        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"}
+    )
 
 
 @router.get("/l/{slug}/download/{kind}")
@@ -142,7 +150,9 @@ async def listing_bundle(request: Request, slug: str, kind: str):
         inv_slug = paywall.unpaid_invoice_slug(listing["id"])
         raise HTTPException(
             status_code=402,
-            detail=f"payment required — pay invoice at /i/{inv_slug}" if inv_slug else "payment required",
+            detail=f"payment required — pay invoice at /i/{inv_slug}"
+            if inv_slug
+            else "payment required",
         )
     path = bundles.get_ready_bundle(listing["id"], kind)
     if not path:
@@ -151,11 +161,14 @@ async def listing_bundle(request: Request, slug: str, kind: str):
             bundles.ensure_exports(gal["id"])
         bundles.enqueue_bundle(listing["id"], kind)
         return templates.TemplateResponse(
-            request, "public/zip_wait.html",
+            request,
+            "public/zip_wait.html",
             {"g": {"title": listing["title"], "slug": slug}, "return_url": f"/l/{slug}"},
         )
     label = {"mls": "MLS", "zillow": "Zillow", "fullres": "Full-Res"}[kind]
-    return FileResponse(path, filename=f"{listing['title']}-{label}.zip", media_type="application/zip")
+    return FileResponse(
+        path, filename=f"{listing['title']}-{label}.zip", media_type="application/zip"
+    )
 
 
 @router.get("/l/{slug}/marketing/{kind}")
@@ -165,7 +178,9 @@ async def listing_marketing_asset(slug: str, kind: str):
         inv_slug = paywall.unpaid_invoice_slug(listing["id"])
         raise HTTPException(
             status_code=402,
-            detail=f"payment required — pay invoice at /i/{inv_slug}" if inv_slug else "payment required",
+            detail=f"payment required — pay invoice at /i/{inv_slug}"
+            if inv_slug
+            else "payment required",
         )
     path = marketing_kit.asset_path(listing["id"], kind)
     if not path:

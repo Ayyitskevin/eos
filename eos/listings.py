@@ -4,7 +4,7 @@ import datetime as dt
 
 from fastapi import HTTPException
 
-from . import config, db, security, studio
+from . import config, db, studio
 from .vocab import (
     DEFAULT_LISTING_TASKS,
     DEFAULT_SHOT_LIST,
@@ -96,11 +96,23 @@ def create_listing(
             beds, baths, sqft, shoot_date, due_at, access_notes, notes)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, client_id, title.strip(), property_type,
-            address_line1.strip(), address_line2.strip(),
-            city.strip(), state.strip(), zip_code.strip(), mls_id.strip(),
-            beds, baths, sqft, shoot_date, due_at or _default_due_at(),
-            access_notes.strip(), notes.strip(),
+            STUDIO_ID,
+            client_id,
+            title.strip(),
+            property_type,
+            address_line1.strip(),
+            address_line2.strip(),
+            city.strip(),
+            state.strip(),
+            zip_code.strip(),
+            mls_id.strip(),
+            beds,
+            baths,
+            sqft,
+            shoot_date,
+            due_at or _default_due_at(),
+            access_notes.strip(),
+            notes.strip(),
         ),
     )
     if seed_defaults:
@@ -120,6 +132,7 @@ def create_listing(
     db.audit("admin", "listing.create", f"id={lid} title={title.strip()}")
     try:
         from . import drive_time
+
         if studio.get_profile()["drive_time_enabled"]:
             drive_time.geocode_listing(lid)
     except Exception:
@@ -130,10 +143,27 @@ def create_listing(
 def update_listing(listing_id: int, **fields) -> None:
     old = get_listing(listing_id)
     allowed = {
-        "client_id", "title", "status", "property_type",
-        "address_line1", "address_line2", "city", "state", "zip", "mls_id",
-        "beds", "baths", "sqft", "shoot_date", "due_at", "access_notes", "notes",
-        "assigned_user_id", "revision_round", "revision_notes", "photographer_pay_cents",
+        "client_id",
+        "title",
+        "status",
+        "property_type",
+        "address_line1",
+        "address_line2",
+        "city",
+        "state",
+        "zip",
+        "mls_id",
+        "beds",
+        "baths",
+        "sqft",
+        "shoot_date",
+        "due_at",
+        "access_notes",
+        "notes",
+        "assigned_user_id",
+        "revision_round",
+        "revision_notes",
+        "photographer_pay_cents",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -151,6 +181,7 @@ def update_listing(listing_id: int, **fields) -> None:
     new_status = fields.get("status")
     if new_status and new_status != old["status"]:
         from . import automations
+
         if new_status == "booked":
             automations.on_listing_booked(listing_id)
         elif new_status == "delivered":
@@ -215,7 +246,9 @@ def request_revision(listing_id: int, *, notes: str = "") -> None:
         revision_round=(row["revision_round"] or 0) + 1,
         revision_notes=notes.strip(),
     )
-    db.audit("admin", "listing.revision", f"id={listing_id} round={(row['revision_round'] or 0) + 1}")
+    db.audit(
+        "admin", "listing.revision", f"id={listing_id} round={(row['revision_round'] or 0) + 1}"
+    )
 
 
 def complete_revision(listing_id: int) -> None:

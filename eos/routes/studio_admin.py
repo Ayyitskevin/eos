@@ -1,10 +1,23 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import api_tokens, config, db, integration_events, plan_limits, platform_billing, referrals, security, studio, usage, users, webhooks
-from ..vocab import STUDIO_ID
+from .. import (
+    api_tokens,
+    config,
+    db,
+    integration_events,
+    plan_limits,
+    platform_billing,
+    referrals,
+    security,
+    studio,
+    usage,
+    users,
+    webhooks,
+)
 from ..integrations import dropbox, google_calendar
 from ..render import templates
+from ..vocab import STUDIO_ID
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
 
@@ -12,7 +25,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/studio", response_class=HTMLResponse)
 async def studio_settings(request: Request):
     return templates.TemplateResponse(
-        request, "admin/studio.html",
+        request,
+        "admin/studio.html",
         {
             "studio": studio.get_studio(),
             "profile": studio.get_profile(),
@@ -42,7 +56,9 @@ async def studio_settings(request: Request):
                 """SELECT * FROM dropbox_ingest_log WHERE studio_id=?
                    ORDER BY created_at DESC LIMIT 15""",
                 (str(STUDIO_ID),),
-            ) if dropbox.is_connected() else [],
+            )
+            if dropbox.is_connected()
+            else [],
         },
     )
 
@@ -87,18 +103,28 @@ async def studio_update(
 ):
     studio.update_studio(name=name, contact_email=contact_email)
     studio.update_profile(
-        headline=headline, about=about, service_area=service_area, published=published,
-        booking_enabled=booking_enabled, min_notice_hours=min_notice_hours,
-        buffer_minutes=buffer_minutes, slot_minutes=slot_minutes,
-        day_start_min=day_start_min, day_end_min=day_end_min,
+        headline=headline,
+        about=about,
+        service_area=service_area,
+        published=published,
+        booking_enabled=booking_enabled,
+        min_notice_hours=min_notice_hours,
+        buffer_minutes=buffer_minutes,
+        slot_minutes=slot_minutes,
+        day_start_min=day_start_min,
+        day_end_min=day_end_min,
         book_weekdays=book_weekdays.strip(),
-        pay_to_download=pay_to_download, watermark_until_paid=watermark_until_paid,
-        auto_deliver_email=auto_deliver_email, auto_publish_site=auto_publish_site,
-        twilight_start_min=twilight_start_min, twilight_end_min=twilight_end_min,
+        pay_to_download=pay_to_download,
+        watermark_until_paid=watermark_until_paid,
+        auto_deliver_email=auto_deliver_email,
+        auto_publish_site=auto_publish_site,
+        twilight_start_min=twilight_start_min,
+        twilight_end_min=twilight_end_min,
         delivery_upsell_title=delivery_upsell_title.strip(),
         delivery_upsell_body=delivery_upsell_body.strip(),
         delivery_upsell_link=delivery_upsell_link.strip() or "/book",
-        drive_time_enabled=drive_time_enabled, drive_buffer_min=drive_buffer_min,
+        drive_time_enabled=drive_time_enabled,
+        drive_buffer_min=drive_buffer_min,
     )
     return RedirectResponse("/admin/studio", status_code=303)
 
@@ -109,7 +135,9 @@ async def studio_domain(custom_domain: str = Form("")):
     if domain:
         plan_limits.check_custom_domain()
         if "://" in domain or "/" in domain:
-            raise HTTPException(status_code=400, detail="Enter hostname only, e.g. photos.yourstudio.com")
+            raise HTTPException(
+                status_code=400, detail="Enter hostname only, e.g. photos.yourstudio.com"
+            )
     studio.update_studio(
         custom_domain=domain or None,
         custom_domain_verified=1 if domain else 0,

@@ -2,9 +2,6 @@
 
 import importlib
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.commerce as commerce
 import eos.config as config
 import eos.db as db
@@ -16,6 +13,8 @@ import eos.monitoring as monitoring
 import eos.platform_admin as platform_admin
 import eos.reports_export as reports_export
 import eos.tenant as tenant
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -25,7 +24,19 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EOS_ADMIN_PASSWORD", "test-admin-pass")
     monkeypatch.setenv("EOS_DEMO_ENABLED", "true")
     monkeypatch.setenv("EOS_PLATFORM_ADMIN_EMAILS", "admin@test.com")
-    for mod in (config, db, jobs, tenant, demo_sandbox, drive_time, monitoring, platform_admin, commerce, reports_export, main):
+    for mod in (
+        config,
+        db,
+        jobs,
+        tenant,
+        demo_sandbox,
+        drive_time,
+        monitoring,
+        platform_admin,
+        commerce,
+        reports_export,
+        main,
+    ):
         importlib.reload(mod)
     config.ensure_dirs()
     db.migrate()

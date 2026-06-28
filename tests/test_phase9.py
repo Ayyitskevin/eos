@@ -2,9 +2,6 @@
 
 import importlib
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.brokerage as brokerage
 import eos.config as config
 import eos.db as db
@@ -13,6 +10,8 @@ import eos.jobs as jobs
 import eos.listings as listings
 import eos.main as main
 import eos.reports as reports
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -31,7 +30,9 @@ def app_env(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_reports_dashboard_shows_revenue(app_env):
-    lid = db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Rev Test', 'delivered')")
+    lid = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Rev Test', 'delivered')"
+    )
     db.run(
         """INSERT INTO invoices (studio_id, listing_id, slug, title, amount_cents, status, paid_at)
            VALUES ('default', ?, 'revslug', 'Paid', 25000, 'paid', datetime('now'))""",
@@ -40,7 +41,9 @@ async def test_reports_dashboard_shows_revenue(app_env):
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        login = await client.post("/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False)
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
         cookie = login.headers["set-cookie"]
         r = await client.get("/admin/reports", headers={"cookie": cookie})
         assert r.status_code == 200
@@ -50,12 +53,18 @@ async def test_reports_dashboard_shows_revenue(app_env):
 
 @pytest.mark.asyncio
 async def test_kanban_lists_pipeline_columns(app_env):
-    db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Kanban Lead', 'lead')")
-    db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Kanban Booked', 'booked')")
+    db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Kanban Lead', 'lead')"
+    )
+    db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Kanban Booked', 'booked')"
+    )
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        login = await client.post("/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False)
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
         cookie = login.headers["set-cookie"]
         r = await client.get("/admin/kanban", headers={"cookie": cookie})
         assert r.status_code == 200
@@ -88,13 +97,19 @@ def test_brokerage_invoice_bill_to_parent(app_env):
 
 @pytest.mark.asyncio
 async def test_listing_advance_via_kanban(app_env):
-    lid = db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Advance Me', 'lead')")
+    lid = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Advance Me', 'lead')"
+    )
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        login = await client.post("/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False)
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
         cookie = login.headers["set-cookie"]
-        r = await client.post(f"/admin/listings/{lid}/advance", headers={"cookie": cookie}, follow_redirects=False)
+        r = await client.post(
+            f"/admin/listings/{lid}/advance", headers={"cookie": cookie}, follow_redirects=False
+        )
         assert r.status_code == 303
     row = listings.get_listing(lid)
     assert row["status"] == "booked"

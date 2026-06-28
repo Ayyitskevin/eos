@@ -26,7 +26,9 @@ def _signer() -> URLSafeTimedSerializer:
 
 
 def is_configured() -> bool:
-    return bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET and config.GOOGLE_REDIRECT_URI)
+    return bool(
+        config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET and config.GOOGLE_REDIRECT_URI
+    )
 
 
 def is_connected() -> bool:
@@ -58,6 +60,7 @@ def handle_callback(*, code: str, state: str) -> None:
     except BadSignature as e:
         raise ValueError("Invalid OAuth state") from e
     from .. import tenant
+
     tenant.set_studio(payload["studio_id"])
     data = oauth_store.exchange_code(
         token_url=TOKEN_URL,
@@ -238,8 +241,15 @@ def pull_changes() -> int:
                         google_event_id, google_synced_at, external_source)
                        VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),'google')""",
                     (
-                        STUDIO_ID, title, "other", "confirmed", starts_at, ends_at,
-                        ev.get("location") or "", security.new_token(), eid,
+                        STUDIO_ID,
+                        title,
+                        "other",
+                        "confirmed",
+                        starts_at,
+                        ends_at,
+                        ev.get("location") or "",
+                        security.new_token(),
+                        eid,
                     ),
                 )
                 imported += 1
@@ -280,7 +290,9 @@ def busy_ranges(*, days: int = 14) -> list[tuple[dt.datetime, dt.datetime]]:
         cal = resp.json().get("calendars", {}).get(_calendar_id(), {})
         ranges: list[tuple[dt.datetime, dt.datetime]] = []
         for block in cal.get("busy", []):
-            b0 = dt.datetime.fromisoformat(block["start"].replace("Z", "+00:00")).replace(tzinfo=None)
+            b0 = dt.datetime.fromisoformat(block["start"].replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
             b1 = dt.datetime.fromisoformat(block["end"].replace("Z", "+00:00")).replace(tzinfo=None)
             ranges.append((b0, b1))
         return ranges
@@ -291,7 +303,9 @@ def busy_ranges(*, days: int = 14) -> list[tuple[dt.datetime, dt.datetime]]:
 
 def enqueue_push(appt_id: int) -> None:
     if is_enabled():
-        jobs.enqueue("google_calendar_push", {"studio_id": str(STUDIO_ID), "appointment_id": appt_id})
+        jobs.enqueue(
+            "google_calendar_push", {"studio_id": str(STUDIO_ID), "appointment_id": appt_id}
+        )
 
 
 def sweep_all() -> int:
@@ -303,6 +317,7 @@ def sweep_all() -> int:
         (PROVIDER,),
     )
     from .. import tenant
+
     for row in rows:
         tenant.set_studio(row["studio_id"])
         total += pull_changes()

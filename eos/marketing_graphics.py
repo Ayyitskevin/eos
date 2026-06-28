@@ -33,7 +33,12 @@ def _draw_caption(img: Image.Image, *, headline: str, subline: str) -> Image.Ima
     sub_font = _load_font(max(20, w // 32))
     draw.text((48, h - bar_h + 28), headline, fill=(255, 255, 255, 255), font=title_font)
     if subline:
-        draw.text((48, h - bar_h + 28 + title_font.size + 12), subline, fill=(228, 232, 240, 255), font=sub_font)
+        draw.text(
+            (48, h - bar_h + 28 + title_font.size + 12),
+            subline,
+            fill=(228, 232, 240, 255),
+            font=sub_font,
+        )
     return out.convert("RGB")
 
 

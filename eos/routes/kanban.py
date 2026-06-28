@@ -13,7 +13,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/kanban", response_class=HTMLResponse)
 async def kanban_board(request: Request):
     return templates.TemplateResponse(
-        request, "admin/kanban.html",
+        request,
+        "admin/kanban.html",
         {
             "board": listings.kanban_board(),
             "statuses": [s for s in LISTING_STATUSES if s != "archived"],

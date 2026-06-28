@@ -8,6 +8,7 @@ from PIL import Image, ImageCms, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 try:
     import pillow_heif
+
     pillow_heif.register_heif_opener()
 except ImportError:  # pragma: no cover
     pass
@@ -20,9 +21,15 @@ VIDEO_EXTS = {".mp4", ".mov", ".webm", ".m4v"}
 _SRGB = ImageCms.createProfile("sRGB")
 
 _ANCHORS = {
-    "tl": (0.0, 0.0), "tc": (0.5, 0.0), "tr": (1.0, 0.0),
-    "ml": (0.0, 0.5), "c": (0.5, 0.5), "mr": (1.0, 0.5),
-    "bl": (0.0, 1.0), "bc": (0.5, 1.0), "br": (1.0, 1.0),
+    "tl": (0.0, 0.0),
+    "tc": (0.5, 0.0),
+    "tr": (1.0, 0.0),
+    "ml": (0.0, 0.5),
+    "c": (0.5, 0.5),
+    "mr": (1.0, 0.5),
+    "bl": (0.0, 1.0),
+    "bc": (0.5, 1.0),
+    "br": (1.0, 1.0),
 }
 
 
@@ -72,11 +79,14 @@ def _apply_overlay(crop: Image.Image, overlay: dict) -> Image.Image:
     return base.convert("RGB")
 
 
-def _save_jpeg_with_metadata(img: Image.Image, path, *, quality: int, metadata: dict | None) -> None:
+def _save_jpeg_with_metadata(
+    img: Image.Image, path, *, quality: int, metadata: dict | None
+) -> None:
     exif_bytes = b""
     if metadata:
         try:
             import piexif
+
             desc = (metadata.get("description") or "")[:2000]
             artist = (metadata.get("artist") or "")[:200]
             copyright_ = (metadata.get("copyright") or "")[:200]
@@ -116,16 +126,24 @@ def listing_export_metadata(listing_row, *, site_name: str = "") -> dict | None:
     }
 
 
-def make_crops(src_path: str, out_dir, stem: str, quality: int,
-               presets, overlay: dict | None = None,
-               metadata: dict | None = None) -> list[str]:
+def make_crops(
+    src_path: str,
+    out_dir,
+    stem: str,
+    quality: int,
+    presets,
+    overlay: dict | None = None,
+    metadata: dict | None = None,
+) -> list[str]:
     written = []
     with Image.open(src_path) as im:
         im = ImageOps.exif_transpose(im)
         im = _to_srgb(im)
         for ps in presets:
             crop = ImageOps.fit(
-                im, (ps["width"], ps["height"]), Image.LANCZOS,
+                im,
+                (ps["width"], ps["height"]),
+                Image.LANCZOS,
                 centering=(ps["centering_x"], ps["centering_y"]),
             )
             if ps["brand_overlay"] and overlay:
@@ -136,8 +154,9 @@ def make_crops(src_path: str, out_dir, stem: str, quality: int,
     return written
 
 
-def make_derivatives(src_path: str, web_path: str, thumb_path: str,
-                     web_max: int, thumb_max: int, quality: int) -> tuple[int, int]:
+def make_derivatives(
+    src_path: str, web_path: str, thumb_path: str, web_max: int, thumb_max: int, quality: int
+) -> tuple[int, int]:
     with Image.open(src_path) as im:
         im = ImageOps.exif_transpose(im)
         w, h = im.size
@@ -162,7 +181,9 @@ def apply_preview_watermark(path: Path, text: str = "PREVIEW") -> bytes:
         w, h = im.size
         font_size = max(18, min(w, h) // 12)
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
+            )
         except OSError:
             font = ImageFont.load_default()
         bbox = draw.textbbox((0, 0), text, font=font)

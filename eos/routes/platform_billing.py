@@ -16,7 +16,8 @@ router = APIRouter()
 @router.get("/admin/billing", response_class=HTMLResponse)
 async def billing_page(request: Request, _: None = Depends(security.require_admin)):
     return templates.TemplateResponse(
-        request, "admin/billing.html",
+        request,
+        "admin/billing.html",
         {
             "billing": platform_billing.studio_billing(),
             "plans": platform_billing.PLANS,
@@ -54,7 +55,9 @@ async def platform_webhook(request: Request):
     sig = request.headers.get("stripe-signature", "")
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig, config.STRIPE_PLATFORM_WEBHOOK_SECRET,
+            payload,
+            sig,
+            config.STRIPE_PLATFORM_WEBHOOK_SECRET,
         )
     except Exception:
         raise HTTPException(status_code=400)

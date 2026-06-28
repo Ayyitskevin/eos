@@ -10,6 +10,7 @@ log = logging.getLogger("eos.automations")
 def _trigger(event: str, listing_id: int) -> None:
     try:
         from . import sequences
+
         sequences.trigger(event, listing_id)
     except Exception:
         log.exception("sequence trigger %s failed for listing %s", event, listing_id)
@@ -18,7 +19,10 @@ def _trigger(event: str, listing_id: int) -> None:
 def on_questionnaire_completed(listing_id: int) -> None:
     row = db.one("SELECT status FROM listings WHERE id=?", (listing_id,))
     if row and row["status"] == "booked":
-        db.run("UPDATE listings SET status='shooting', updated_at=datetime('now') WHERE id=?", (listing_id,))
+        db.run(
+            "UPDATE listings SET status='shooting', updated_at=datetime('now') WHERE id=?",
+            (listing_id,),
+        )
         log.info("listing %s auto-advanced booked → shooting (questionnaire)", listing_id)
 
 
@@ -44,6 +48,7 @@ def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
 def on_gallery_published_email(gallery_id: int) -> None:
     try:
         from . import delivery_notify
+
         delivery_notify.maybe_send_gallery_email(gallery_id)
     except Exception:
         log.exception("auto gallery email failed for %s", gallery_id)
@@ -66,6 +71,7 @@ def on_invoice_paid(listing_id: int | None) -> None:
 def _webhook(event: str, listing_id: int, *, extra: dict | None = None) -> None:
     try:
         from . import webhooks
+
         payload = {"listing_id": listing_id}
         if extra:
             payload.update(extra)
@@ -97,6 +103,7 @@ def on_deposit_paid(inquiry_id: int, listing_id: int | None) -> None:
     )
     if prop:
         from . import proposals
+
         proposals.mark_sent(prop["id"])
     else:
         on_listing_booked(listing_id)

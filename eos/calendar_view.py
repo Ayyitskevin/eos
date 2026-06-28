@@ -112,14 +112,16 @@ def busy_blocks(
         for b0, b1 in google_calendar.busy_ranges(days=days):
             if b1.date() < range_start or b0.date() >= range_end:
                 continue
-            blocks.append({
-                "starts_at": b0.strftime("%Y-%m-%d %H:%M:%S"),
-                "ends_at": b1.strftime("%Y-%m-%d %H:%M:%S"),
-                "day": b0.date().isoformat(),
-                "time_label": f"{b0.strftime('%H:%M')}–{b1.strftime('%H:%M')}",
-                "title": "Busy (Google Calendar)",
-                "style": "busy",
-            })
+            blocks.append(
+                {
+                    "starts_at": b0.strftime("%Y-%m-%d %H:%M:%S"),
+                    "ends_at": b1.strftime("%Y-%m-%d %H:%M:%S"),
+                    "day": b0.date().isoformat(),
+                    "time_label": f"{b0.strftime('%H:%M')}–{b1.strftime('%H:%M')}",
+                    "title": "Busy (Google Calendar)",
+                    "style": "busy",
+                }
+            )
     except Exception:
         pass
     return blocks

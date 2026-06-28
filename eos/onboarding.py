@@ -4,8 +4,7 @@ import re
 
 from fastapi import HTTPException
 
-from . import db, security, studio_seed, users
-from . import config
+from . import config, db, studio_seed, users
 
 _SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 _RESERVED = {"www", "admin", "api", "app", "mail", "default", "signup", "static"}
@@ -47,11 +46,17 @@ def create_studio(
     )
     studio_seed.seed_studio(studio_id)
     uid = users.create_user(
-        email, owner_password, name=owner_name or "Owner", role="owner", studio_id=studio_id,
+        email,
+        owner_password,
+        name=owner_name or "Owner",
+        role="owner",
+        studio_id=studio_id,
     )
     from . import platform_billing
+
     platform_billing.provision_new_studio(studio_id, email=email, name=name)
     from . import signup_verify
+
     if config.SIGNUP_ENABLED:
         signup_verify.issue_token(studio_id, email=email)
     db.audit("signup", "studio.create", f"id={studio_id} owner={email}")

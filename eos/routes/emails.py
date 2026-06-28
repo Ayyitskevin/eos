@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse
 
-from .. import config, db, emails, galleries, mailer, security
+from .. import db, galleries, mailer, security
 from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.routes.emails")

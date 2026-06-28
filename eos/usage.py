@@ -1,7 +1,6 @@
 """Per-studio usage metering for plan enforcement and billing UI."""
 
 import datetime as dt
-from pathlib import Path
 
 from . import config, db, plan_limits
 from .vocab import STUDIO_ID

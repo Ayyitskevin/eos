@@ -3,15 +3,14 @@
 import importlib
 from unittest.mock import patch
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
 import eos.main as main
 import eos.sequences as sequences
 import eos.users as users
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -27,6 +26,7 @@ def app_env(tmp_path, monkeypatch):
     config.ensure_dirs()
     db.migrate()
     from eos import bootstrap
+
     importlib.reload(bootstrap)
     bootstrap.maybe_bootstrap()
     jobs.start()

@@ -14,12 +14,15 @@ router = APIRouter(prefix="/admin")
 async def login_form(request: Request):
     has_users = bool(db.one("SELECT 1 AS x FROM users WHERE active=1 LIMIT 1"))
     return templates.TemplateResponse(
-        request, "admin/login.html",
+        request,
+        "admin/login.html",
         {
             "error": None,
             "saas_mode": config.SAAS_MODE or has_users,
             "google_login": admin_oauth.is_configured(),
-            "google_login_url": admin_oauth.login_url(studio_id=tenant.get_studio_id()) if admin_oauth.is_configured() else None,
+            "google_login_url": admin_oauth.login_url(studio_id=tenant.get_studio_id())
+            if admin_oauth.is_configured()
+            else None,
         },
     )
 
@@ -39,7 +42,8 @@ async def login(
     ip = security.client_ip(request)
     if security.pin_locked(ip, security.ADMIN_BUCKET):
         return templates.TemplateResponse(
-            request, "admin/login.html",
+            request,
+            "admin/login.html",
             {"error": "Locked out. Try again later.", "saas_mode": saas_mode},
             status_code=429,
         )
@@ -50,7 +54,8 @@ async def login(
         if not user:
             security.pin_fail(ip, security.ADMIN_BUCKET)
             return templates.TemplateResponse(
-                request, "admin/login.html",
+                request,
+                "admin/login.html",
                 {"error": "Wrong email or password.", "saas_mode": saas_mode},
                 status_code=401,
             )
@@ -58,14 +63,16 @@ async def login(
         if not security.check_admin_password(password):
             security.pin_fail(ip, security.ADMIN_BUCKET)
             return templates.TemplateResponse(
-                request, "admin/login.html",
+                request,
+                "admin/login.html",
                 {"error": "Wrong password.", "saas_mode": saas_mode},
                 status_code=401,
             )
     else:
         security.pin_fail(ip, security.ADMIN_BUCKET)
         return templates.TemplateResponse(
-            request, "admin/login.html",
+            request,
+            "admin/login.html",
             {"error": "Email is required.", "saas_mode": saas_mode},
             status_code=401,
         )
@@ -74,15 +81,20 @@ async def login(
     if user:
         tenant.set_studio(user["studio_id"])
     from .. import onboarding_wizard
+
     dest = "/admin"
     if user and onboarding_wizard.should_redirect() and not onboarding_wizard.status()["done"]:
         dest = "/admin/onboarding"
     resp = RedirectResponse(dest, status_code=303)
     name, value = security.set_session_cookie(user["id"] if user else None)
     resp.set_cookie(
-        name, value,
-        max_age=config.SESSION_MAX_AGE, httponly=True,
-        secure=config.COOKIE_SECURE, samesite="lax", path="/",
+        name,
+        value,
+        max_age=config.SESSION_MAX_AGE,
+        httponly=True,
+        secure=config.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
     )
     security.set_csrf_cookie(resp)
     log.info("admin login from %s (%s)", ip, email or "legacy")

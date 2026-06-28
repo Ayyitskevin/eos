@@ -14,9 +14,11 @@ async def contract_detail(request: Request, contract_id: int):
     client = None
     if listing["client_id"]:
         from .. import db
+
         client = db.one("SELECT * FROM clients WHERE id=?", (listing["client_id"],))
     return templates.TemplateResponse(
-        request, "admin/contract.html",
+        request,
+        "admin/contract.html",
         {
             "d": d,
             "listing": listing,

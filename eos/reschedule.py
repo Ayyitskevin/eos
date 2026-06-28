@@ -29,12 +29,13 @@ def create_hold(*, appointment_id: int, client_id: int, starts_at: str) -> str:
         raise HTTPException(status_code=403)
     if appt.get("external_source") == "google":
         raise HTTPException(status_code=400, detail="Contact studio to reschedule this shoot.")
-    twilight = appt["kind"] == "twilight"
     open_vals = {s["value"] for s in scheduling.reschedule_slots()}
     if starts_at not in open_vals:
         raise HTTPException(status_code=409, detail="That slot is no longer available.")
     token = security.new_token()
-    expires = (dt.datetime.now() + dt.timedelta(minutes=_HOLD_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
+    expires = (dt.datetime.now() + dt.timedelta(minutes=_HOLD_MINUTES)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     db.run("DELETE FROM appointment_holds WHERE appointment_id=?", (appointment_id,))
     db.run(
         """INSERT INTO appointment_holds

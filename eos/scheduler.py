@@ -28,6 +28,7 @@ def _loop() -> None:
             _tick = 0
             try:
                 from . import jobs, sms
+
                 jobs.enqueue("integration_sweep", {})
                 sms.shoot_day_reminders()
             except Exception:

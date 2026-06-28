@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from . import config, db, studio
+from . import db, studio
 from .vocab import STUDIO_ID
 
 
@@ -36,11 +36,13 @@ def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
         ranges.append((start - buf, end + buf))
     try:
         from .integrations import google_calendar
+
         ranges.extend(google_calendar.busy_ranges())
     except Exception:
         pass
     if drive_buf:
         from . import drive_time
+
         today = dt.date.today()
         for offset in range(14):
             day = today + dt.timedelta(days=offset)
@@ -48,7 +50,9 @@ def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
     return ranges
 
 
-def _conflicts(slot_start: dt.datetime, slot_end: dt.datetime, busy: list[tuple[dt.datetime, dt.datetime]]) -> bool:
+def _conflicts(
+    slot_start: dt.datetime, slot_end: dt.datetime, busy: list[tuple[dt.datetime, dt.datetime]]
+) -> bool:
     for b0, b1 in busy:
         if slot_start < b1 and slot_end > b0:
             return True

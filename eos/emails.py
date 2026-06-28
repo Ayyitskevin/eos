@@ -9,7 +9,9 @@ def _first(name: str) -> str:
     return (name or "there").split()[0]
 
 
-def gallery_delivery(*, client_name: str, title: str, link: str, pin: str, expires: str | None) -> tuple[str, str]:
+def gallery_delivery(
+    *, client_name: str, title: str, link: str, pin: str, expires: str | None
+) -> tuple[str, str]:
     subject = f"Your listing photos are ready — {title}"
     body = f"""Hi {_first(client_name)},
 

@@ -73,8 +73,12 @@ def create_proposal(listing_id: int, *, preset: str = "blank") -> int:
            (studio_id, listing_id, slug, title, intro, line_items, total_cents)
            VALUES (?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, security.new_slug(), tpl["title"],
-            tpl.get("intro", ""), json.dumps(tpl["items"]),
+            STUDIO_ID,
+            listing_id,
+            security.new_slug(),
+            tpl["title"],
+            tpl.get("intro", ""),
+            json.dumps(tpl["items"]),
             sum(i["qty"] * i["unit_cents"] for i in tpl["items"]),
         ),
     )
@@ -82,7 +86,9 @@ def create_proposal(listing_id: int, *, preset: str = "blank") -> int:
     return pid
 
 
-def update_proposal(proposal_id: int, *, title: str, intro: str, line_items: str, total_cents: int) -> None:
+def update_proposal(
+    proposal_id: int, *, title: str, intro: str, line_items: str, total_cents: int
+) -> None:
     prop = get_proposal(proposal_id)
     if prop["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent proposals are locked")
@@ -105,6 +111,7 @@ def mark_sent(proposal_id: int) -> None:
         (prop["listing_id"],),
     )
     from . import automations
+
     automations.on_proposal_sent(prop["listing_id"])
     row = db.one("SELECT status FROM listings WHERE id=?", (prop["listing_id"],))
     if row and row["status"] == "booked":
@@ -131,8 +138,10 @@ def accept_by_slug(slug: str) -> None:
         (row["listing_id"],),
     )
     from . import automations
+
     automations.on_listing_booked(row["listing_id"])
     from . import automations
+
     automations.on_listing_booked(row["listing_id"])
 
 

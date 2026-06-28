@@ -55,6 +55,7 @@ def build_bundle(listing_id: int, kind: str) -> Path | None:
     tmp = final.with_suffix(".part")
     src_exports = crops_dir(gal["id"])
     from . import media_paths
+
     src_original = media_paths.gallery_dir(gal["id"]) / "original"
 
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:

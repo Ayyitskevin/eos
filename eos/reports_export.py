@@ -25,7 +25,9 @@ def agents_csv() -> str:
     w = csv.writer(buf)
     w.writerow(["name", "company", "listings", "revenue_cents", "open_cents"])
     for a in reports.top_agents(limit=100):
-        w.writerow([a["name"], a["company"] or "", a["n_listings"], a["revenue_cents"], a["open_cents"]])
+        w.writerow(
+            [a["name"], a["company"] or "", a["n_listings"], a["revenue_cents"], a["open_cents"]]
+        )
     return buf.getvalue()
 
 
@@ -52,10 +54,12 @@ def quickbooks_csv() -> str:
     w.writerow(["Date", "Name", "Memo", "Amount"])
     for r in rows:
         memo = f"{r['listing_title'] or ''} — {r['title']}".strip(" —")
-        w.writerow([
-            (r["paid_at"] or "")[:10],
-            r["client_name"] or "Client",
-            memo,
-            f"{(r['amount_cents'] or 0) / 100:.2f}",
-        ])
+        w.writerow(
+            [
+                (r["paid_at"] or "")[:10],
+                r["client_name"] or "Client",
+                memo,
+                f"{(r['amount_cents'] or 0) / 100:.2f}",
+            ]
+        )
     return buf.getvalue()

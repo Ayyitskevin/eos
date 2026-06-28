@@ -152,9 +152,13 @@ CSRF_FORM = "_csrf"
 def set_csrf_cookie(response, token: str | None = None) -> str:
     tok = token or new_token()
     response.set_cookie(
-        CSRF_COOKIE, sign(tok),
-        max_age=86400, httponly=False, secure=config.COOKIE_SECURE,
-        samesite="lax", path="/",
+        CSRF_COOKIE,
+        sign(tok),
+        max_age=86400,
+        httponly=False,
+        secure=config.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
     )
     return tok
 
@@ -163,7 +167,9 @@ def validate_csrf(request: Request) -> None:
     if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
         return
     path = request.url.path
-    if path in ("/admin/login", "/admin/logout") or path.startswith(("/stripe/", "/oauth/", "/api/")):
+    if path in ("/admin/login", "/admin/logout") or path.startswith(
+        ("/stripe/", "/oauth/", "/api/")
+    ):
         return
     if not path.startswith("/admin"):
         return

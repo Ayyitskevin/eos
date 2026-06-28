@@ -1,36 +1,12 @@
 """Foundation smoke tests — migrate, listing spine, RE gallery sections."""
 
-import os
-import tempfile
-from pathlib import Path
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-ROOT = Path(__file__).resolve().parent.parent
-
-
-@pytest.fixture()
-def app_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("EOS_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("EOS_SECRET_KEY", "test-secret-key-32chars-minimum!!")
-    monkeypatch.setenv("EOS_ADMIN_PASSWORD", "test-admin-pass")
-    monkeypatch.setenv("EOS_BASE_URL", "http://testserver")
-    import importlib
-    import eos.config as config
-    import eos.db as db
-    import eos.security as security
-    import eos.main as main
-    for mod in (config, db, security, main):
-        importlib.reload(mod)
-    config.ensure_dirs()
-    db.migrate()
-    return main.app
-
 
 @pytest.mark.asyncio
-async def test_healthz(app_env):
-    transport = ASGITransport(app=app_env)
+async def test_healthz(app_env_http):
+    transport = ASGITransport(app=app_env_http)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         r = await client.get("/healthz")
     assert r.status_code == 200
@@ -89,6 +65,7 @@ async def test_listing_and_gallery_flow(app_env):
 @pytest.mark.asyncio
 async def test_crop_presets_seeded(app_env):
     import eos.db as db
+
     db.migrate()
     rows = db.all_("SELECT slug FROM crop_presets WHERE studio_id='default'")
     slugs = {r["slug"] for r in rows}

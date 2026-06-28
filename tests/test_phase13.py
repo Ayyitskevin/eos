@@ -2,20 +2,19 @@
 
 import importlib
 
+import eos.api_tokens as api_tokens
+import eos.calendar_view as calendar_view
+import eos.config as config
+import eos.db as db
+import eos.galleries as galleries
+import eos.jobs as jobs
+import eos.listings as listings
+import eos.plan_limits as plan_limits
+import eos.tenant as tenant
+import eos.usage as usage
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-
-import eos.config as config
-import eos.db as db
-import eos.jobs as jobs
-import eos.tenant as tenant
-import eos.plan_limits as plan_limits
-import eos.usage as usage
-import eos.api_tokens as api_tokens
-import eos.listings as listings
-import eos.galleries as galleries
-import eos.calendar_view as calendar_view
 
 
 @pytest.fixture()
@@ -23,9 +22,21 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("EOS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("EOS_SECRET_KEY", "test-secret-key-32chars-minimum!!")
     monkeypatch.setenv("EOS_ADMIN_PASSWORD", "test-admin-pass")
-    for mod in (config, db, jobs, tenant, plan_limits, usage, api_tokens, listings, galleries, calendar_view):
+    for mod in (
+        config,
+        db,
+        jobs,
+        tenant,
+        plan_limits,
+        usage,
+        api_tokens,
+        listings,
+        galleries,
+        calendar_view,
+    ):
         importlib.reload(mod)
     import eos.main as main
+
     importlib.reload(main)
     config.ensure_dirs()
     db.migrate()
@@ -39,7 +50,9 @@ def env(tmp_path, monkeypatch):
 async def test_calendar_month_view(env):
     transport = ASGITransport(app=env)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        login = await client.post("/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False)
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
         r = await client.get("/admin/calendar?view=month", cookies=login.cookies)
     assert r.status_code == 200
     assert "cal-month" in r.text

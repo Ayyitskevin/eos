@@ -12,7 +12,9 @@ router = APIRouter()
 @router.get("/admin/integrations/google/connect")
 async def google_connect(_: None = Depends(security.require_admin)):
     if not google_calendar.is_configured():
-        raise HTTPException(status_code=503, detail="Google Calendar is not configured on this server")
+        raise HTTPException(
+            status_code=503, detail="Google Calendar is not configured on this server"
+        )
     return RedirectResponse(google_calendar.connect_url(), status_code=303)
 
 
@@ -60,6 +62,7 @@ async def dropbox_disconnect(_: None = Depends(security.require_admin)):
 @router.post("/admin/integrations/dropbox/scan")
 async def dropbox_scan_now(_: None = Depends(security.require_admin)):
     from .. import jobs, tenant
+
     jobs.enqueue("dropbox_scan", {"studio_id": tenant.get_studio_id()})
     return RedirectResponse("/admin/studio#integrations", status_code=303)
 

@@ -16,7 +16,8 @@ async def demo_landing(request: Request):
     demo_sandbox.ensure_demo()
     url = demo_sandbox.demo_base_url()
     return templates.TemplateResponse(
-        request, "public/demo.html",
+        request,
+        "public/demo.html",
         {"demo_url": url, "admin_hint": "demo@eos.app / demo-view-only"},
     )
 

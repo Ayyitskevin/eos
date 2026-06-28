@@ -1,0 +1,23 @@
+# Eos — Caddy reverse proxy with automatic HTTPS
+# Usage: caddy run --config /opt/eos/deploy/Caddyfile
+#
+# Replace eos.example.com and *.eos.example.com with your domain.
+# Set EOS_BASE_DOMAIN=eos.example.com in /opt/eos/.env
+
+{
+	email you@example.com
+}
+
+eos.example.com {
+	reverse_proxy 127.0.0.1:8410
+	request_body {
+		max_size 64MB
+	}
+}
+
+*.eos.example.com {
+	reverse_proxy 127.0.0.1:8410
+	request_body {
+		max_size 64MB
+	}
+}

@@ -1,6 +1,6 @@
 """Google OAuth callback for operator login (no /admin prefix)."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
 from .. import admin_oauth, config, security, tenant
@@ -19,8 +19,13 @@ async def google_admin_callback(code: str = "", state: str = ""):
     resp = RedirectResponse("/admin", status_code=303)
     name, value = security.set_session_cookie(result["user_id"])
     resp.set_cookie(
-        name, value, max_age=config.SESSION_MAX_AGE, httponly=True,
-        secure=config.COOKIE_SECURE, samesite="lax", path="/",
+        name,
+        value,
+        max_age=config.SESSION_MAX_AGE,
+        httponly=True,
+        secure=config.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
     )
     security.set_csrf_cookie(resp)
     return resp

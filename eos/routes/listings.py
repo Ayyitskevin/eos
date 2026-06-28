@@ -1,7 +1,21 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, config, contracts, galleries, invoices, listing_media, listings, marketing_kit, microsites, proposals, questionnaires, security, users
+from .. import (
+    clients,
+    config,
+    contracts,
+    galleries,
+    invoices,
+    listing_media,
+    listings,
+    marketing_kit,
+    microsites,
+    proposals,
+    questionnaires,
+    security,
+    users,
+)
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -11,7 +25,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/listings/new", response_class=HTMLResponse)
 async def listing_new_form(request: Request):
     return templates.TemplateResponse(
-        request, "admin/listing_new.html",
+        request,
+        "admin/listing_new.html",
         {
             "client_list": clients.list_clients(),
             "property_types": PROPERTY_TYPES,
@@ -70,7 +85,8 @@ async def listing_detail(request: Request, listing_id: int):
     for g in listings.listing_galleries(listing_id):
         fav_count += len(galleries.agent_favorites(g["id"]))
     return templates.TemplateResponse(
-        request, "admin/listing.html",
+        request,
+        "admin/listing.html",
         {
             "l": row,
             "agent_favorite_count": fav_count,
@@ -126,16 +142,25 @@ async def listing_update(
     pay = int(float(photographer_pay_cents) * 100) if photographer_pay_cents.strip() else None
     listings.update_listing(
         listing_id,
-        title=title, status=status, client_id=cid, property_type=property_type,
-        assigned_user_id=uid, photographer_pay_cents=pay,
-        address_line1=address_line1, address_line2=address_line2,
-        city=city, state=state, zip=zip_code, mls_id=mls_id,
+        title=title,
+        status=status,
+        client_id=cid,
+        property_type=property_type,
+        assigned_user_id=uid,
+        photographer_pay_cents=pay,
+        address_line1=address_line1,
+        address_line2=address_line2,
+        city=city,
+        state=state,
+        zip=zip_code,
+        mls_id=mls_id,
         beds=float(beds) if beds.strip() else None,
         baths=float(baths) if baths.strip() else None,
         sqft=int(sqft) if sqft.strip().isdigit() else None,
         shoot_date=shoot_date.strip() or None,
         due_at=due_at.strip() or None,
-        access_notes=access_notes, notes=notes,
+        access_notes=access_notes,
+        notes=notes,
     )
     return RedirectResponse(f"/admin/listings/{listing_id}", status_code=303)
 

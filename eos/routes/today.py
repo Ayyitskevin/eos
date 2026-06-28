@@ -38,7 +38,8 @@ async def today_view(request: Request):
         (STUDIO_ID,),
     )
     return templates.TemplateResponse(
-        request, "admin/today.html",
+        request,
+        "admin/today.html",
         {
             "today": today,
             "shoots": shoots,

@@ -12,7 +12,8 @@ router = APIRouter(prefix="/admin/platform")
 @router.get("/studios", response_class=HTMLResponse)
 async def studios(request: Request, _: None = Depends(platform_admin.require_platform_admin)):
     return templates.TemplateResponse(
-        request, "admin/platform_studios.html",
+        request,
+        "admin/platform_studios.html",
         {
             "studios": platform_admin.list_studios(),
             "impersonating": platform_admin.impersonated_studio_id(request),

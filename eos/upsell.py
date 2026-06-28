@@ -51,8 +51,12 @@ def create_order(
            (studio_id, listing_id, client_id, addon_ids, amount_cents, token)
            VALUES (?,?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, client_id or listing["client_id"],
-            json.dumps(addon_ids), total, token,
+            STUDIO_ID,
+            listing_id,
+            client_id or listing["client_id"],
+            json.dumps(addon_ids),
+            total,
+            token,
         ),
     )
     title = f"Add-ons — {listing['title']}"
@@ -91,7 +95,8 @@ def checkout_url(order_token: str) -> str:
     if inv.get("stripe_session_id"):
         try:
             session = stripe.checkout.Session.retrieve(
-                inv["stripe_session_id"], api_key=config.STRIPE_SECRET_KEY,
+                inv["stripe_session_id"],
+                api_key=config.STRIPE_SECRET_KEY,
             )
             if session.url:
                 return session.url
@@ -104,14 +109,16 @@ def checkout_url(order_token: str) -> str:
         api_key=config.STRIPE_SECRET_KEY,
         mode="payment",
         payment_method_types=["card"],
-        line_items=[{
-            "quantity": 1,
-            "price_data": {
-                "currency": "usd",
-                "unit_amount": inv["amount_cents"],
-                "product_data": {"name": inv["title"]},
-            },
-        }],
+        line_items=[
+            {
+                "quantity": 1,
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": inv["amount_cents"],
+                    "product_data": {"name": inv["title"]},
+                },
+            }
+        ],
         customer_email=client["email"] if client and client["email"] else None,
         metadata={"invoice_id": str(inv["id"]), "upsell_order_id": str(row["id"])},
         success_url=f"{config.BASE_URL}/i/{inv['slug']}?thanks=1",

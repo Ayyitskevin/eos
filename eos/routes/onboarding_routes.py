@@ -12,6 +12,7 @@ router = APIRouter()
 @router.get("/verify/{token}")
 async def verify_signup(token: str):
     from .. import signup_verify
+
     slug = signup_verify.verify_token(token)
     return RedirectResponse(f"/admin/login?verified=1&studio={slug}", status_code=303)
 
@@ -19,7 +20,8 @@ async def verify_signup(token: str):
 @router.get("/admin/verify-pending", response_class=HTMLResponse)
 async def verify_pending(request: Request):
     return templates.TemplateResponse(
-        request, "admin/verify_pending.html",
+        request,
+        "admin/verify_pending.html",
         {"contact_email": studio.get_studio().get("contact_email", "")},
     )
 
@@ -27,7 +29,8 @@ async def verify_pending(request: Request):
 @router.get("/admin/onboarding", response_class=HTMLResponse)
 async def onboarding_page(request: Request, _: None = Depends(security.require_admin)):
     return templates.TemplateResponse(
-        request, "admin/onboarding.html",
+        request,
+        "admin/onboarding.html",
         {"status": onboarding_wizard.status()},
     )
 

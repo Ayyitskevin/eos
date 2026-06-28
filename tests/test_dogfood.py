@@ -2,12 +2,11 @@
 
 import importlib
 
-import pytest
-
 import eos.config as config
 import eos.db as db
 import eos.dogfood as dogfood
 import eos.tenant as tenant
+import pytest
 
 
 @pytest.fixture()
@@ -31,9 +30,14 @@ def test_dogfood_seed_idempotent(app_env):
     assert first["gallery_pin"] == dogfood.GALLERY_PIN
     assert first["site_url"].endswith("/l/1420-maple-dr")
 
-    listing = db.one("SELECT status, site_published FROM listings WHERE id=?", (first["listing_id"],))
+    listing = db.one(
+        "SELECT status, site_published FROM listings WHERE id=?", (first["listing_id"],)
+    )
     assert listing["status"] == "delivered"
     assert listing["site_published"] == 1
 
-    assets = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id IN (SELECT id FROM galleries WHERE listing_id=?)", (first["listing_id"],))
+    assets = db.one(
+        "SELECT COUNT(*) AS n FROM assets WHERE gallery_id IN (SELECT id FROM galleries WHERE listing_id=?)",
+        (first["listing_id"],),
+    )
     assert assets["n"] == 6

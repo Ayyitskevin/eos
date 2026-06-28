@@ -7,7 +7,9 @@ from .vocab import STUDIO_ID
 
 
 def ensure_token(client_id: int) -> str:
-    row = db.one("SELECT portal_token FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID))
+    row = db.one(
+        "SELECT portal_token FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID)
+    )
     if row and row["portal_token"]:
         return row["portal_token"]
     token = security.new_token()

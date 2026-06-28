@@ -33,6 +33,7 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
         raise HTTPException(status_code=507, detail="low disk space — upload refused")
 
     from .. import media_paths
+
     for sub in ("original", "web", "thumb"):
         media_paths.gallery_subdir(gallery_id, sub)
 

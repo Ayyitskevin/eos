@@ -32,6 +32,7 @@ def get_client(client_id: int):
     row = db.one("SELECT * FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID))
     if not row:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404)
     return row
 
@@ -58,21 +59,39 @@ def create_client(
     parent_id: int | None = None,
 ) -> int:
     from . import security
+
     cid = db.run(
         """INSERT INTO clients
            (studio_id, parent_id, client_type, name, company, email, phone, license_number, notes, portal_token)
            VALUES (?,?,?,?,?,?,?,?,?,?)""",
-        (STUDIO_ID, parent_id, client_type, name.strip(), company.strip(),
-         email.strip(), phone.strip(), license_number.strip(), notes.strip(),
-         security.new_token()),
+        (
+            STUDIO_ID,
+            parent_id,
+            client_type,
+            name.strip(),
+            company.strip(),
+            email.strip(),
+            phone.strip(),
+            license_number.strip(),
+            notes.strip(),
+            security.new_token(),
+        ),
     )
     db.audit("admin", "client.create", f"id={cid} name={name.strip()}")
     return cid
 
 
 def update_client(client_id: int, **fields) -> None:
-    allowed = {"parent_id", "client_type", "name", "company", "email",
-               "phone", "license_number", "notes"}
+    allowed = {
+        "parent_id",
+        "client_type",
+        "name",
+        "company",
+        "email",
+        "phone",
+        "license_number",
+        "notes",
+    }
     parts = []
     params: list = []
     for k, v in fields.items():

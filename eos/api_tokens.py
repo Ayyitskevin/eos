@@ -57,5 +57,6 @@ def authenticate_request(request: Request) -> str:
         (_hash(raw),),
     )
     from . import usage
+
     usage.bump("api_calls")
     return row["studio_id"]

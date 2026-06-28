@@ -21,7 +21,8 @@ async def upsell_confirm(request: Request, token: str):
     if not row:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
-        request, "public/upsell.html",
+        request,
+        "public/upsell.html",
         {
             "order": row,
             "payments_on": bool(config.STRIPE_SECRET_KEY),

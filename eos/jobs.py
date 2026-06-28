@@ -16,12 +16,13 @@ MAX_ATTEMPTS = 3
 
 def _gallery_dirs(gallery_id: int) -> dict[str, Path]:
     from . import media_paths
-    base = media_paths.gallery_dir(gallery_id)
+
     return {k: media_paths.gallery_subdir(gallery_id, k) for k in ("original", "web", "thumb")}
 
 
 def crops_dir(gallery_id: int) -> Path:
     from . import media_paths
+
     return media_paths.exports_dir(gallery_id)
 
 
@@ -67,6 +68,7 @@ def _h_exports(p: dict) -> None:
     metadata = None
     if listing_id:
         from .tenant import get_site_name
+
         listing = db.one(
             """SELECT l.*, c.name AS client_name FROM listings l
                LEFT JOIN clients c ON c.id=l.client_id WHERE l.id=?""",
@@ -74,8 +76,13 @@ def _h_exports(p: dict) -> None:
         )
         metadata = imaging.listing_export_metadata(listing, site_name=get_site_name())
     imaging.make_crops(
-        str(src), out, stem, config.JPEG_QUALITY, active,
-        overlay=overlay, metadata=metadata,
+        str(src),
+        out,
+        stem,
+        config.JPEG_QUALITY,
+        active,
+        overlay=overlay,
+        metadata=metadata,
     )
 
 
@@ -112,11 +119,13 @@ def _h_gallery_exports(p: dict) -> None:
 
 def _h_bundle(p: dict) -> None:
     from . import bundles
+
     bundles.build_bundle(p["listing_id"], p["kind"])
 
 
 def _h_marketing_kit(p: dict) -> None:
     from . import marketing_kit
+
     try:
         marketing_kit.build_kit(p["listing_id"])
     except Exception as e:
@@ -127,6 +136,7 @@ def _h_marketing_kit(p: dict) -> None:
 def _h_google_calendar_push(p: dict) -> None:
     from . import tenant
     from .integrations import google_calendar
+
     tenant.set_studio(p["studio_id"])
     google_calendar.push_appointment(p["appointment_id"])
 
@@ -134,12 +144,14 @@ def _h_google_calendar_push(p: dict) -> None:
 def _h_dropbox_scan(p: dict) -> None:
     from . import tenant
     from .integrations import dropbox
+
     tenant.set_studio(p["studio_id"])
     dropbox.scan_now()
 
 
 def _h_integration_sweep(p: dict) -> None:
     from .integrations import dropbox, google_calendar
+
     g = google_calendar.sweep_all()
     d = dropbox.sweep_all()
     log.info("integration sweep: google=%d dropbox=%d queued", g, d)
@@ -169,6 +181,7 @@ def _h_ai_cull(p: dict) -> None:
 def _h_dropbox_ingest(p: dict) -> None:
     from . import tenant
     from .integrations import dropbox
+
     tenant.set_studio(p["studio_id"])
     try:
         dropbox.ingest_file(

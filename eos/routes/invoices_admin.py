@@ -17,8 +17,15 @@ async def invoice_detail(request: Request, invoice_id: int):
     if inv["agent_client_id"]:
         agent = clients.get_client(inv["agent_client_id"])
     return templates.TemplateResponse(
-        request, "admin/invoice.html",
-        {"inv": inv, "listing": listing, "bill_to": bill_to, "agent": agent, "base_url": config.BASE_URL},
+        request,
+        "admin/invoice.html",
+        {
+            "inv": inv,
+            "listing": listing,
+            "bill_to": bill_to,
+            "agent": agent,
+            "base_url": config.BASE_URL,
+        },
     )
 
 

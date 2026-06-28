@@ -16,12 +16,15 @@ async def dashboard(request: Request):
     pipeline = listings.pipeline_counts()
     rows = listings.list_listings()
     due_soon = [
-        r for r in rows
-        if r["due_at"] and r["status"] not in ("delivered", "archived")
+        r
+        for r in rows
+        if r["due_at"]
+        and r["status"] not in ("delivered", "archived")
         and r["due_at"][:10] <= (today + dt.timedelta(days=2)).isoformat()
     ]
     return templates.TemplateResponse(
-        request, "admin/dashboard.html",
+        request,
+        "admin/dashboard.html",
         {
             "listings": rows,
             "pipeline": pipeline,

@@ -7,7 +7,9 @@ from .vocab import STUDIO_ID
 
 
 def balance(client_id: int) -> int:
-    row = db.one("SELECT credit_cents FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID))
+    row = db.one(
+        "SELECT credit_cents FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID)
+    )
     if not row:
         raise HTTPException(status_code=404)
     return row["credit_cents"] or 0

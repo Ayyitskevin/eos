@@ -2,18 +2,17 @@
 
 import importlib
 
-import pytest
-
+import eos.churn as churn
+import eos.clients as clients
 import eos.config as config
+import eos.credits as credits
 import eos.db as db
 import eos.jobs as jobs
-import eos.tenant as tenant
-import eos.credits as credits
-import eos.clients as clients
-import eos.reschedule as reschedule
-import eos.churn as churn
 import eos.media_paths as media_paths
 import eos.rbac as rbac
+import eos.reschedule as reschedule
+import eos.tenant as tenant
+import pytest
 
 
 @pytest.fixture()
@@ -62,6 +61,7 @@ def test_churn_inactive_agents(env):
 
 def test_reschedule_slots(env):
     from eos import scheduling
+
     tenant.set_studio("default")
     slots = scheduling.reschedule_slots(days=7)
     assert isinstance(slots, list)
@@ -69,6 +69,7 @@ def test_reschedule_slots(env):
 
 def test_users_extended_roles(env):
     from eos import users
+
     tenant.set_studio("default")
     uid = users.create_user("sched@test.com", "pass12345", role="scheduler")
     row = users.get_user(uid)

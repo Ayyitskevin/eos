@@ -3,7 +3,7 @@
 import json
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import contracts, db, proposals, security
@@ -16,7 +16,9 @@ router = APIRouter()
 @router.get("/p/{slug}", response_class=HTMLResponse)
 async def view_proposal(request: Request, slug: str):
     d = proposals.get_proposal_by_slug(slug)
-    listing = db.one("SELECT title, address_line1, city FROM listings WHERE id=?", (d["listing_id"],))
+    listing = db.one(
+        "SELECT title, address_line1, city FROM listings WHERE id=?", (d["listing_id"],)
+    )
     client = None
     if listing:
         row = db.one(
@@ -29,7 +31,8 @@ async def view_proposal(request: Request, slug: str):
         proposals.mark_viewed(d["id"])
         log.info("proposal %s viewed from %s", d["id"], security.client_ip(request))
     return templates.TemplateResponse(
-        request, "public/proposal.html",
+        request,
+        "public/proposal.html",
         {
             "d": d,
             "listing": listing,
@@ -59,7 +62,9 @@ async def view_contract(request: Request, slug: str):
         contracts.mark_viewed(d["id"])
         log.info("contract %s viewed from %s", d["id"], security.client_ip(request))
     return templates.TemplateResponse(
-        request, "public/contract.html", {"d": d, "listing": listing},
+        request,
+        "public/contract.html",
+        {"d": d, "listing": listing},
     )
 
 

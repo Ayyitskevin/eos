@@ -64,9 +64,7 @@ def render_template(listing_id: int) -> str:
            WHERE listing_id=? AND status='accepted' ORDER BY accepted_at DESC LIMIT 1""",
         (listing_id,),
     )
-    total_clause = (
-        f" for a total of ${accepted['total_cents'] / 100:.2f}" if accepted else ""
-    )
+    total_clause = f" for a total of ${accepted['total_cents'] / 100:.2f}" if accepted else ""
     addr = listings.format_address(listing)
     address_clause = f" at {addr}" if addr else ""
     return DEFAULT_TEMPLATE.format(
@@ -86,7 +84,9 @@ def create_contract(listing_id: int) -> int:
         """INSERT INTO contracts (studio_id, listing_id, slug, title, body)
            VALUES (?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, security.new_slug(),
+            STUDIO_ID,
+            listing_id,
+            security.new_slug(),
             f"Services Agreement — {listing['title']}",
             render_template(listing_id),
         ),
@@ -101,7 +101,10 @@ def update_contract(contract_id: int, *, title: str, body: str) -> None:
         raise HTTPException(status_code=400, detail="sent contracts are locked")
     if not body.strip():
         raise HTTPException(status_code=400, detail="body required")
-    db.run("UPDATE contracts SET title=?, body=? WHERE id=?", (title.strip() or d["title"], body, contract_id))
+    db.run(
+        "UPDATE contracts SET title=?, body=? WHERE id=?",
+        (title.strip() or d["title"], body, contract_id),
+    )
 
 
 def mark_sent(contract_id: int) -> None:

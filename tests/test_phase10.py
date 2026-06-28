@@ -2,9 +2,6 @@
 
 import importlib
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.api_tokens as api_tokens
 import eos.config as config
 import eos.db as db
@@ -14,6 +11,8 @@ import eos.onboarding as onboarding
 import eos.referrals as referrals
 import eos.sequences as sequences
 import eos.tenant as tenant
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -89,7 +88,9 @@ async def test_subdomain_resolves_tenant(app_env):
 @pytest.mark.asyncio
 async def test_api_token_lists_tenant_listings(app_env):
     tenant.set_studio("default")
-    db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'API Listing', 'lead')")
+    db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'API Listing', 'lead')"
+    )
     _tid, raw = api_tokens.create_token(label="test")
 
     transport = ASGITransport(app=app_env)

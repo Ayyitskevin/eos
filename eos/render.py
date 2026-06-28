@@ -2,7 +2,6 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from . import config
 from .tenant import get_base_url, get_site_name
 from .vocab import (
     CLIENT_TYPE_LABELS,
@@ -14,6 +13,7 @@ from .vocab import (
 
 ROOT = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=ROOT / "templates")
+
 
 class _LazyStr:
     def __init__(self, fn):
@@ -33,7 +33,9 @@ templates.env.globals["property_type_labels"] = PROPERTY_TYPE_LABELS
 templates.env.globals["client_type_labels"] = CLIENT_TYPE_LABELS
 templates.env.globals["shot_room_labels"] = SHOT_ROOM_LABELS
 templates.env.globals["shot_priority_labels"] = SHOT_PRIORITY_LABELS
-templates.env.globals["static_rev"] = int(max(
-    (f.stat().st_mtime for f in (ROOT / "static").glob("*") if f.is_file()),
-    default=0,
-))
+templates.env.globals["static_rev"] = int(
+    max(
+        (f.stat().st_mtime for f in (ROOT / "static").glob("*") if f.is_file()),
+        default=0,
+    )
+)

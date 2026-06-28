@@ -6,7 +6,7 @@ import urllib.parse
 import httpx
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from . import config, db, security, tenant, users
+from . import config, tenant, users
 
 log = logging.getLogger("eos.admin_oauth")
 
@@ -24,9 +24,7 @@ def _signer() -> URLSafeTimedSerializer:
 
 def is_configured() -> bool:
     return bool(
-        config.GOOGLE_CLIENT_ID
-        and config.GOOGLE_CLIENT_SECRET
-        and config.GOOGLE_ADMIN_REDIRECT_URI
+        config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET and config.GOOGLE_ADMIN_REDIRECT_URI
     )
 
 

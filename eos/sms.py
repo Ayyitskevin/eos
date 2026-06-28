@@ -12,9 +12,7 @@ log = logging.getLogger("eos.sms")
 
 def configured() -> bool:
     return bool(
-        config.TWILIO_ACCOUNT_SID
-        and config.TWILIO_AUTH_TOKEN
-        and config.TWILIO_FROM_NUMBER
+        config.TWILIO_ACCOUNT_SID and config.TWILIO_AUTH_TOKEN and config.TWILIO_FROM_NUMBER
     )
 
 
@@ -67,6 +65,7 @@ def shoot_day_reminders() -> int:
         (STUDIO_ID,),
     )
     from .tenant import get_site_name
+
     site = get_site_name()
     for r in rows:
         when = r["starts_at"][11:16] if r["starts_at"] else "today"

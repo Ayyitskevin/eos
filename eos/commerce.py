@@ -5,7 +5,7 @@ import logging
 
 from fastapi import HTTPException
 
-from . import appointments, clients, db, invoices, listings, proposals, scheduling, security, studio
+from . import appointments, clients, db, invoices, listings, proposals, scheduling, security
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.commerce")
@@ -19,6 +19,7 @@ MLS/marketing usage rights apply as described in the photography services agreem
 
 def _find_or_create_client(name: str, email: str, phone: str, *, client_type: str = "agent") -> int:
     from . import portal
+
     email = email.strip().lower()
     row = db.one(
         "SELECT id FROM clients WHERE studio_id=? AND lower(email)=?",
@@ -37,7 +38,9 @@ def _parse_address(raw: str) -> tuple[str, str]:
     return raw, raw
 
 
-def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[int, int, list[dict], int | None]:
+def calc_total(
+    package_id: int, addon_ids: list[int], promo: str = ""
+) -> tuple[int, int, list[dict], int | None]:
     pkg = db.one(
         "SELECT * FROM service_packages WHERE id=? AND studio_id=? AND active=1",
         (package_id, STUDIO_ID),
@@ -69,6 +72,7 @@ def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[
                 total = max(0, total - row["discount_cents"])
         else:
             from . import referrals
+
             total, referral_row = referrals.apply_credit(promo, total)
     deposit = pkg["deposit_cents"] if pkg["deposit_cents"] > 0 else 0
     if deposit > total:
@@ -109,8 +113,11 @@ def create_booking(
     pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
 
     client_id = _find_or_create_client(name, email, phone, client_type=client_type)
-    total_cents, deposit_cents, line_items, referral_id = calc_total(package_id, addon_ids, promo_code)
+    total_cents, deposit_cents, line_items, referral_id = calc_total(
+        package_id, addon_ids, promo_code
+    )
     from . import credits
+
     total_cents, credit_applied = credits.apply_at_checkout(client_id, total_cents)
     if credit_applied:
         line_items.append({"label": "Account credit", "qty": 1, "unit_cents": -credit_applied})
@@ -165,11 +172,25 @@ def create_booking(
             appointment_id, order_token, signer_name, promo_code, total_cents, deposit_cents)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, name.strip(), email.strip().lower(), phone.strip(), message.strip(),
-            property_address.strip(), "pending_payment" if deposit_cents else "confirmed",
-            package_id, json.dumps(addon_ids), sqft, scheduled_at, listing_id, client_id,
-            appt_id, token, signer_name.strip(), promo_code.strip().upper(),
-            total_cents, deposit_cents,
+            STUDIO_ID,
+            name.strip(),
+            email.strip().lower(),
+            phone.strip(),
+            message.strip(),
+            property_address.strip(),
+            "pending_payment" if deposit_cents else "confirmed",
+            package_id,
+            json.dumps(addon_ids),
+            sqft,
+            scheduled_at,
+            listing_id,
+            client_id,
+            appt_id,
+            token,
+            signer_name.strip(),
+            promo_code.strip().upper(),
+            total_cents,
+            deposit_cents,
         ),
     )
     db.run("UPDATE appointments SET inquiry_id=? WHERE id=?", (inquiry_id, appt_id))
@@ -189,11 +210,12 @@ def create_booking(
         db.run("UPDATE inquiries SET invoice_id=? WHERE id=?", (invoice_id, inquiry_id))
         pay_slug = db.one("SELECT slug FROM invoices WHERE id=?", (invoice_id,))["slug"]
 
-
     if referral_id:
         from . import referrals
+
         referrals.record_use(referral_id)
     from . import webhooks
+
     webhooks.dispatch(
         "booking.created",
         {

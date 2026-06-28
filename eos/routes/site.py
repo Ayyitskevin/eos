@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import commerce, config, security, scheduling, studio
+from .. import commerce, config, scheduling, security, studio
 from ..render import templates
 
 router = APIRouter()
@@ -38,7 +38,8 @@ async def home(request: Request):
     profile = studio.get_profile()
     packages = studio.list_packages(active_only=True)
     return templates.TemplateResponse(
-        request, "site/home.html",
+        request,
+        "site/home.html",
         {"profile": profile, "packages": packages},
     )
 
@@ -69,13 +70,15 @@ async def book_submit(
     email = email.strip().lower()
     if not _EMAIL.match(email):
         return templates.TemplateResponse(
-            request, "site/book.html",
+            request,
+            "site/book.html",
             _book_context(error="Invalid email."),
             status_code=400,
         )
     if not property_address.strip():
         return templates.TemplateResponse(
-            request, "site/book.html",
+            request,
+            "site/book.html",
             _book_context(error="Property address is required."),
             status_code=400,
         )
@@ -98,7 +101,8 @@ async def book_submit(
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else "Booking failed."
         return templates.TemplateResponse(
-            request, "site/book.html",
+            request,
+            "site/book.html",
             _book_context(error=detail),
             status_code=e.status_code,
         )
@@ -134,22 +138,30 @@ async def book_homeowner_submit(
     email = email.strip().lower()
     if not _EMAIL.match(email):
         return templates.TemplateResponse(
-            request, "site/book_homeowner.html",
+            request,
+            "site/book_homeowner.html",
             _book_context(error="Invalid email."),
             status_code=400,
         )
     security.inquiry_record(ip, security.INQUIRY_BUCKET_BOOK)
     try:
         result = commerce.create_booking(
-            name=name, email=email, phone=phone,
-            property_address=property_address, package_id=package_id,
-            scheduled_at=scheduled_at, sqft=sqft or None, message=message,
-            signer_name=signer_name, client_type="homeowner",
+            name=name,
+            email=email,
+            phone=phone,
+            property_address=property_address,
+            package_id=package_id,
+            scheduled_at=scheduled_at,
+            sqft=sqft or None,
+            message=message,
+            signer_name=signer_name,
+            client_type="homeowner",
         )
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else "Booking failed."
         return templates.TemplateResponse(
-            request, "site/book_homeowner.html",
+            request,
+            "site/book_homeowner.html",
             _book_context(error=detail),
             status_code=e.status_code,
         )

@@ -12,7 +12,9 @@ from . import config, db, security
 log = logging.getLogger("eos.tenant")
 
 _studio_id: contextvars.ContextVar[str] = contextvars.ContextVar("studio_id", default="default")
-_site_name: contextvars.ContextVar[str] = contextvars.ContextVar("site_name", default=config.SITE_NAME)
+_site_name: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "site_name", default=config.SITE_NAME
+)
 _base_url: contextvars.ContextVar[str] = contextvars.ContextVar("base_url", default=config.BASE_URL)
 
 
@@ -93,11 +95,13 @@ def studio_id_for_custom_domain(host: str | None) -> str | None:
 
 def resolve_tenant(request: Request) -> str:
     from . import platform_admin
+
     imp = platform_admin.impersonated_studio_id(request)
     if imp:
         return imp
     if request.url.path.startswith("/demo"):
         from . import config, demo_sandbox
+
         if config.DEMO_ENABLED:
             return demo_sandbox.DEMO_STUDIO_ID
     host = request.headers.get("host")
@@ -111,6 +115,7 @@ def resolve_tenant(request: Request) -> str:
             return sid
     if host and host.split(":")[0].lower() == "demo" and not config.BASE_DOMAIN:
         from . import demo_sandbox
+
         if config.DEMO_ENABLED:
             return demo_sandbox.DEMO_STUDIO_ID
     uid = security.current_user_id(request)

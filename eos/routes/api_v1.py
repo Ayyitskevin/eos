@@ -16,7 +16,7 @@ async def _api_tenant(request: Request):
 def _paginate(rows: list, *, limit: int, offset: int) -> dict:
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
-    page = rows[offset: offset + limit]
+    page = rows[offset : offset + limit]
     return {"items": page, "limit": limit, "offset": offset, "total": len(rows)}
 
 
@@ -190,6 +190,7 @@ async def api_inbound_event(event_name: str, request: Request, _: str = Depends(
 async def api_mls_export_ready(request: Request, _: str = Depends(_api_tenant)):
     """MLS push webhook stub — logs payload for partner integration."""
     import json
+
     try:
         payload = await request.json()
     except Exception:
@@ -199,7 +200,10 @@ async def api_mls_export_ready(request: Request, _: str = Depends(_api_tenant)):
         "INSERT INTO mls_push_log (studio_id, listing_id, payload, status) VALUES (?,?,?,?)",
         (str(STUDIO_ID), int(lid) if lid else None, json.dumps(payload), "received"),
     )
-    return {"ok": True, "message": "MLS export logged — configure partner connector for auto-upload"}
+    return {
+        "ok": True,
+        "message": "MLS export logged — configure partner connector for auto-upload",
+    }
 
 
 @router.get("/health")
@@ -210,6 +214,7 @@ async def api_health():
 @router.get("/me")
 async def api_me(_: str = Depends(_api_tenant)):
     from .. import plan_limits, usage
+
     return {
         "ok": True,
         "studio_id": str(STUDIO_ID),

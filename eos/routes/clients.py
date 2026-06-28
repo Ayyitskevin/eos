@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import brand_kits, clients, portal, security
 from ..render import templates
-from ..vocab import CLIENT_TYPES, CLIENT_TYPE_LABELS
+from ..vocab import CLIENT_TYPE_LABELS, CLIENT_TYPES
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
 
@@ -11,7 +11,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/clients", response_class=HTMLResponse)
 async def clients_index(request: Request):
     return templates.TemplateResponse(
-        request, "admin/clients.html",
+        request,
+        "admin/clients.html",
         {"clients": clients.list_clients(), "client_types": CLIENT_TYPES},
     )
 
@@ -28,8 +29,13 @@ async def clients_create(
 ):
     pid = int(parent_id) if parent_id.strip().isdigit() else None
     cid = clients.create_client(
-        name, client_type=client_type, company=company, email=email,
-        phone=phone, license_number=license_number, parent_id=pid,
+        name,
+        client_type=client_type,
+        company=company,
+        email=email,
+        phone=phone,
+        license_number=license_number,
+        parent_id=pid,
     )
     return RedirectResponse(f"/admin/clients/{cid}", status_code=303)
 
@@ -38,6 +44,7 @@ async def clients_create(
 async def client_detail(request: Request, client_id: int):
     c = clients.get_client(client_id)
     from .. import db
+
     kids = db.all_("SELECT * FROM clients WHERE parent_id=? ORDER BY name", (client_id,))
     listings_rows = db.all_(
         "SELECT * FROM listings WHERE client_id=? ORDER BY created_at DESC",
@@ -48,8 +55,10 @@ async def client_detail(request: Request, client_id: int):
     if c["client_type"] == "brokerage":
         brokerage_link = portal.brokerage_portal_url(client_id)
     from .. import credits
+
     return templates.TemplateResponse(
-        request, "admin/client.html",
+        request,
+        "admin/client.html",
         {
             "c": c,
             "credit_balance": credits.balance(client_id),
@@ -82,9 +91,15 @@ async def client_update(
     if pid == client_id:
         pid = None
     clients.update_client(
-        client_id, name=name, client_type=client_type, company=company,
-        email=email, phone=phone, license_number=license_number,
-        notes=notes, parent_id=pid,
+        client_id,
+        name=name,
+        client_type=client_type,
+        company=company,
+        email=email,
+        phone=phone,
+        license_number=license_number,
+        notes=notes,
+        parent_id=pid,
     )
     return RedirectResponse(f"/admin/clients/{client_id}", status_code=303)
 
@@ -96,5 +111,6 @@ async def client_add_credit(
     note: str = Form(""),
 ):
     from .. import credits
+
     credits.add_credit(client_id, amount_cents=round(amount_dollars * 100), note=note)
     return RedirectResponse(f"/admin/clients/{client_id}", status_code=303)

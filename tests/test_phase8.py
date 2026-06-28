@@ -3,16 +3,15 @@
 import importlib
 from pathlib import Path
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-from PIL import Image
-
 import eos.bundles as bundles
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
 import eos.main as main
 import eos.marketing_kit as marketing_kit
+import pytest
+from httpx import ASGITransport, AsyncClient
+from PIL import Image
 
 
 @pytest.fixture()

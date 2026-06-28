@@ -13,7 +13,11 @@ from .vocab import STUDIO_ID
 log = logging.getLogger("eos.platform_billing")
 
 PLANS = {
-    "starter": {"tier": "starter", "price_id": lambda: config.STRIPE_PRICE_STARTER, "label": "Starter"},
+    "starter": {
+        "tier": "starter",
+        "price_id": lambda: config.STRIPE_PRICE_STARTER,
+        "label": "Starter",
+    },
     "pro": {"tier": "pro", "price_id": lambda: config.STRIPE_PRICE_PRO, "label": "Pro"},
 }
 
@@ -161,6 +165,7 @@ def handle_webhook_event(event: dict) -> None:
 
 def provision_new_studio(studio_id: str, *, email: str, name: str) -> None:
     from . import tenant
+
     tenant.set_studio(studio_id)
     start_trial()
     if is_configured():

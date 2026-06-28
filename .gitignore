@@ -6,4 +6,8 @@ venv/
 data/
 *.db
 .pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
 .DS_Store
+backups/

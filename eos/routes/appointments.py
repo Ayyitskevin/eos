@@ -57,7 +57,8 @@ def _calendar_ctx(request: Request, *, view: str, date: str, photographer: str, 
         "statuses": STATUSES,
         "operators": users.list_users(),
         "google_connected": __import__(
-            "eos.integrations.google_calendar", fromlist=["is_enabled"],
+            "eos.integrations.google_calendar",
+            fromlist=["is_enabled"],
         ).is_enabled(),
     }
 
@@ -91,8 +92,13 @@ async def create_appt(
     cid = int(client_id) if client_id.strip().isdigit() else None
     uid = int(assigned_user_id) if assigned_user_id.strip().isdigit() else None
     appointments.create_appointment(
-        title, kind=kind, starts_at=starts_at.strip() or None,
-        location=location, listing_id=lid, client_id=cid, assigned_user_id=uid,
+        title,
+        kind=kind,
+        starts_at=starts_at.strip() or None,
+        location=location,
+        listing_id=lid,
+        client_id=cid,
+        assigned_user_id=uid,
     )
     q = f"view={view}&date={date}&photographer={photographer}"
     return RedirectResponse(f"/admin/calendar?{q}", status_code=303)
@@ -123,9 +129,14 @@ async def update_appt(
             normalized += ":00"
         appointments.reschedule_appointment(appt_id, starts_at=normalized)
     appointments.update_appointment(
-        appt_id, title=title, kind=kind, status=status,
-        location=location, assigned_user_id=uid,
-        listing_id=lid, client_id=cid,
+        appt_id,
+        title=title,
+        kind=kind,
+        status=status,
+        location=location,
+        assigned_user_id=uid,
+        listing_id=lid,
+        client_id=cid,
     )
     q = f"view={view}&date={date}&photographer={photographer}&edit={appt_id}"
     return RedirectResponse(f"/admin/calendar?{q}", status_code=303)

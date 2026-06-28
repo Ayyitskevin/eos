@@ -31,7 +31,9 @@ def save_tokens(
 ) -> None:
     expires_at = None
     if expires_in:
-        expires_at = (dt.datetime.utcnow() + dt.timedelta(seconds=expires_in)).strftime("%Y-%m-%d %H:%M:%S")
+        expires_at = (dt.datetime.utcnow() + dt.timedelta(seconds=expires_in)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
     enc_access = secret_store.encrypt(access_token)
     enc_refresh = secret_store.encrypt(refresh_token) if refresh_token else None
     existing = get_connection(provider)

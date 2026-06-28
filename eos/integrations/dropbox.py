@@ -30,7 +30,9 @@ def _signer() -> URLSafeTimedSerializer:
 
 
 def is_configured() -> bool:
-    return bool(config.DROPBOX_APP_KEY and config.DROPBOX_APP_SECRET and config.DROPBOX_REDIRECT_URI)
+    return bool(
+        config.DROPBOX_APP_KEY and config.DROPBOX_APP_SECRET and config.DROPBOX_REDIRECT_URI
+    )
 
 
 def is_connected() -> bool:
@@ -60,6 +62,7 @@ def handle_callback(*, code: str, state: str) -> None:
     except BadSignature as e:
         raise ValueError("Invalid OAuth state") from e
     from .. import tenant
+
     tenant.set_studio(payload["studio_id"])
     data = oauth_store.exchange_code(
         token_url=TOKEN_URL,
@@ -111,7 +114,7 @@ def resolve_listing_id(dropbox_path: str) -> int | None:
     watch = _watch_path()
     if not dropbox_path.startswith(watch):
         return None
-    rel = dropbox_path[len(watch):].lstrip("/")
+    rel = dropbox_path[len(watch) :].lstrip("/")
     if not rel:
         return None
     parts = rel.split("/")
@@ -135,6 +138,7 @@ def _gallery_for_listing(listing_id: int) -> int:
     if row:
         return row["id"]
     from .. import galleries
+
     listing = db.one("SELECT title FROM listings WHERE id=?", (listing_id,))
     return galleries.create_gallery(listing["title"], listing_id=listing_id)
 
@@ -193,7 +197,12 @@ def scan_folder() -> int:
             )
             jobs.enqueue(
                 "dropbox_ingest",
-                {"studio_id": str(STUDIO_ID), "log_id": log_id, "dropbox_path": path, "listing_id": listing_id},
+                {
+                    "studio_id": str(STUDIO_ID),
+                    "log_id": log_id,
+                    "dropbox_path": path,
+                    "listing_id": listing_id,
+                },
             )
             queued += 1
         new_cursor = data.get("cursor")
@@ -223,6 +232,7 @@ def ingest_file(*, log_id: int, dropbox_path: str, listing_id: int) -> None:
     if not token:
         raise RuntimeError("dropbox not connected")
     from .. import media_paths
+
     gallery_id = _gallery_for_listing(listing_id)
     for sub in ("original", "web", "thumb"):
         media_paths.gallery_subdir(gallery_id, sub)
@@ -294,6 +304,7 @@ def sweep_all() -> int:
         (PROVIDER,),
     )
     from .. import tenant
+
     for row in rows:
         tenant.set_studio(row["studio_id"])
         total += scan_folder()

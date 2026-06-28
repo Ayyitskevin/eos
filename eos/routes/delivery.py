@@ -23,7 +23,8 @@ async def gallery_gate(request: Request, slug: str):
     if security.gallery_unlocked(request, g["id"]):
         return await gallery_view(request, slug)
     return templates.TemplateResponse(
-        request, "public/pin.html",
+        request,
+        "public/pin.html",
         {"g": g, "error": None},
     )
 
@@ -35,14 +36,16 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
     ip = security.client_ip(request)
     if security.pin_locked(ip, g["id"]):
         return templates.TemplateResponse(
-            request, "public/pin.html",
+            request,
+            "public/pin.html",
             {"g": g, "error": "Too many attempts. Try again later."},
             status_code=429,
         )
     if pin.strip() != g["pin"]:
         security.pin_fail(ip, g["id"])
         return templates.TemplateResponse(
-            request, "public/pin.html",
+            request,
+            "public/pin.html",
             {"g": g, "error": "Wrong PIN."},
             status_code=401,
         )
@@ -50,8 +53,13 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
     resp = RedirectResponse(f"/g/{slug}", status_code=303)
     name, value = security.set_gallery_cookie(g["id"])
     resp.set_cookie(
-        name, value, max_age=config.SESSION_MAX_AGE, httponly=True,
-        secure=config.COOKIE_SECURE, samesite="lax", path="/",
+        name,
+        value,
+        max_age=config.SESSION_MAX_AGE,
+        httponly=True,
+        secure=config.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
     )
     return resp
 
@@ -72,10 +80,14 @@ async def gallery_view(request: Request, slug: str):
             upsell_banner = studio.delivery_upsell()
             upsell_addons = upsell_mod.list_delivery_addons()
     return templates.TemplateResponse(
-        request, "public/gallery.html",
+        request,
+        "public/gallery.html",
         {
-            "g": g, "sections": sections, "by_section": by_section,
-            "unsectioned": unsectioned, "assets": galleries.gallery_assets(g["id"]),
+            "g": g,
+            "sections": sections,
+            "by_section": by_section,
+            "unsectioned": unsectioned,
+            "assets": galleries.gallery_assets(g["id"]),
             "payment_locked": locked,
             "pay_url": f"/i/{inv_slug}" if inv_slug else None,
             "payments_on": bool(config.STRIPE_SECRET_KEY),

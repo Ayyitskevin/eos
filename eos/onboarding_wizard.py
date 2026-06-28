@@ -15,8 +15,8 @@ def status() -> dict:
     profile = studio.get_profile()
     done = bool(profile["onboarding_done"])
     step = int(profile["onboarding_step"] or 0)
-    from .integrations import google_calendar
     from . import platform_billing
+    from .integrations import google_calendar
 
     checks = {
         "profile": bool(profile["service_area"] and profile["headline"]),
@@ -36,6 +36,7 @@ def should_redirect() -> bool:
     if status()["done"]:
         return False
     from . import config
+
     return config.SIGNUP_ENABLED or config.SAAS_MODE
 
 

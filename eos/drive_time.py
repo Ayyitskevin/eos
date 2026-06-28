@@ -3,7 +3,6 @@
 import datetime as dt
 import logging
 import math
-import urllib.parse
 
 import httpx
 
@@ -111,7 +110,9 @@ def travel_ranges_for_day(day: dt.date, buffer_min: int) -> list[tuple[dt.dateti
     for i in range(len(rows) - 1):
         cur, nxt = rows[i], rows[i + 1]
         mins = travel_minutes(cur["latitude"], cur["longitude"], nxt["latitude"], nxt["longitude"])
-        end_cur = dt.datetime.strptime((cur["ends_at"] or cur["starts_at"])[:19], "%Y-%m-%d %H:%M:%S")
+        end_cur = dt.datetime.strptime(
+            (cur["ends_at"] or cur["starts_at"])[:19], "%Y-%m-%d %H:%M:%S"
+        )
         start_nxt = dt.datetime.strptime(nxt["starts_at"][:19], "%Y-%m-%d %H:%M:%S")
         travel_end = end_cur + dt.timedelta(minutes=mins)
         if travel_end > start_nxt:

@@ -41,6 +41,7 @@ def _cover_path(listing_id: int) -> str | None:
     if not asset:
         return None
     from . import media_paths
+
     base = media_paths.gallery_dir(gal["id"])
     path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
@@ -59,7 +60,11 @@ def build_kit(listing_id: int) -> None:
     headline = listings.format_address(listing) or listing["title"]
     parts = []
     if listing["beds"]:
-        parts.append(f"{listing['beds']:.0f} bed" if listing["beds"] == int(listing["beds"]) else f"{listing['beds']} bed")
+        parts.append(
+            f"{listing['beds']:.0f} bed"
+            if listing["beds"] == int(listing["beds"])
+            else f"{listing['beds']} bed"
+        )
     if listing["baths"]:
         parts.append(f"{listing['baths']} bath")
     if listing["sqft"]:
@@ -79,7 +84,7 @@ def build_kit(listing_id: int) -> None:
     if studio_row["contact_email"]:
         studio_line = f"{studio_line} · {studio_row['contact_email']}"
 
-    out_dir = kit_dir(listing_id)
+    kit_dir(listing_id)
     ig_sq = _file_path(listing_id, "ig_square")
     ig_st = _file_path(listing_id, "ig_story")
     flyer = _file_path(listing_id, "flyer")

@@ -47,12 +47,20 @@ def create_appointment(
            (studio_id, listing_id, client_id, title, kind, starts_at, location, token, assigned_user_id)
            VALUES (?,?,?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, client_id, title.strip(), kind,
-            starts_at, location.strip(), security.new_token(), assigned_user_id,
+            STUDIO_ID,
+            listing_id,
+            client_id,
+            title.strip(),
+            kind,
+            starts_at,
+            location.strip(),
+            security.new_token(),
+            assigned_user_id,
         ),
     )
     db.audit("admin", "appointment.create", f"id={aid}")
     from .integrations import google_calendar
+
     google_calendar.enqueue_push(aid)
     return aid
 
@@ -68,15 +76,20 @@ def list_for_calendar(
     start = calendar_view.parse_anchor(range_start)
     end = calendar_view.parse_anchor(range_end)
     return calendar_view.list_events(
-        range_start=start, range_end=end, photographer_id=photographer_id,
+        range_start=start,
+        range_end=end,
+        photographer_id=photographer_id,
     )
 
 
 def reschedule_appointment(appt_id: int, *, starts_at: str) -> None:
     row = get_appointment(appt_id)
     if row.get("external_source") == "google":
-        raise HTTPException(status_code=400, detail="Google Calendar events cannot be rescheduled here.")
+        raise HTTPException(
+            status_code=400, detail="Google Calendar events cannot be rescheduled here."
+        )
     from . import scheduling
+
     twilight = row["kind"] == "twilight"
     open_vals = {s["value"] for s in scheduling.reschedule_slots()}
     if starts_at not in open_vals and not scheduling.slot_is_open(starts_at, twilight=twilight):
@@ -87,8 +100,15 @@ def reschedule_appointment(appt_id: int, *, starts_at: str) -> None:
 
 def update_appointment(appt_id: int, **fields) -> None:
     allowed = {
-        "title", "kind", "status", "starts_at", "ends_at", "location",
-        "listing_id", "client_id", "assigned_user_id",
+        "title",
+        "kind",
+        "status",
+        "starts_at",
+        "ends_at",
+        "location",
+        "listing_id",
+        "client_id",
+        "assigned_user_id",
     }
     parts = []
     params: list = []
@@ -103,4 +123,5 @@ def update_appointment(appt_id: int, **fields) -> None:
     db.run(f"UPDATE appointments SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "appointment.update", f"id={appt_id}")
     from .integrations import google_calendar
+
     google_calendar.enqueue_push(appt_id)

@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, portal, reschedule, scheduling, studio
 from .. import brokerage_portal as bp
+from .. import config, portal, reschedule, scheduling, studio
 from ..render import templates
 
 router = APIRouter()
@@ -16,7 +16,8 @@ async def agent_portal(request: Request, token: str):
     rows = portal.deliveries(client["id"])
     upcoming = reschedule.upcoming_for_client(client["id"])
     return templates.TemplateResponse(
-        request, "public/portal.html",
+        request,
+        "public/portal.html",
         {
             "client": client,
             "deliveries": rows,
@@ -39,7 +40,8 @@ async def reschedule_form(request: Request, token: str, appointment_id: int):
         return RedirectResponse(f"/portal/{token}", status_code=303)
     slots = scheduling.reschedule_slots(days=14)
     return templates.TemplateResponse(
-        request, "public/reschedule.html",
+        request,
+        "public/reschedule.html",
         {
             "client": client,
             "appointment": match,
@@ -70,7 +72,8 @@ async def brokerage_portal_view(request: Request, token: str):
     client = bp.get_brokerage_by_token(token)
     data = bp.portal_summary(client["id"])
     return templates.TemplateResponse(
-        request, "public/brokerage_portal.html",
+        request,
+        "public/brokerage_portal.html",
         {
             "client": client,
             "totals": data["totals"],

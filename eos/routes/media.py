@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 
-from .. import config, db, imaging, paywall, security
+from .. import db, imaging, paywall, security
 from ..galleries import get_gallery_by_slug
 
 router = APIRouter()
@@ -15,6 +15,7 @@ VARIANTS = {"thumb", "web", "original", "export"}
 
 def _asset_path(gallery_id: int, asset, variant: str) -> Path:
     from .. import media_paths
+
     base = media_paths.gallery_dir(gallery_id)
     stem = Path(asset["stored"]).stem
     if variant == "original":
@@ -67,11 +68,17 @@ async def public_media(request: Request, slug: str, variant: str, asset_id: int)
         if not path.is_file():
             raise HTTPException(status_code=404)
         mt = mimetypes.guess_type(str(path))[0] or "video/mp4"
-        return FileResponse(path, media_type=mt, headers={"Cache-Control": "private, max-age=86400"})
+        return FileResponse(
+            path, media_type=mt, headers={"Cache-Control": "private, max-age=86400"}
+        )
     path = _asset_path(g["id"], a, variant)
     if not path.is_file():
         raise HTTPException(status_code=404)
     if paywall.payment_required(g["listing_id"]) and paywall.watermark_previews():
         data = imaging.apply_preview_watermark(path)
-        return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"})
-    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+        return Response(
+            content=data, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"}
+        )
+    return FileResponse(
+        path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"}
+    )

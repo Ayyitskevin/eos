@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
 
-from .. import brand_kits, config, db, security
+from .. import config, db, security
 from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.routes.brand_kits")

@@ -2,8 +2,6 @@
 
 import importlib
 
-import pytest
-
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
@@ -11,6 +9,7 @@ import eos.oauth_store as oauth_store
 import eos.platform_billing as platform_billing
 import eos.secret_store as secret_store
 import eos.tenant as tenant
+import pytest
 
 
 @pytest.fixture()
@@ -31,6 +30,7 @@ def env(tmp_path, monkeypatch):
         importlib.reload(mod)
     import eos.integrations.dropbox as dropbox
     import eos.integrations.google_calendar as google_calendar
+
     importlib.reload(google_calendar)
     importlib.reload(dropbox)
     config.ensure_dirs()
@@ -46,8 +46,9 @@ def test_secret_store_roundtrip(env):
 
 
 def test_dropbox_resolve_listing_from_subfolder(env):
-    from eos.integrations import dropbox
     import eos.studio as studio
+    from eos.integrations import dropbox
+
     studio.get_profile()
     db.run(
         "UPDATE studio_profiles SET dropbox_watch_path='/Eos Ingest' WHERE studio_id='default'",
@@ -60,8 +61,9 @@ def test_dropbox_resolve_listing_from_subfolder(env):
 
 
 def test_dropbox_default_listing(env):
-    from eos.integrations import dropbox
     import eos.studio as studio
+    from eos.integrations import dropbox
+
     studio.get_profile()
     lid = db.run(
         "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Default', 'booked')",
@@ -80,7 +82,9 @@ def test_platform_billing_apply_subscription(env):
         status="active",
         plan_tier="pro",
     )
-    row = db.one("SELECT billing_status, plan_tier, stripe_subscription_id FROM studio WHERE id='default'")
+    row = db.one(
+        "SELECT billing_status, plan_tier, stripe_subscription_id FROM studio WHERE id='default'"
+    )
     assert row["billing_status"] == "active"
     assert row["plan_tier"] == "pro"
     assert row["stripe_subscription_id"] == "sub_123"
@@ -88,8 +92,10 @@ def test_platform_billing_apply_subscription(env):
 
 def test_google_push_enqueues_job(env):
     import eos.integrations.google_calendar as google_calendar
+
     importlib.reload(google_calendar)
     import eos.studio as studio
+
     studio.get_profile()
     oauth_store.save_tokens("google", access_token="at", refresh_token="rt")
     db.run("UPDATE studio_profiles SET google_calendar_enabled=1 WHERE studio_id='default'")
@@ -114,6 +120,7 @@ def test_integration_tables_exist(env):
 
 def test_google_and_dropbox_configured(env):
     from eos.integrations import dropbox, google_calendar
+
     assert google_calendar.is_configured()
     assert dropbox.is_configured()
     assert platform_billing.is_configured()

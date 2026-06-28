@@ -1,12 +1,11 @@
 """Gallery downloads — originals ZIP and single-asset (PIN cookie gate)."""
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
-from .. import config, db, jobs, paywall, security
+from .. import db, jobs, paywall, security
 from ..galleries import get_gallery_by_slug
 from ..jobs import zip_path
 from ..render import templates
@@ -25,7 +24,9 @@ def _gate(request: Request, slug: str, *, require_paid: bool = True):
         slug_inv = paywall.unpaid_invoice_slug(g["listing_id"])
         raise HTTPException(
             status_code=402,
-            detail=f"payment required — pay invoice at /i/{slug_inv}" if slug_inv else "payment required",
+            detail=f"payment required — pay invoice at /i/{slug_inv}"
+            if slug_inv
+            else "payment required",
         )
     return g
 
@@ -37,7 +38,9 @@ async def download_landing(request: Request, slug: str):
     if not z.is_file():
         jobs.enqueue("zip_build", {"gallery_id": g["id"], "rev": g["content_rev"]})
         return templates.TemplateResponse(
-            request, "public/zip_wait.html", {"g": g},
+            request,
+            "public/zip_wait.html",
+            {"g": g},
         )
     return RedirectResponse(f"/g/{slug}/download/zip", status_code=303)
 
@@ -61,6 +64,7 @@ async def download_asset(request: Request, slug: str, asset_id: int):
     if not a:
         raise HTTPException(status_code=404)
     from .. import media_paths
+
     path = media_paths.gallery_dir(g["id"]) / "original" / a["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)

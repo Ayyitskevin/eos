@@ -30,7 +30,9 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def get_user(user_id: int):
-    row = db.one("SELECT * FROM users WHERE id=? AND studio_id=? AND active=1", (user_id, STUDIO_ID))
+    row = db.one(
+        "SELECT * FROM users WHERE id=? AND studio_id=? AND active=1", (user_id, STUDIO_ID)
+    )
     if not row:
         raise HTTPException(status_code=404)
     return row

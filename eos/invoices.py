@@ -54,10 +54,18 @@ def create_invoice(
             slug, title, amount_cents, line_items, notes, invoice_kind, inquiry_id)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, client_id, bill_to_client_id, agent_client_id,
-            security.new_slug(), title.strip(),
-            amount_cents, json.dumps(line_items or []), notes.strip(),
-            invoice_kind, inquiry_id,
+            STUDIO_ID,
+            listing_id,
+            client_id,
+            bill_to_client_id,
+            agent_client_id,
+            security.new_slug(),
+            title.strip(),
+            amount_cents,
+            json.dumps(line_items or []),
+            notes.strip(),
+            invoice_kind,
+            inquiry_id,
         ),
     )
     db.audit("admin", "invoice.create", f"id={iid} listing_id={listing_id}")
@@ -86,7 +94,15 @@ def create_deposit_invoice(
 
 
 def update_invoice(invoice_id: int, **fields) -> None:
-    allowed = {"title", "amount_cents", "status", "notes", "client_id", "bill_to_client_id", "agent_client_id"}
+    allowed = {
+        "title",
+        "amount_cents",
+        "status",
+        "notes",
+        "client_id",
+        "bill_to_client_id",
+        "agent_client_id",
+    }
     parts = []
     params: list = []
     for k, v in fields.items():

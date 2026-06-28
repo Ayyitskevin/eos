@@ -88,8 +88,15 @@ def update_gallery_settings(
     db.run(
         """UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
            published=?, listing_id=?, content_rev=content_rev+1 WHERE id=?""",
-        (title.strip(), client_name, pin, expires_at, 1 if published else 0,
-         listing_id, gallery_id),
+        (
+            title.strip(),
+            client_name,
+            pin,
+            expires_at,
+            1 if published else 0,
+            listing_id,
+            gallery_id,
+        ),
     )
     db.audit("admin", "gallery.update", f"id={gallery_id}")
 

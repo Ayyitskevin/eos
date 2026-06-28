@@ -10,7 +10,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/sequences", response_class=HTMLResponse)
 async def sequences_index(request: Request):
     return templates.TemplateResponse(
-        request, "admin/sequences.html",
+        request,
+        "admin/sequences.html",
         {
             "sequences": sequences.list_sequences(),
             "pending": sequences.list_pending_runs(),
@@ -36,7 +37,8 @@ async def cancel_run(run_id: int):
 async def sequence_edit_form(request: Request, seq_id: int):
     seq = sequences.get_sequence(seq_id)
     return templates.TemplateResponse(
-        request, "admin/sequence_edit.html",
+        request,
+        "admin/sequence_edit.html",
         {"seq": seq, "triggers": sequences.TRIGGER_EVENTS},
     )
 

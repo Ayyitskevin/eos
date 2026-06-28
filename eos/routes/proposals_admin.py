@@ -18,9 +18,11 @@ async def proposal_detail(request: Request, proposal_id: int):
     client = None
     if listing["client_id"]:
         from .. import db
+
         client = db.one("SELECT * FROM clients WHERE id=?", (listing["client_id"],))
     return templates.TemplateResponse(
-        request, "admin/proposal.html",
+        request,
+        "admin/proposal.html",
         {
             "d": prop,
             "listing": listing,
@@ -41,10 +43,14 @@ async def create_proposal(listing_id: int, preset: str = Form("blank")):
 
 
 @router.post("/proposals/{proposal_id}")
-async def update_proposal(request: Request, proposal_id: int, title: str = Form(...), intro: str = Form("")):
+async def update_proposal(
+    request: Request, proposal_id: int, title: str = Form(...), intro: str = Form("")
+):
     form = await request.form()
     line_items, total = proposals.parse_items(form)
-    proposals.update_proposal(proposal_id, title=title, intro=intro, line_items=line_items, total_cents=total)
+    proposals.update_proposal(
+        proposal_id, title=title, intro=intro, line_items=line_items, total_cents=total
+    )
     return RedirectResponse(f"/admin/proposals/{proposal_id}", status_code=303)
 
 

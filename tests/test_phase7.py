@@ -2,15 +2,14 @@
 
 import importlib
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
 import eos.main as main
 import eos.paywall as paywall
 import eos.portal as portal
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -23,6 +22,7 @@ def app_env(tmp_path, monkeypatch):
     config.ensure_dirs()
     db.migrate()
     import eos.studio as studio
+
     importlib.reload(studio)
     studio.update_profile(pay_to_download=True, watermark_until_paid=True)
     jobs.start()
@@ -53,7 +53,9 @@ async def test_paywall_blocks_download(app_env):
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        login = await client.post("/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False)
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
         cookie = login.headers["set-cookie"]
         pin = await client.post("/g/paygal/pin", data={"pin": "1234"}, follow_redirects=False)
         gal_cookie = pin.headers.get("set-cookie", "")
@@ -90,7 +92,9 @@ async def test_agent_portal_lists_deliveries(app_env):
 
 @pytest.mark.asyncio
 async def test_listing_media_embed_on_gallery(app_env):
-    lid = db.run("INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Embed Test', 'delivered')")
+    lid = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('default', 'Embed Test', 'delivered')"
+    )
     db.run(
         """INSERT INTO listing_media (studio_id, listing_id, kind, label, embed_url)
            VALUES ('default', ?, 'youtube', 'Walkthrough', 'https://www.youtube.com/embed/demo')""",

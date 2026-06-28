@@ -15,7 +15,8 @@ async def signup_form(request: Request):
     if not config.SIGNUP_ENABLED:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
-        request, "site/signup.html",
+        request,
+        "site/signup.html",
         {"error": None, "base_domain": config.BASE_DOMAIN},
     )
 
@@ -34,8 +35,12 @@ async def signup_submit(
     ip = security.client_ip(request)
     if security.signup_throttled(ip):
         return templates.TemplateResponse(
-            request, "site/signup.html",
-            {"error": "Too many signups from this network. Try again later.", "base_domain": config.BASE_DOMAIN},
+            request,
+            "site/signup.html",
+            {
+                "error": "Too many signups from this network. Try again later.",
+                "base_domain": config.BASE_DOMAIN,
+            },
             status_code=429,
         )
     try:
@@ -49,7 +54,8 @@ async def signup_submit(
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else "Signup failed."
         return templates.TemplateResponse(
-            request, "site/signup.html",
+            request,
+            "site/signup.html",
             {"error": detail, "base_domain": config.BASE_DOMAIN},
             status_code=e.status_code,
         )

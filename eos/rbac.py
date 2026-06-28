@@ -2,25 +2,44 @@
 
 from fastapi import HTTPException, Request
 
-from . import security, users
+from . import security
 
 ROLES = ("owner", "operator", "scheduler", "editor", "accountant")
 
 # Permission sets per role (owner always has all).
 ROLE_PERMS: dict[str, frozenset[str]] = {
     "owner": frozenset({"*"}),
-    "operator": frozenset({
-        "*",
-    }),
-    "scheduler": frozenset({
-        "calendar", "listings.read", "listings.write", "clients.read", "today",
-    }),
-    "editor": frozenset({
-        "listings.read", "listings.write", "galleries", "deliveries", "today",
-    }),
-    "accountant": frozenset({
-        "reports", "invoices", "clients.read", "listings.read",
-    }),
+    "operator": frozenset(
+        {
+            "*",
+        }
+    ),
+    "scheduler": frozenset(
+        {
+            "calendar",
+            "listings.read",
+            "listings.write",
+            "clients.read",
+            "today",
+        }
+    ),
+    "editor": frozenset(
+        {
+            "listings.read",
+            "listings.write",
+            "galleries",
+            "deliveries",
+            "today",
+        }
+    ),
+    "accountant": frozenset(
+        {
+            "reports",
+            "invoices",
+            "clients.read",
+            "listings.read",
+        }
+    ),
 }
 
 # Routes blocked unless owner/operator.
@@ -82,4 +101,5 @@ def require_perm(perm: str):
         role = role_for_request(request)
         if not has_perm(role, perm):
             raise HTTPException(status_code=403, detail="Insufficient permissions.")
+
     return _dep

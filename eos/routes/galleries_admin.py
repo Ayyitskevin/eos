@@ -10,7 +10,8 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 @router.get("/galleries", response_class=HTMLResponse)
 async def galleries_index(request: Request):
     return templates.TemplateResponse(
-        request, "admin/galleries.html",
+        request,
+        "admin/galleries.html",
         {"galleries": galleries.list_galleries(), "base_url": config.BASE_URL},
     )
 
@@ -32,7 +33,8 @@ async def gallery_detail(request: Request, gallery_id: int):
             unsectioned.append(a)
     n_pending = sum(1 for a in assets if a["status"] == "pending")
     return templates.TemplateResponse(
-        request, "admin/gallery.html",
+        request,
+        "admin/gallery.html",
         {
             "g": g,
             "sections": sections,
@@ -86,7 +88,9 @@ async def gallery_settings(
     )
     if published and not old["published"]:
         listing_id = lid or old["listing_id"]
-        n = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,))
+        n = db.one(
+            "SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,)
+        )
         automations.on_gallery_published(listing_id, n["n"] if n else 0)
         automations.on_gallery_published_email(gallery_id)
         if listing_id:
@@ -99,9 +103,12 @@ async def gallery_settings(
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
 async def set_cover(gallery_id: int, asset_id: int):
     g = galleries.get_gallery(gallery_id)
-    a = db.one("SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id))
+    a = db.one(
+        "SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id)
+    )
     if not a:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
     db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
@@ -110,6 +117,7 @@ async def set_cover(gallery_id: int, asset_id: int):
 
 def _get_section(gallery_id: int, section_id: int):
     from fastapi import HTTPException
+
     s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
     if not s:
         raise HTTPException(status_code=404)
@@ -133,6 +141,7 @@ async def add_section(gallery_id: int, name: str = Form(...)):
 @router.post("/galleries/{gallery_id}/sections/{section_id}/rename")
 async def rename_section(gallery_id: int, section_id: int, name: str = Form(...)):
     from fastapi import HTTPException
+
     _get_section(gallery_id, section_id)
     if not name.strip():
         raise HTTPException(status_code=400, detail="name required")
@@ -143,6 +152,7 @@ async def rename_section(gallery_id: int, section_id: int, name: str = Form(...)
 @router.post("/galleries/{gallery_id}/sections/{section_id}/move")
 async def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)):
     from fastapi import HTTPException
+
     if dir not in ("up", "down"):
         raise HTTPException(status_code=400, detail="dir must be up or down")
     _get_section(gallery_id, section_id)
@@ -181,6 +191,7 @@ async def move_asset(gallery_id: int, asset_id: int, section_id: str = Form(""))
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/move")
 async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
     from fastapi import HTTPException
+
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
     a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))

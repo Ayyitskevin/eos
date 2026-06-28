@@ -15,7 +15,13 @@ def list_codes():
     )
 
 
-def create_code(*, code: str, credit_cents: int, referrer_client_id: int | None = None, max_uses: int | None = None) -> int:
+def create_code(
+    *,
+    code: str,
+    credit_cents: int,
+    referrer_client_id: int | None = None,
+    max_uses: int | None = None,
+) -> int:
     code = code.strip().upper()
     rid = db.run(
         """INSERT INTO referral_codes

@@ -59,7 +59,9 @@ def build_context(listing_id: int, extra: dict | None = None) -> dict:
         "client_first": client_name.split()[0] if client_name else "there",
         "client_email": row["email"] if row else "",
         "listing_title": row["title"] if row else "",
-        "listing_address": ", ".join(p for p in (row["address_line1"], row["city"]) if row and p) if row else "",
+        "listing_address": ", ".join(p for p in (row["address_line1"], row["city"]) if row and p)
+        if row
+        else "",
         "gallery_link": f"{get_base_url()}/g/{gallery['slug']}" if gallery else "",
         "gallery_pin": gallery["pin"] if gallery else "",
         "proposal_link": f"{get_base_url()}/p/{proposal['slug']}" if proposal else "",
@@ -73,6 +75,7 @@ def build_context(listing_id: int, extra: dict | None = None) -> dict:
 def render_template(template: str, ctx: dict) -> str:
     def repl(m):
         return str(ctx.get(m.group(1), ""))
+
     return _VAR_RE.sub(repl, template)
 
 
@@ -128,6 +131,7 @@ def process_due() -> int:
             channel = (seq["channel"] if seq else "email") or "email"
             if channel == "sms":
                 from . import sms
+
                 phone_row = db.one("SELECT phone FROM clients WHERE id=?", (run["client_id"],))
                 phone = phone_row["phone"] if phone_row else ""
                 if not phone or not sms.send(to_phone=phone, body=body[:500]):
@@ -141,7 +145,14 @@ def process_due() -> int:
             db.run(
                 """INSERT INTO emails_log (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
                    VALUES (?,?,?,?,?,?)""",
-                (STUDIO_ID, run["listing_id"], "sequence", run["sequence_id"], run["to_email"], subject),
+                (
+                    STUDIO_ID,
+                    run["listing_id"],
+                    "sequence",
+                    run["sequence_id"],
+                    run["to_email"],
+                    subject,
+                ),
             )
             sent += 1
         except Exception as e:
@@ -188,6 +199,7 @@ def toggle_sequence(seq_id: int, active: bool) -> None:
 
 def get_sequence(seq_id: int):
     from fastapi import HTTPException
+
     row = db.one(
         "SELECT * FROM email_sequences WHERE id=? AND studio_id=?",
         (seq_id, STUDIO_ID),
@@ -210,6 +222,14 @@ def update_sequence(
     db.run(
         """UPDATE email_sequences SET name=?, subject=?, body_template=?, delay_hours=?, trigger_event=?
            WHERE id=? AND studio_id=?""",
-        (name.strip(), subject.strip(), body_template, delay_hours, trigger_event.strip(), seq_id, STUDIO_ID),
+        (
+            name.strip(),
+            subject.strip(),
+            body_template,
+            delay_hours,
+            trigger_event.strip(),
+            seq_id,
+            STUDIO_ID,
+        ),
     )
     db.audit("admin", "sequence.update", f"id={seq_id}")

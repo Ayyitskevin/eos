@@ -2,15 +2,13 @@
 
 import importlib
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
 import eos.main as main
 import eos.scheduling as scheduling
-import eos.studio as studio
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture()
@@ -21,6 +19,7 @@ def app_env(tmp_path, monkeypatch):
     for mod in (config, db, jobs, scheduling, main):
         importlib.reload(mod)
     import eos.studio as studio_mod
+
     importlib.reload(studio_mod)
     config.ensure_dirs()
     db.migrate()
@@ -40,6 +39,7 @@ def _first_slot():
 async def test_open_slots_respect_appointments(app_env):
     slot = _first_slot()
     from eos import appointments
+
     appointments.create_appointment("Busy", starts_at=slot)
     db.run("UPDATE appointments SET status='confirmed' WHERE starts_at=?", (slot,))
     assert not scheduling.slot_is_open(slot)
@@ -98,10 +98,15 @@ async def test_booking_deposit_pending_payment(app_env):
             follow_redirects=False,
         )
         assert r.status_code == 303
-        inq = db.one("SELECT status, listing_id, invoice_id FROM inquiries WHERE email=?", ("deposit@book.test",))
+        inq = db.one(
+            "SELECT status, listing_id, invoice_id FROM inquiries WHERE email=?",
+            ("deposit@book.test",),
+        )
         assert inq["status"] == "pending_payment"
         listing = db.one("SELECT status FROM listings WHERE id=?", (inq["listing_id"],))
         assert listing["status"] == "lead"
-        inv = db.one("SELECT invoice_kind, amount_cents FROM invoices WHERE id=?", (inq["invoice_id"],))
+        inv = db.one(
+            "SELECT invoice_kind, amount_cents FROM invoices WHERE id=?", (inq["invoice_id"],)
+        )
         assert inv["invoice_kind"] == "deposit"
         assert inv["amount_cents"] == 5000

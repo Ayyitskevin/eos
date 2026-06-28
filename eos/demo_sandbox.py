@@ -23,8 +23,11 @@ def ensure_demo() -> str:
     studio_seed.seed_studio(DEMO_STUDIO_ID)
     tenant.set_studio(DEMO_STUDIO_ID)
     users.create_user(
-        "demo@eos.app", "demo-view-only",
-        name="Demo Viewer", role="owner", studio_id=DEMO_STUDIO_ID,
+        "demo@eos.app",
+        "demo-view-only",
+        name="Demo Viewer",
+        role="owner",
+        studio_id=DEMO_STUDIO_ID,
     )
     dogfood.seed()
     log.info("demo sandbox studio created")

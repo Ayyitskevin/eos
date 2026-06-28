@@ -10,8 +10,23 @@ import sys
 
 from PIL import Image
 
-from . import config, db, galleries, invoices, listings, scheduling, studio_seed, tenant
-from . import appointments, clients, credits, media_paths, microsites, studio, users
+from . import (
+    appointments,
+    clients,
+    config,
+    credits,
+    db,
+    galleries,
+    invoices,
+    listings,
+    media_paths,
+    microsites,
+    scheduling,
+    studio,
+    studio_seed,
+    tenant,
+    users,
+)
 
 log = logging.getLogger("eos.dogfood")
 
@@ -58,13 +73,26 @@ def _seed_photos(gallery_id: int) -> int:
         img = Image.new("RGB", (1600, 1067), color=color)
         for sub in ("original", "web", "thumb"):
             dest = media_paths.gallery_subdir(gallery_id, sub) / stored
-            size = (1600, 1067) if sub == "original" else ((1200, 800) if sub == "web" else (480, 320))
+            size = (
+                (1600, 1067) if sub == "original" else ((1200, 800) if sub == "web" else (480, 320))
+            )
             img.resize(size, Image.Resampling.LANCZOS).save(dest, "JPEG", quality=88)
         asset_id = db.run(
             """INSERT INTO assets
                (gallery_id, section_id, kind, filename, stored, bytes, status, width, height, agent_favorite)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (gallery_id, section_id, "photo", filename, stored, 250_000, "ready", 1600, 1067, 1 if favorite else 0),
+            (
+                gallery_id,
+                section_id,
+                "photo",
+                filename,
+                stored,
+                250_000,
+                "ready",
+                1600,
+                1067,
+                1 if favorite else 0,
+            ),
         )
         if favorite:
             cover_id = asset_id
@@ -94,7 +122,9 @@ def seed(*, force: bool = False) -> dict:
         db.run("DELETE FROM listing_shots WHERE listing_id=?", (lid,))
         db.run("DELETE FROM listing_tasks WHERE listing_id=?", (lid,))
         db.run("DELETE FROM listings WHERE id=?", (lid,))
-        agent = db.one("SELECT id FROM clients WHERE studio_id='default' AND email='sarah.chen@kw.com'")
+        agent = db.one(
+            "SELECT id FROM clients WHERE studio_id='default' AND email='sarah.chen@kw.com'"
+        )
         if agent:
             db.run("DELETE FROM credit_ledger WHERE client_id=?", (agent["id"],))
             db.run("DELETE FROM clients WHERE id=?", (agent["id"],))
@@ -180,7 +210,7 @@ def seed(*, force: bool = False) -> dict:
         listing_id=listing_id,
         client_name="Sarah Chen",
     )
-    row = galleries.get_gallery(gallery_id)
+    galleries.get_gallery(gallery_id)
     galleries.update_gallery_settings(
         gallery_id,
         title="1420 Maple Dr",
@@ -204,7 +234,9 @@ def seed(*, force: bool = False) -> dict:
     return _summary(listing_id, owner_email=email, owner_password=password)
 
 
-def _summary(listing_id: int, *, owner_email: str | None = None, owner_password: str | None = None) -> dict:
+def _summary(
+    listing_id: int, *, owner_email: str | None = None, owner_password: str | None = None
+) -> dict:
     listing = listings.get_listing(listing_id)
     gallery = db.one(
         "SELECT id, slug, pin FROM galleries WHERE listing_id=? ORDER BY id DESC LIMIT 1",
@@ -228,7 +260,9 @@ def _summary(listing_id: int, *, owner_email: str | None = None, owner_password:
         "gallery_pin": gallery["pin"],
         "site_url": f"{base}/l/{listing['site_slug']}",
         "agent_portal_url": f"{base}/portal/{agent['portal_token']}",
-        "broker_portal_url": f"{base}/portal/brokerage/{broker['portal_token']}" if broker else None,
+        "broker_portal_url": f"{base}/portal/brokerage/{broker['portal_token']}"
+        if broker
+        else None,
         "appointment_id": appt["id"] if appt else None,
         "appointment_at": appt["starts_at"] if appt else None,
         "agent_credit_cents": credits.balance(listing["client_id"]),
