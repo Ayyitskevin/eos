@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Clients · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Clients</h1>
+    <nav><a href="/admin">Pipeline</a> · <a href="/admin/galleries">Galleries</a></nav>
+  </header>
+
+  <form method="post" action="/admin/clients" class="inline-form card">
+    <input name="name" placeholder="Name" required>
+    <select name="client_type">
+      {% for ct in client_types %}
+      <option value="{{ ct }}">{{ client_type_labels[ct] }}</option>
+      {% endfor %}
+    </select>
+    <input name="company" placeholder="Brokerage / company">
+    <input name="email" type="email" placeholder="Email">
+    <input name="phone" placeholder="Phone">
+    <input name="license_number" placeholder="License #">
+    <button type="submit">Add client</button>
+  </form>
+
+  <table class="list">
+    <tr><th>Name</th><th>Type</th><th>Company</th><th>Listings</th><th></th></tr>
+    {% for c in clients %}
+    <tr>
+      <td><a href="/admin/clients/{{ c.id }}">{{ c.name }}</a></td>
+      <td>{{ client_type_labels[c.client_type] }}</td>
+      <td>{{ c.company or "—" }}</td>
+      <td>{{ c.n_listings }}</td>
+      <td><a href="/admin/clients/{{ c.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not clients %}<p class="muted">No clients yet.</p>{% endif %}
+</main>
+{% endblock %}

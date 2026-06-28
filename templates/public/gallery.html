@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
+{% block bodyclass %}gallery-body{% endblock %}
+{% block content %}
+<header class="gallery-header">
+  <div class="gallery-header-inner">
+    <p class="brand-mark light">Eos</p>
+    <h1>{{ g.title }}</h1>
+    {% if g.client_name %}<p>{{ g.client_name }}</p>{% endif %}
+  </div>
+</header>
+
+<main class="gallery-main">
+  {% for s in sections %}
+    {% if by_section[s.id] %}
+      <h2 class="section-name">{{ s.name }}</h2>
+      <div class="grid">
+        {% for a in by_section[s.id] %}
+        <figure class="tile"><img src="/static/placeholder.svg" alt="{{ a.filename }}" loading="lazy"></figure>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+  {% if unsectioned %}
+    {% if sections %}<h2 class="section-name">More</h2>{% endif %}
+    <div class="grid">
+      {% for a in unsectioned %}
+      <figure class="tile"><img src="/static/placeholder.svg" alt="{{ a.filename }}" loading="lazy"></figure>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if not assets %}
+  <p class="muted center">Photos are being prepared — check back soon.</p>
+  {% endif %}
+</main>
+{% endblock %}

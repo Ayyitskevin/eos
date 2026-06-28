@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ g.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <div>
+      <h1>{{ g.title }}</h1>
+      {% if listing %}<p class="muted"><a href="/admin/listings/{{ listing.id }}">{{ listing.title }}</a></p>{% endif %}
+    </div>
+    <nav><a href="/admin/galleries">← Galleries</a></nav>
+  </header>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Delivery settings</h2>
+      <form method="post" action="/admin/galleries/{{ g.id }}/settings" class="form-grid compact">
+        <label>Title <input name="title" value="{{ g.title }}" required></label>
+        <label>Client name <input name="client_name" value="{{ g.client_name or '' }}"></label>
+        <label>PIN <input name="pin" value="{{ g.pin }}" pattern="[0-9]{4}" maxlength="4" required></label>
+        <label>Expires <input name="expires_at" type="date" value="{{ g.expires_at or '' }}"></label>
+        <label>Listing
+          <select name="listing_id">
+            <option value="">— none —</option>
+            {% for l in listings %}
+            <option value="{{ l.id }}" {% if g.listing_id == l.id %}selected{% endif %}>{{ l.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="checkbox"><input type="checkbox" name="published" value="true" {% if g.published %}checked{% endif %}> Published</label>
+        <button type="submit">Save</button>
+      </form>
+      <p class="muted">Delivery link: <code class="slug">{{ base_url }}/g/{{ g.slug }}</code></p>
+    </section>
+
+    <section class="card">
+      <h2>Sections</h2>
+      <ol class="section-list">
+        {% for s in sections %}
+        <li>{{ s.name }}</li>
+        {% endfor %}
+      </ol>
+      <p class="muted">Room-based sections seeded for RE delivery. Upload pipeline ships in phase 2.</p>
+    </section>
+
+    <section class="card">
+      <h2>Assets</h2>
+      {% if assets %}
+      <p>{{ assets|length }} file(s) — processing pipeline not wired in v0.</p>
+      {% else %}
+      <p class="muted">No photos yet. Wire uploads + Pillow pipeline in phase 2.</p>
+      {% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

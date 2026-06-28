@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+jinja2
+itsdangerous
+python-multipart
+aiofiles
+pytest
+pytest-asyncio
+httpx

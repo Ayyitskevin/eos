@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Galleries · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Galleries</h1>
+    <nav><a href="/admin">Pipeline</a> · <a href="/admin/clients">Clients</a></nav>
+  </header>
+
+  <table class="list">
+    <tr><th>Title</th><th>Listing</th><th>Assets</th><th>PIN</th><th>Link</th><th>Status</th></tr>
+    {% for g in galleries %}
+    <tr>
+      <td><a href="/admin/galleries/{{ g.id }}">{{ g.title }}</a></td>
+      <td>{{ g.listing_title or "—" }}</td>
+      <td>{{ g.n_assets }}</td>
+      <td><code>{{ g.pin }}</code></td>
+      <td><code class="slug">{{ base_url }}/g/{{ g.slug }}</code></td>
+      <td>{{ "published" if g.published else "draft" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not galleries %}<p class="muted">Create a gallery from a listing detail page.</p>{% endif %}
+</main>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>{{ c.name }}</h1>
+    <nav><a href="/admin/clients">← Clients</a></nav>
+  </header>
+
+  <form method="post" action="/admin/clients/{{ c.id }}" class="form-grid card">
+    <label>Name <input name="name" value="{{ c.name }}" required></label>
+    <label>Type
+      <select name="client_type">
+        {% for ct in client_types %}
+        <option value="{{ ct }}" {% if c.client_type == ct %}selected{% endif %}>{{ client_type_labels[ct] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Company <input name="company" value="{{ c.company }}"></label>
+    <label>Email <input name="email" type="email" value="{{ c.email }}"></label>
+    <label>Phone <input name="phone" value="{{ c.phone }}"></label>
+    <label>License # <input name="license_number" value="{{ c.license_number }}"></label>
+    <label>Parent (broker)
+      <select name="parent_id">
+        <option value="">— none —</option>
+        {% for o in all_clients %}
+        {% if o.id != c.id %}
+        <option value="{{ o.id }}" {% if c.parent_id == o.id %}selected{% endif %}>{{ o.name }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label>Notes <textarea name="notes" rows="3">{{ c.notes }}</textarea></label>
+    <button type="submit">Save</button>
+  </form>
+
+  {% if children %}
+  <section class="card">
+    <h2>Agents under this brokerage</h2>
+    <ul>{% for ch in children %}<li><a href="/admin/clients/{{ ch.id }}">{{ ch.name }}</a></li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>Listings</h2>
+    {% if listings %}
+    <ul>{% for l in listings %}<li><a href="/admin/listings/{{ l.id }}">{{ l.title }}</a></li>{% endfor %}</ul>
+    {% else %}<p class="muted">No listings linked yet.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

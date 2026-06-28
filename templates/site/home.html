@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}{{ site_name }}{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<header class="site-hero">
+  <p class="brand-mark">Eos</p>
+  <h1>{{ profile.headline or "Real estate photography that sells the listing" }}</h1>
+  <p class="lead">{{ profile.about or "MLS-ready delivery, agent-branded exports, and 24-hour turnaround for solo operators who ship like a studio." }}</p>
+  {% if profile.service_area %}<p class="muted">Serving {{ profile.service_area }}</p>{% endif %}
+  <a href="/admin" class="btn btn-accent">Studio login</a>
+</header>
+
+<main class="site-main">
+  <section>
+    <h2>Listing packages</h2>
+    <div class="pkg-grid">
+      {% for p in packages %}
+      <article class="pkg-card">
+        <h3>{{ p.name }}</h3>
+        <p class="muted">{{ p.description }}</p>
+        <p class="price">${{ "%.0f"|format(p.price_cents / 100) }}</p>
+        <p class="muted">{{ p.turnaround_hours }}h turnaround</p>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</main>
+{% endblock %}

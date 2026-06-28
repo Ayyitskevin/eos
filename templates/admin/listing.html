@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ l.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <div>
+      <h1>{{ l.title }}</h1>
+      <p class="muted">{{ address }}</p>
+    </div>
+    <nav>
+      <a href="/admin">Pipeline</a>
+      {% if client %} · <a href="/admin/clients/{{ client.id }}">{{ client.name }}</a>{% endif %}
+    </nav>
+  </header>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Listing details</h2>
+      <form method="post" action="/admin/listings/{{ l.id }}" class="form-grid compact">
+        <label>Title <input name="title" value="{{ l.title }}" required></label>
+        <label>Status
+          <select name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if l.status == s %}selected{% endif %}>{{ listing_status_labels[s] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Client
+          <select name="client_id">
+            <option value="">— none —</option>
+            {% for c in client_list %}
+            <option value="{{ c.id }}" {% if l.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>MLS ID <input name="mls_id" value="{{ l.mls_id }}"></label>
+        <label>Address <input name="address_line1" value="{{ l.address_line1 }}"></label>
+        <div class="row-3">
+          <label>City <input name="city" value="{{ l.city }}"></label>
+          <label>State <input name="state" value="{{ l.state }}"></label>
+          <label>ZIP <input name="zip_code" value="{{ l.zip }}"></label>
+        </div>
+        <label>Shoot date <input name="shoot_date" type="date" value="{{ l.shoot_date or '' }}"></label>
+        <label>Due <input name="due_at" type="datetime-local" value="{{ l.due_at[:16] if l.due_at else '' }}"></label>
+        <label>Access <textarea name="access_notes" rows="2">{{ l.access_notes }}</textarea></label>
+        <button type="submit">Save</button>
+      </form>
+    </section>
+
+    <section class="card" id="shots">
+      <h2>Shot list</h2>
+      <table class="list compact">
+        {% for s in shots %}
+        <tr class="{% if s.done %}done-row{% endif %}">
+          <td><span class="badge badge-room">{{ shot_room_labels.get(s.room, s.room) }}</span></td>
+          <td>{{ s.title }}</td>
+          <td class="muted">{{ shot_priority_labels[s.priority] }}</td>
+          <td>
+            <form method="post" action="/admin/listings/{{ l.id }}/shots/{{ s.id }}/toggle" class="inline-form">
+              <input type="hidden" name="done" value="{{ 0 if s.done else 1 }}">
+              <button type="submit" class="link">{{ "Undo" if s.done else "Done" }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </section>
+
+    <section class="card" id="tasks">
+      <h2>Delivery checklist</h2>
+      <ul class="checklist">
+        {% for t in tasks %}
+        <li class="{% if t.done %}done-row{% endif %}">
+          <form method="post" action="/admin/listings/{{ l.id }}/tasks/{{ t.id }}/toggle" class="inline-form">
+            <input type="hidden" name="done" value="{{ 0 if t.done else 1 }}">
+            <button type="submit" class="check-btn" aria-label="Toggle">{{ "☑" if t.done else "☐" }}</button>
+          </form>
+          {{ t.label }}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Galleries</h2>
+      {% if galleries %}
+      <ul class="pkg-list">
+        {% for g in galleries %}
+        <li><a href="/admin/galleries/{{ g.id }}">{{ g.title }}</a>
+          <code class="slug">{{ base_url }}/g/{{ g.slug }}</code>
+          {{ "published" if g.published else "draft" }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">No gallery yet for this listing.</p>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/gallery">
+        <button type="submit" class="btn btn-accent">Create delivery gallery</button>
+      </form>
+    </section>
+  </div>
+</main>
+{% endblock %}

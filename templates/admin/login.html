@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Admin · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="center-card">
+  <p class="brand-mark">Eos</p>
+  <h1>Studio admin</h1>
+  <p class="muted">Real estate photography pipeline</p>
+  <form method="post" action="/admin/login" class="pin-form">
+    <input type="password" name="password" placeholder="Password" autofocus required>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <button type="submit">Sign in</button>
+  </form>
+</main>
+{% endblock %}

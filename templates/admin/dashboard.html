@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Pipeline · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <div class="admin-brand">
+      <span class="brand-mark">Eos</span>
+      <h1>Listing pipeline</h1>
+    </div>
+    <nav class="admin-nav">
+      <a href="/admin/listings/new" class="btn btn-accent">+ New listing</a>
+      <a href="/admin/clients">Clients</a>
+      <a href="/admin/galleries">Galleries</a>
+    </nav>
+    <form method="post" action="/admin/logout"><button class="link">Sign out</button></form>
+  </header>
+
+  <section class="pipeline-strip">
+    {% for s in statuses %}
+    <div class="pipeline-card {% if pipeline.get(s, 0) %}has-items{% endif %}">
+      <span class="pipeline-count">{{ pipeline.get(s, 0) }}</span>
+      <span class="pipeline-label">{{ listing_status_labels[s] }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  {% if due_soon %}
+  <details class="alert-banner" open>
+    <summary>{{ due_soon|length }} listing{{ "s" if due_soon|length != 1 }} due within 48h</summary>
+    <ul class="due-list">
+      {% for d in due_soon %}
+      <li><a href="/admin/listings/{{ d.id }}">{{ d.title }}</a>
+        <span class="muted">due {{ d.due_at[:16] }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+
+  <table class="list">
+    <tr>
+      <th>Listing</th><th>Client</th><th>Status</th><th>Due</th>
+      <th>Shots</th><th>Tasks</th><th></th>
+    </tr>
+    {% for l in listings %}
+    <tr>
+      <td>
+        <a href="/admin/listings/{{ l.id }}" class="listing-title">{{ l.title }}</a>
+        {% if l.address_line1 %}<span class="muted listing-sub">{{ l.address_line1 }}{% if l.city %}, {{ l.city }}{% endif %}</span>{% endif %}
+        {% if l.mls_id %}<code class="mls-tag">{{ l.mls_id }}</code>{% endif %}
+      </td>
+      <td>{{ l.client_name or "—" }}{% if l.client_company %}<span class="muted"> · {{ l.client_company }}</span>{% endif %}</td>
+      <td><span class="badge badge-{{ l.status }}">{{ listing_status_labels[l.status] }}</span></td>
+      <td class="{% if l.due_at and l.due_at[:10] < today and l.status not in ['delivered','archived'] %}warn{% endif %}">
+        {{ l.due_at[:16] if l.due_at else "—" }}
+      </td>
+      <td>{{ l.shots_open or 0 }} open</td>
+      <td>{{ l.tasks_open or 0 }} open</td>
+      <td><a href="/admin/listings/{{ l.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not listings %}
+  <div class="empty-state">
+    <h2>No listings yet</h2>
+    <p class="muted">Create your first property shoot to seed a shot list and delivery checklist.</p>
+    <a href="/admin/listings/new" class="btn btn-accent">Create listing</a>
+  </div>
+  {% endif %}
+
+  <aside class="sidebar-cards">
+    <div class="card">
+      <h3>Service packages</h3>
+      <ul class="pkg-list">
+        {% for p in packages %}
+        <li><strong>{{ p.name }}</strong><span class="muted">{{ p.description }}</span>
+          <span class="price">${{ "%.0f"|format(p.price_cents / 100) }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Export presets</h3>
+      <ul class="pkg-list">
+        {% for pr in presets %}
+        <li><strong>{{ pr.name }}</strong> <code>{{ pr.ratio_label }}</code>
+          <span class="muted">{{ pr.width }}×{{ pr.height }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</main>
+{% endblock %}
