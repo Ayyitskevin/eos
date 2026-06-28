@@ -7,6 +7,7 @@
     <p class="brand-mark light">Eos</p>
     <h1>{{ g.title }}</h1>
     {% if g.client_name %}<p>{{ g.client_name }}</p>{% endif %}
+    <a class="btn" href="/g/{{ g.slug }}/download">Download all</a>
   </div>
 </header>
 
@@ -16,7 +17,13 @@
       <h2 class="section-name">{{ s.name }}</h2>
       <div class="grid">
         {% for a in by_section[s.id] %}
-        <figure class="tile"><img src="/static/placeholder.svg" alt="{{ a.filename }}" loading="lazy"></figure>
+        {% if a.status == 'ready' %}
+        <figure class="tile">
+          <a href="/g/{{ g.slug }}/download/asset/{{ a.id }}">
+            <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+          </a>
+        </figure>
+        {% endif %}
         {% endfor %}
       </div>
     {% endif %}
@@ -25,7 +32,13 @@
     {% if sections %}<h2 class="section-name">More</h2>{% endif %}
     <div class="grid">
       {% for a in unsectioned %}
-      <figure class="tile"><img src="/static/placeholder.svg" alt="{{ a.filename }}" loading="lazy"></figure>
+      {% if a.status == 'ready' %}
+      <figure class="tile">
+        <a href="/g/{{ g.slug }}/download/asset/{{ a.id }}">
+          <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+        </a>
+      </figure>
+      {% endif %}
       {% endfor %}
     </div>
   {% endif %}

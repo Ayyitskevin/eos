@@ -56,6 +56,12 @@ PIN_LOCKOUT_MIN = int(os.environ.get("EOS_PIN_LOCKOUT_MIN", "15"))
 SESSION_MAX_AGE = int(os.environ.get("EOS_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
 COOKIE_SECURE = _b("EOS_COOKIE_SECURE", "false")
 
+WEB_MAX_PX = int(os.environ.get("EOS_WEB_MAX_PX", "2400"))
+THUMB_MAX_PX = int(os.environ.get("EOS_THUMB_MAX_PX", "480"))
+JPEG_QUALITY = int(os.environ.get("EOS_JPEG_QUALITY", "88"))
+JOB_WORKERS = int(os.environ.get("EOS_JOB_WORKERS", "2"))
+MIN_FREE_GB = float(os.environ.get("EOS_MIN_FREE_GB", "2"))
+
 
 def ensure_dirs() -> None:
     for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, BRAND_DIR):

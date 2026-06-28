@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ inv.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>{{ inv.title }}</h1>
+    {% if listing %}<nav><a href="/admin/listings/{{ listing.id }}">← Listing</a></nav>{% endif %}
+  </header>
+
+  <section class="card">
+    <p class="price-lg">${{ "%.2f"|format(inv.amount_cents / 100) }}</p>
+    <p>Status: <span class="badge badge-{{ inv.status }}">{{ inv.status }}</span></p>
+    <p class="muted">Client link: <code class="slug">{{ base_url }}/i/{{ inv.slug }}</code></p>
+    {% if inv.notes %}<p>{{ inv.notes }}</p>{% endif %}
+
+    <div class="inline-form" style="margin-top:1rem">
+      {% if inv.status == 'draft' %}
+      <form method="post" action="/admin/invoices/{{ inv.id }}/send">
+        <button type="submit" class="btn btn-accent">Mark sent</button>
+      </form>
+      {% endif %}
+      {% if inv.status in ['sent','draft'] %}
+      <form method="post" action="/admin/invoices/{{ inv.id }}/paid">
+        <button type="submit">Mark paid (manual)</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+</main>
+{% endblock %}

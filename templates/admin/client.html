@@ -42,6 +42,29 @@
   {% endif %}
 
   <section class="card">
+    <h2>Brand kit (MLS watermark)</h2>
+    {% if brand_kit and brand_kit.active %}
+    <p class="muted">Active logo: {{ brand_kit.label }} · {{ brand_kit.position }} · {{ brand_kit.scale_pct }}%</p>
+    {% else %}
+    <p class="muted">No brand kit — MLS/Zillow exports won't include an agent watermark.</p>
+    {% endif %}
+    <form method="post" action="/admin/clients/{{ c.id }}/brand-kit" enctype="multipart/form-data" class="form-grid compact">
+      <label>Logo file <input type="file" name="file" accept="image/*" required></label>
+      <label>Position
+        <select name="position">
+          <option value="br">Bottom right</option>
+          <option value="bl">Bottom left</option>
+          <option value="tr">Top right</option>
+          <option value="tl">Top left</option>
+        </select>
+      </label>
+      <label>Scale % <input name="scale_pct" type="number" min="5" max="40" value="18"></label>
+      <label>Opacity <input name="opacity" type="number" min="20" max="100" value="100"></label>
+      <button type="submit">Upload brand kit</button>
+    </form>
+  </section>
+
+  <section class="card">
     <h2>Listings</h2>
     {% if listings %}
     <ul>{% for l in listings %}<li><a href="/admin/listings/{{ l.id }}">{{ l.title }}</a></li>{% endfor %}</ul>

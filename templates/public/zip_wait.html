@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Preparing download · {{ g.title }}{% endblock %}
+{% block content %}
+<main class="center-card">
+  <h1>Preparing your download</h1>
+  <p class="muted">We're zipping {{ g.title }} — this usually takes a few seconds.</p>
+  <meta http-equiv="refresh" content="3">
+  <a href="/g/{{ g.slug }}/download" class="btn">Try again</a>
+</main>
+{% endblock %}

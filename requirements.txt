@@ -4,6 +4,9 @@ jinja2
 itsdangerous
 python-multipart
 aiofiles
+pillow>=11.3
+pillow-heif
+stripe
 pytest
 pytest-asyncio
 httpx

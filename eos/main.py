@@ -12,9 +12,12 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import config, db
+from . import config, db, jobs
 from .render import ROOT, templates
-from .routes import auth, clients, dashboard, delivery, galleries_admin, listings, site
+from .routes import (
+    appointments, auth, brand_kits, clients, dashboard, delivery, downloads,
+    galleries_admin, invoices_admin, listings, media, pay, site, uploads,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,8 +29,10 @@ log = logging.getLogger("eos.app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.migrate()
+    jobs.start()
     log.info("Eos up on :%s · data=%s", config.PORT, config.DATA_DIR)
     yield
+    jobs.stop()
 
 
 app = FastAPI(
@@ -68,11 +73,19 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
 
 @app.get("/healthz")
 async def healthz():
-    return {"ok": True, "service": "eos", "version": "0.1.0"}
+    return {
+        "ok": True,
+        "service": "eos",
+        "version": "0.2.0",
+        "jobs_pending": jobs.pending_count(),
+    }
 
 
 for r in (
     auth.router, dashboard.router, clients.router, listings.router,
-    galleries_admin.router, delivery.router, site.router,
+    galleries_admin.router, uploads.router, media.router,
+    delivery.router, downloads.router, brand_kits.router,
+    invoices_admin.router, pay.router, appointments.router,
+    site.router,
 ):
     app.include_router(r)

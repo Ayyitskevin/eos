@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, galleries, listings, security
+from .. import config, galleries, jobs, listings, security, studio
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -23,17 +23,36 @@ async def gallery_detail(request: Request, gallery_id: int):
     listing = None
     if g["listing_id"]:
         listing = listings.get_listing(g["listing_id"])
+    by_section: dict[int, list] = {s["id"]: [] for s in sections}
+    unsectioned = []
+    for a in assets:
+        if a["section_id"] and a["section_id"] in by_section:
+            by_section[a["section_id"]].append(a)
+        else:
+            unsectioned.append(a)
+    n_pending = sum(1 for a in assets if a["status"] == "pending")
     return templates.TemplateResponse(
         request, "admin/gallery.html",
         {
             "g": g,
             "sections": sections,
             "assets": assets,
+            "by_section": by_section,
+            "unsectioned": unsectioned,
             "listing": listing,
             "listings": listings.list_listings(),
+            "presets": studio.list_crop_presets(),
+            "n_pending": n_pending,
             "base_url": config.BASE_URL,
         },
     )
+
+
+@router.post("/galleries/{gallery_id}/exports")
+async def build_exports(gallery_id: int):
+    galleries.get_gallery(gallery_id)
+    jobs.enqueue("gallery_exports", {"gallery_id": gallery_id})
+    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/settings")

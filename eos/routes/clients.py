@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, security
+from .. import brand_kits, clients, security
 from ..render import templates
 from ..vocab import CLIENT_TYPES
 
@@ -51,6 +51,7 @@ async def client_detail(request: Request, client_id: int):
             "listings": listings_rows,
             "all_clients": clients.list_clients(),
             "client_types": CLIENT_TYPES,
+            "brand_kit": brand_kits.get_kit(client_id),
         },
     )
 

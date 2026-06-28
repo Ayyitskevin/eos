@@ -21,9 +21,18 @@ Eos inherits the best patterns from two sibling projects:
 - **`client_type`**: agent / brokerage / homeowner / vendor
 - Vertical locked to RE — no `shoot_type` enum
 
-### Deferred to phase 2
+### Phase 2 (shipped)
 
-Stripe wiring, Pillow imaging pipeline, ZIP generation, questionnaires, contract e-sign, multi-tenant auth.
+- Photo uploads + Pillow derivatives (web/thumb)
+- MLS / Zillow / Instagram export crops with agent brand-kit watermark
+- Background job queue (derivatives, exports, ZIP)
+- PIN-gated gallery media + download ZIP
+- Listing invoices with optional Stripe Checkout
+- Shoot calendar (day + twilight appointments)
+
+### Still deferred
+
+Questionnaires, contract e-sign, multi-tenant auth, email delivery templates.
 
 ## Quick start
 

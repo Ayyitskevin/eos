@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, galleries, listings, security
+from .. import clients, galleries, invoices, listings, security
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -78,6 +78,7 @@ async def listing_detail(request: Request, listing_id: int):
             "client_list": clients.list_clients(),
             "statuses": LISTING_STATUSES,
             "property_types": PROPERTY_TYPES,
+            "invoices": invoices.list_for_listing(listing_id),
         },
     )
 

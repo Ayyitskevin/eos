@@ -10,6 +10,8 @@
     <nav><a href="/admin/galleries">← Galleries</a></nav>
   </header>
 
+  <p class="delivery-link">Client link: <code class="slug">{{ base_url }}/g/{{ g.slug }}</code> · PIN: <code>{{ g.pin }}</code></p>
+
   <div class="detail-grid">
     <section class="card">
       <h2>Delivery settings</h2>
@@ -29,27 +31,77 @@
         <label class="checkbox"><input type="checkbox" name="published" value="true" {% if g.published %}checked{% endif %}> Published</label>
         <button type="submit">Save</button>
       </form>
-      <p class="muted">Delivery link: <code class="slug">{{ base_url }}/g/{{ g.slug }}</code></p>
     </section>
 
     <section class="card">
-      <h2>Sections</h2>
-      <ol class="section-list">
-        {% for s in sections %}
-        <li>{{ s.name }}</li>
-        {% endfor %}
-      </ol>
-      <p class="muted">Room-based sections seeded for RE delivery. Upload pipeline ships in phase 2.</p>
-    </section>
-
-    <section class="card">
-      <h2>Assets</h2>
-      {% if assets %}
-      <p>{{ assets|length }} file(s) — processing pipeline not wired in v0.</p>
-      {% else %}
-      <p class="muted">No photos yet. Wire uploads + Pillow pipeline in phase 2.</p>
-      {% endif %}
+      <h2>Upload photos</h2>
+      <form id="upload-form" class="upload-zone">
+        <input type="file" name="files" multiple accept="image/*,.heic,.heif">
+        <p class="muted">JPEG, PNG, HEIC, WebP — lands in first section by default.</p>
+        <button type="submit" class="btn btn-accent">Upload</button>
+      </form>
+      {% if n_pending %}<p class="warn">{{ n_pending }} processing…</p>{% endif %}
+      <form method="post" action="/admin/galleries/{{ g.id }}/exports" style="margin-top:1rem">
+        <button type="submit">Build MLS / Zillow exports</button>
+      </form>
+      <p class="muted">Exports use crop presets{% if listing and listing.client_id %} with agent watermark if brand kit is set{% endif %}.</p>
     </section>
   </div>
+
+  <section class="card">
+    <h2>Sections</h2>
+    <ol class="section-list">
+      {% for s in sections %}<li>{{ s.name }}</li>{% endfor %}
+    </ol>
+  </section>
+
+  {% for s in sections %}
+    {% if by_section[s.id] %}
+    <h3 class="section-name">{{ s.name }}</h3>
+    <div class="asset-grid">
+      {% for a in by_section[s.id] %}
+      <figure class="asset-tile">
+        {% if a.status == 'ready' %}
+        <img src="/admin/galleries/{{ g.id }}/media/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+        {% else %}
+        <span class="asset-pending">{{ a.status }}</span>
+        {% endif %}
+        <figcaption class="muted">{{ a.filename }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
+  {% if unsectioned %}
+  <h3 class="section-name">Unsectioned</h3>
+  <div class="asset-grid">
+    {% for a in unsectioned %}
+    <figure class="asset-tile">
+      {% if a.status == 'ready' %}
+      <img src="/admin/galleries/{{ g.id }}/media/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
+      {% else %}
+      <span class="asset-pending">{{ a.status }}</span>
+      {% endif %}
+      <figcaption class="muted">{{ a.filename }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if not assets %}<p class="muted">No photos yet — drag files above.</p>{% endif %}
 </main>
+<script>
+document.getElementById('upload-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = e.target.querySelector('input[type=file]');
+  if (!input.files.length) return;
+  const fd = new FormData();
+  for (const f of input.files) fd.append('files', f);
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  const r = await fetch('/admin/galleries/{{ g.id }}/upload', { method: 'POST', body: fd });
+  btn.disabled = false;
+  if (r.ok) location.reload();
+  else alert('Upload failed');
+});
+</script>
 {% endblock %}

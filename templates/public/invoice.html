@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ inv.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="center-card wide">
+  <p class="brand-mark">Eos</p>
+  {% if thanks %}<p class="ok">Payment received — thank you!</p>{% endif %}
+  <h1>{{ inv.title }}</h1>
+  {% if listing %}<p class="muted">{{ listing.title }}{% if listing.address_line1 %} · {{ listing.address_line1 }}{% endif %}</p>{% endif %}
+  {% if client %}<p>{{ client.name }}{% if client.company %} · {{ client.company }}{% endif %}</p>{% endif %}
+
+  <p class="price-lg">${{ "%.2f"|format(inv.amount_cents / 100) }}</p>
+  <p class="muted">Status: {{ inv.status }}</p>
+
+  {% if inv.status != 'paid' and payments_on %}
+  <form method="post" action="/i/{{ inv.slug }}/pay">
+    <button type="submit" class="btn btn-accent">Pay online</button>
+  </form>
+  {% elif inv.status != 'paid' %}
+  <p class="muted">Contact your photographer to arrange payment.</p>
+  {% endif %}
+
+  {% if inv.notes %}<p>{{ inv.notes }}</p>{% endif %}
+</main>
+{% endblock %}

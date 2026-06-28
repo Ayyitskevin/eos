@@ -30,6 +30,11 @@ code { background: var(--dawn); padding: 2px 6px; border-radius: 4px; font-size:
 }
 .brand-mark.light { color: rgba(255,255,255,0.85); }
 
+.center-card.wide { max-width: 520px; text-align: left; }
+.price-lg { font-size: 2rem; font-weight: 700; color: var(--accent); margin: 0.5rem 0; }
+.ok { color: var(--success); }
+.delivery-link { margin-bottom: 1rem; }
+
 .center-card {
   max-width: 420px; margin: 12vh auto; padding: 2.5rem;
   background: var(--card); border: 1px solid var(--line); border-radius: 16px;
@@ -192,6 +197,17 @@ button.link:hover { transform: none; text-decoration: underline; }
 }
 .tile { margin: 0; overflow: hidden; border-radius: 8px; background: var(--dawn); }
 .tile img { width: 100%; height: 180px; object-fit: cover; display: block; }
+
+.asset-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem; margin-bottom: 1.5rem;
+}
+.asset-tile { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.asset-tile img { width: 100%; height: 120px; object-fit: cover; display: block; }
+.asset-tile figcaption { padding: 0.35rem 0.5rem; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-pending { display: grid; place-items: center; height: 120px; background: var(--dawn); color: var(--muted); font-size: 0.85rem; }
+.upload-zone { border: 2px dashed var(--line); border-radius: 12px; padding: 1.25rem; }
+.upload-zone input[type=file] { width: 100%; margin-bottom: 0.5rem; }
 
 @media (max-width: 640px) {
   .admin-bar { flex-direction: column; align-items: flex-start; }

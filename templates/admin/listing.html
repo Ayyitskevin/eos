@@ -82,6 +82,24 @@
     </section>
 
     <section class="card">
+      <h2>Invoices</h2>
+      {% if invoices %}
+      <ul class="pkg-list">
+        {% for inv in invoices %}
+        <li><a href="/admin/invoices/{{ inv.id }}">{{ inv.title }}</a>
+          ${{ "%.2f"|format(inv.amount_cents / 100) }} · {{ inv.status }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/invoice" class="form-grid compact">
+        <label>Title <input name="title" value="Photography — {{ l.title }}" required></label>
+        <label>Amount ($) <input name="amount_dollars" type="number" step="0.01" min="0" value="175" required></label>
+        <label>Notes <input name="notes" placeholder="Optional"></label>
+        <button type="submit">Create invoice</button>
+      </form>
+    </section>
+
+    <section class="card">
       <h2>Galleries</h2>
       {% if galleries %}
       <ul class="pkg-list">

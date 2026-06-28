@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Calendar · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Shoot calendar</h1>
+    <nav><a href="/admin">Pipeline</a></nav>
+  </header>
+
+  <form method="post" action="/admin/appointments" class="card form-grid compact">
+    <h2>Schedule shoot</h2>
+    <label>Title <input name="title" required placeholder="123 Oak St — day shoot"></label>
+    <label>Kind
+      <select name="kind">
+        {% for k in kinds %}
+        <option value="{{ k }}">{{ k|replace('_',' ')|title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Starts <input name="starts_at" type="datetime-local" required></label>
+    <label>Location <input name="location" placeholder="Property address"></label>
+    <label>Listing
+      <select name="listing_id">
+        <option value="">— none —</option>
+        {% for l in listings %}
+        <option value="{{ l.id }}">{{ l.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Client
+      <select name="client_id">
+        <option value="">— none —</option>
+        {% for c in client_list %}
+        <option value="{{ c.id }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-accent">Add to calendar</button>
+  </form>
+
+  <table class="list">
+    <tr><th>When</th><th>Title</th><th>Kind</th><th>Client</th><th>Listing</th><th>Status</th></tr>
+    {% for a in appointments %}
+    <tr>
+      <td>{{ a.starts_at[:16] if a.starts_at else "—" }}</td>
+      <td>{{ a.title }}</td>
+      <td>{{ a.kind }}</td>
+      <td>{{ a.client_name or "—" }}</td>
+      <td>{{ a.listing_title or "—" }}</td>
+      <td>{{ a.status }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not appointments %}<p class="muted">No upcoming shoots scheduled.</p>{% endif %}
+</main>
+{% endblock %}

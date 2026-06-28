@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**In scope (foundation):** CRUD for clients/listings/galleries, pipeline dashboard, public site shell, PIN-gated delivery pages.
+**Shipped:** uploads, Pillow derivatives, MLS export crops, brand kits, job queue, ZIP downloads, invoices/Stripe, calendar.
 
-**Out of scope (phase 2+):** file uploads, imaging, ZIP, Stripe, e-sign, multi-tenant auth, automations.
+**Out of scope:** questionnaires, e-sign, multi-tenant auth, email automations.
