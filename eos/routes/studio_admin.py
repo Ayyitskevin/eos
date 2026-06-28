@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import security, studio
+from .. import config, security, studio, users
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -17,8 +17,21 @@ async def studio_settings(request: Request):
             "packages": studio.list_packages(),
             "presets": studio.list_crop_presets(),
             "inquiries": studio.list_inquiries(20),
+            "operators": users.list_users(),
+            "saas_mode": config.SAAS_MODE or bool(users.list_users()),
         },
     )
+
+
+@router.post("/studio/users")
+async def add_user(
+    email: str = Form(...),
+    password: str = Form(...),
+    name: str = Form(""),
+    role: str = Form("operator"),
+):
+    users.create_user(email, password, name=name, role=role)
+    return RedirectResponse("/admin/studio", status_code=303)
 
 
 @router.post("/studio")

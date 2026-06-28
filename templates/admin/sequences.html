@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Email sequences · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Email sequences</h1>
+    <nav><a href="/admin/sent">Sent emails</a> · <a href="/admin/studio">Studio</a> · <a href="/admin">Pipeline</a></nav>
+  </header>
+
+  {% if not mailer_on %}
+  <p class="alert-banner">Gmail SMTP is not configured — sequences schedule but won't send until <code>EOS_GMAIL_USER</code> and <code>EOS_GMAIL_APP_PASSWORD</code> are set.</p>
+  {% endif %}
+
+  <section class="card">
+    <h2>Sequences</h2>
+    <p class="muted">Drip emails fire on listing events. Use <code>{client_first}</code>, <code>{gallery_link}</code>, <code>{proposal_link}</code>, <code>{intake_link}</code> in templates.</p>
+    <table class="list compact">
+      <tr><th>Name</th><th>Trigger</th><th>Delay</th><th>Active</th></tr>
+      {% for s in sequences %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td class="muted">{{ s.trigger_event }}</td>
+        <td>{{ s.delay_hours }}h</td>
+        <td>
+          <form method="post" action="/admin/sequences/{{ s.id }}/toggle" class="inline-form">
+            <input type="hidden" name="active" value="false">
+            <label class="checkbox">
+              <input type="checkbox" name="active" value="true" {% if s.active %}checked{% endif %}
+                     onchange="this.form.submit()">
+            </label>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Pending runs</h2>
+    {% if pending %}
+    <table class="list compact">
+      <tr><th>Due</th><th>Sequence</th><th>Listing</th><th>To</th><th>Status</th><th></th></tr>
+      {% for r in pending %}
+      <tr>
+        <td class="muted">{{ r.scheduled_at[:16] }}</td>
+        <td>{{ r.sequence_name }}</td>
+        <td>{{ r.listing_title or "—" }}</td>
+        <td>{{ r.to_email }}</td>
+        <td>{% if r.status == 'failed' %}<span class="error">{{ r.status }}{% if r.error %}: {{ r.error[:40] }}{% endif %}</span>{% else %}{{ r.status }}{% endif %}</td>
+        <td>
+          {% if r.status == 'scheduled' %}
+          <form method="post" action="/admin/sequences/runs/{{ r.id }}/cancel" class="inline-form">
+            <button type="submit" class="link">Cancel</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No scheduled or failed runs.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

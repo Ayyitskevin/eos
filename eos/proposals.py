@@ -104,6 +104,11 @@ def mark_sent(proposal_id: int) -> None:
         "UPDATE listings SET status='booked' WHERE id=? AND status='lead'",
         (prop["listing_id"],),
     )
+    from . import automations
+    automations.on_proposal_sent(prop["listing_id"])
+    row = db.one("SELECT status FROM listings WHERE id=?", (prop["listing_id"],))
+    if row and row["status"] == "booked":
+        automations.on_listing_booked(prop["listing_id"])
 
 
 def mark_viewed(proposal_id: int) -> None:
@@ -125,6 +130,10 @@ def accept_by_slug(slug: str) -> None:
         "UPDATE listings SET status='booked' WHERE id=? AND status IN ('lead','booked')",
         (row["listing_id"],),
     )
+    from . import automations
+    automations.on_listing_booked(row["listing_id"])
+    from . import automations
+    automations.on_listing_booked(row["listing_id"])
 
 
 def decline_by_slug(slug: str) -> None:

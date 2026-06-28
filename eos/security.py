@@ -93,9 +93,32 @@ def set_gallery_cookie(gallery_id: int) -> tuple[str, str]:
 ADMIN_COOKIE = "eos_admin"
 
 
-def is_admin(request: Request) -> bool:
+def _session_value(request: Request) -> str | None:
     raw = request.cookies.get(ADMIN_COOKIE)
-    return bool(raw) and unsign(raw) == "admin"
+    if not raw:
+        return None
+    return unsign(raw)
+
+
+def is_admin(request: Request) -> bool:
+    val = _session_value(request)
+    return bool(val) and (val == "admin" or val.startswith("user:"))
+
+
+def current_user_id(request: Request) -> int | None:
+    val = _session_value(request)
+    if val and val.startswith("user:"):
+        try:
+            return int(val.split(":", 1)[1])
+        except ValueError:
+            return None
+    return None
+
+
+def set_session_cookie(user_id: int | None = None) -> tuple[str, str]:
+    if user_id is None:
+        return ADMIN_COOKIE, sign("admin")
+    return ADMIN_COOKIE, sign(f"user:{user_id}")
 
 
 def require_admin(request: Request) -> None:

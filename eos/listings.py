@@ -118,6 +118,7 @@ def create_listing(
 
 
 def update_listing(listing_id: int, **fields) -> None:
+    old = get_listing(listing_id)
     allowed = {
         "client_id", "title", "status", "property_type",
         "address_line1", "address_line2", "city", "state", "zip", "mls_id",
@@ -136,6 +137,13 @@ def update_listing(listing_id: int, **fields) -> None:
     params.append(listing_id)
     db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=?", tuple(params))
     db.audit("admin", "listing.update", f"id={listing_id}")
+    new_status = fields.get("status")
+    if new_status and new_status != old["status"]:
+        from . import automations
+        if new_status == "booked":
+            automations.on_listing_booked(listing_id)
+        elif new_status == "delivered":
+            automations._trigger("listing.delivered", listing_id)
 
 
 def listing_shots(listing_id: int):

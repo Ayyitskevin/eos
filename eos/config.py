@@ -66,6 +66,10 @@ JPEG_QUALITY = int(os.environ.get("EOS_JPEG_QUALITY", "88"))
 JOB_WORKERS = int(os.environ.get("EOS_JOB_WORKERS", "2"))
 MIN_FREE_GB = float(os.environ.get("EOS_MIN_FREE_GB", "2"))
 
+SAAS_MODE = _b("EOS_SAAS_MODE", "false")
+BOOTSTRAP_EMAIL = os.environ.get("EOS_BOOTSTRAP_EMAIL", "")
+SEQUENCE_TICK_SECONDS = int(os.environ.get("EOS_SEQUENCE_TICK_SECONDS", "60"))
+
 
 def ensure_dirs() -> None:
     for d in (DATA_DIR, MEDIA_DIR, ZIP_DIR, BRAND_DIR):

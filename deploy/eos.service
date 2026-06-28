@@ -1,0 +1,23 @@
+[Unit]
+Description=Eos — real estate photography OS
+After=network.target
+
+[Service]
+Type=simple
+User=eos
+Group=eos
+WorkingDirectory=/opt/eos
+EnvironmentFile=/opt/eos/.env
+ExecStart=/opt/eos/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/eos/data
+
+[Install]
+WantedBy=multi-user.target

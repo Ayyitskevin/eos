@@ -7,11 +7,23 @@ from . import db
 log = logging.getLogger("eos.automations")
 
 
+def _trigger(event: str, listing_id: int) -> None:
+    try:
+        from . import sequences
+        sequences.trigger(event, listing_id)
+    except Exception:
+        log.exception("sequence trigger %s failed for listing %s", event, listing_id)
+
+
 def on_questionnaire_completed(listing_id: int) -> None:
     row = db.one("SELECT status FROM listings WHERE id=?", (listing_id,))
     if row and row["status"] == "booked":
         db.run("UPDATE listings SET status='shooting', updated_at=datetime('now') WHERE id=?", (listing_id,))
         log.info("listing %s auto-advanced booked → shooting (questionnaire)", listing_id)
+
+
+def on_listing_booked(listing_id: int) -> None:
+    _trigger("listing.booked", listing_id)
 
 
 def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
@@ -24,6 +36,11 @@ def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
             (listing_id,),
         )
         log.info("listing %s auto-advanced → delivered (gallery published)", listing_id)
+        _trigger("listing.delivered", listing_id)
+
+
+def on_proposal_sent(listing_id: int) -> None:
+    _trigger("proposal.sent", listing_id)
 
 
 def on_invoice_paid(listing_id: int | None) -> None:

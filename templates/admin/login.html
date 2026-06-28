@@ -6,7 +6,10 @@
   <h1>Studio admin</h1>
   <p class="muted">Real estate photography pipeline</p>
   <form method="post" action="/admin/login" class="pin-form">
-    <input type="password" name="password" placeholder="Password" autofocus required>
+    {% if saas_mode %}
+    <input type="email" name="email" placeholder="Email" autocomplete="username" required>
+    {% endif %}
+    <input type="password" name="password" placeholder="Password" {% if not saas_mode %}autofocus{% endif %} autocomplete="current-password" required>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <button type="submit">Sign in</button>
   </form>
