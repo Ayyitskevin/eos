@@ -24,6 +24,7 @@ def on_questionnaire_completed(listing_id: int) -> None:
 
 def on_listing_booked(listing_id: int) -> None:
     _trigger("listing.booked", listing_id)
+    _webhook("booking.created", listing_id, extra={"status": "booked"})
 
 
 def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
@@ -37,6 +38,7 @@ def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
         )
         log.info("listing %s auto-advanced → delivered (gallery published)", listing_id)
         _trigger("listing.delivered", listing_id)
+        _webhook("listing.delivered", listing_id)
 
 
 def on_gallery_published_email(gallery_id: int) -> None:
@@ -58,6 +60,18 @@ def on_invoice_paid(listing_id: int | None) -> None:
         "UPDATE listing_tasks SET done=1 WHERE listing_id=? AND label LIKE '%invoice%'",
         (listing_id,),
     )
+    _webhook("invoice.paid", listing_id)
+
+
+def _webhook(event: str, listing_id: int, *, extra: dict | None = None) -> None:
+    try:
+        from . import webhooks
+        payload = {"listing_id": listing_id}
+        if extra:
+            payload.update(extra)
+        webhooks.dispatch(event, payload)
+    except Exception:
+        log.exception("webhook %s failed for listing %s", event, listing_id)
 
 
 def on_deposit_paid(inquiry_id: int, listing_id: int | None) -> None:

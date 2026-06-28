@@ -12,13 +12,14 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import bootstrap, config, db, jobs, scheduler
+from . import bootstrap, config, db, jobs, scheduler, tenant
 from .render import ROOT, templates
 from .routes import (
     activity, appointments, auth, booking, brand_kits, clients, contracts_admin, dashboard,
     portal as portal_routes,
     microsites as microsite_routes,
     reports as reports_routes, kanban as kanban_routes,
+    signup as signup_routes, api_v1,
     delivery, docs, downloads, emails, galleries_admin, invoices_admin, listings,
     media, pay, proposals_admin, questionnaires, sequences_admin, site, studio_admin,
     today, uploads,
@@ -44,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Eos", version="0.9.0", lifespan=lifespan,
+    title="Eos", version="1.0.0", lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -57,10 +58,16 @@ _ERROR_MESSAGES = {
 
 
 @app.middleware("http")
+async def tenant_context(request: Request, call_next):
+    tenant.bind_request(request)
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def common_headers(request: Request, call_next):
     resp = await call_next(request)
     p = request.url.path
-    if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/"))):
+    if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/", "/api/"))):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -84,7 +91,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "0.9.0",
+        "version": "1.0.0",
         "jobs_pending": jobs.pending_count(),
     }
 
@@ -97,6 +104,7 @@ for r in (
     proposals_admin.router, contracts_admin.router, docs.router, emails.router,
     questionnaires.admin, questionnaires.router, studio_admin.router, today.router,
     activity.router, sequences_admin.router, booking.router, portal_routes.router,
-    microsite_routes.router, reports_routes.router, kanban_routes.router, site.router,
+    microsite_routes.router, reports_routes.router, kanban_routes.router,
+    signup_routes.router, api_v1.router, site.router,
 ):
     app.include_router(r)

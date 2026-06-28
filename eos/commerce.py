@@ -37,7 +37,7 @@ def _parse_address(raw: str) -> tuple[str, str]:
     return raw, raw
 
 
-def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[int, int, list[dict]]:
+def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[int, int, list[dict], int | None]:
     pkg = db.one(
         "SELECT * FROM service_packages WHERE id=? AND studio_id=? AND active=1",
         (package_id, STUDIO_ID),
@@ -56,6 +56,7 @@ def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[
             items.append({"label": a["name"], "qty": 1, "unit_cents": a["price_cents"]})
             total += a["price_cents"]
     promo = promo.strip().upper()
+    referral_row = None
     if promo:
         row = db.one(
             "SELECT * FROM promo_codes WHERE studio_id=? AND upper(code)=? AND active=1",
@@ -66,10 +67,14 @@ def calc_total(package_id: int, addon_ids: list[int], promo: str = "") -> tuple[
                 total = max(0, total - (total * row["discount_pct"] // 100))
             else:
                 total = max(0, total - row["discount_cents"])
+        else:
+            from . import referrals
+            total, referral_row = referrals.apply_credit(promo, total)
     deposit = pkg["deposit_cents"] if pkg["deposit_cents"] > 0 else 0
     if deposit > total:
         deposit = total
-    return total, deposit, items
+    ref_id = referral_row["id"] if referral_row else None
+    return total, deposit, items, ref_id
 
 
 def create_booking(
@@ -100,7 +105,7 @@ def create_booking(
         raise HTTPException(status_code=400, detail="slot no longer available")
     if not signer_name.strip():
         raise HTTPException(status_code=400, detail="signature required")
-    total_cents, deposit_cents, line_items = calc_total(package_id, addon_ids, promo_code)
+    total_cents, deposit_cents, line_items, referral_id = calc_total(package_id, addon_ids, promo_code)
     pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
 
     client_id = _find_or_create_client(name, email, phone)
@@ -179,6 +184,20 @@ def create_booking(
         pay_slug = db.one("SELECT slug FROM invoices WHERE id=?", (invoice_id,))["slug"]
 
 
+    if referral_id:
+        from . import referrals
+        referrals.record_use(referral_id)
+    from . import webhooks
+    webhooks.dispatch(
+        "booking.created",
+        {
+            "inquiry_id": inquiry_id,
+            "listing_id": listing_id,
+            "client_id": client_id,
+            "scheduled_at": scheduled_at,
+            "total_cents": total_cents,
+        },
+    )
     db.audit("public", "booking.create", f"inquiry={inquiry_id} listing={listing_id}")
     log.info("booking %s listing %s deposit %s", inquiry_id, listing_id, deposit_cents)
     return {

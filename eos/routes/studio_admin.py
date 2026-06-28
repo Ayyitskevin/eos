@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, security, studio, users
+from .. import api_tokens, config, referrals, security, studio, users, webhooks
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -21,6 +21,12 @@ async def studio_settings(request: Request):
             "promos": studio.list_promo_codes(),
             "operators": users.list_users(),
             "saas_mode": config.SAAS_MODE or bool(users.list_users()),
+            "api_tokens": api_tokens.list_tokens(),
+            "webhooks": webhooks.list_subscriptions(),
+            "referrals": referrals.list_codes(),
+            "webhook_events": webhooks.EVENTS,
+            "signup_enabled": config.SIGNUP_ENABLED,
+            "base_domain": config.BASE_DOMAIN,
         },
     )
 
@@ -98,3 +104,49 @@ async def package_update(
         active=active,
     )
     return RedirectResponse("/admin/studio", status_code=303)
+
+
+@router.post("/studio/api-tokens")
+async def create_api_token(label: str = Form("Zapier")):
+    _tid, raw = api_tokens.create_token(label=label)
+    return RedirectResponse(f"/admin/studio?token={raw}", status_code=303)
+
+
+@router.post("/studio/api-tokens/{token_id}/revoke")
+async def revoke_api_token(token_id: int):
+    api_tokens.revoke_token(token_id)
+    return RedirectResponse("/admin/studio#integrations", status_code=303)
+
+
+@router.post("/studio/webhooks")
+async def create_webhook(
+    label: str = Form("Zapier"),
+    url: str = Form(...),
+    events: list[str] = Form(default=[]),
+):
+    try:
+        webhooks.create_subscription(label=label, url=url, events=events)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return RedirectResponse("/admin/studio#integrations", status_code=303)
+
+
+@router.post("/studio/webhooks/{hook_id}/delete")
+async def delete_webhook(hook_id: int):
+    webhooks.delete_subscription(hook_id)
+    return RedirectResponse("/admin/studio#integrations", status_code=303)
+
+
+@router.post("/studio/referrals")
+async def create_referral(
+    code: str = Form(...),
+    credit_dollars: float = Form(25),
+    max_uses: str = Form(""),
+):
+    max_u = int(max_uses) if max_uses.strip().isdigit() else None
+    referrals.create_code(
+        code=code,
+        credit_cents=round(credit_dollars * 100),
+        max_uses=max_u,
+    )
+    return RedirectResponse("/admin/studio#integrations", status_code=303)

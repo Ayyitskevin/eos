@@ -92,9 +92,19 @@ Eos inherits the best patterns from two sibling projects:
 - Twilight booking window — evening slots for twilight add-on on `/book`
 - Delivery upsell prompts on gallery, property site, and agent portal
 
+### Phase 10 (shipped) — Eos 1.0
+
+- Multi-tenant studios — subdomain routing (`{slug}.yourdomain.com`), per-studio data isolation
+- Studio signup at `/signup` — auto-seeds packages, presets, sequences, owner account
+- Sequence editor — customize drip subject/body/delay/trigger in admin
+- API tokens + `/api/v1/listings` and `/api/v1/bookings` for Zapier integrations
+- Outbound webhooks — `booking.created`, `listing.delivered`, `invoice.paid` with HMAC signatures
+- Agent referral codes — booking credit applied at checkout
+- Set `EOS_SIGNUP_ENABLED=true` and `EOS_BASE_DOMAIN` for hosted SaaS
+
 ### Still deferred
 
-Phase 10: full SaaS multi-tenant; Google Calendar sync; Dropbox ingest (roadmap).
+Google Calendar sync; Dropbox ingest; per-studio Stripe billing (roadmap).
 
 ## Quick start
 

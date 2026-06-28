@@ -12,6 +12,9 @@ _VERSION_RE = re.compile(r"^(\d+)_")
 
 
 def connect() -> sqlite3.Connection:
+    from .vocab import _StudioId
+
+    sqlite3.register_adapter(_StudioId, str)
     con = sqlite3.connect(config.DB_PATH, timeout=30)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
@@ -95,7 +98,9 @@ def tx():
 
 
 def audit(actor: str, action: str, detail: str | None = None) -> None:
+    from .vocab import STUDIO_ID
+
     run(
-        "INSERT INTO audit_log (studio_id, actor, action, detail) VALUES ('default', ?, ?, ?)",
-        (actor, action, detail),
+        "INSERT INTO audit_log (studio_id, actor, action, detail) VALUES (?, ?, ?, ?)",
+        (str(STUDIO_ID), actor, action, detail),
     )

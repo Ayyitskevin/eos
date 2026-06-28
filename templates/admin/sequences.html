@@ -15,10 +15,10 @@
     <h2>Sequences</h2>
     <p class="muted">Drip emails fire on listing events. Use <code>{client_first}</code>, <code>{gallery_link}</code>, <code>{proposal_link}</code>, <code>{intake_link}</code> in templates.</p>
     <table class="list compact">
-      <tr><th>Name</th><th>Trigger</th><th>Delay</th><th>Active</th></tr>
+      <tr><th>Name</th><th>Trigger</th><th>Delay</th><th>Active</th><th></th></tr>
       {% for s in sequences %}
       <tr>
-        <td>{{ s.name }}</td>
+        <td><a href="/admin/sequences/{{ s.id }}/edit">{{ s.name }}</a></td>
         <td class="muted">{{ s.trigger_event }}</td>
         <td>{{ s.delay_hours }}h</td>
         <td>
@@ -30,6 +30,7 @@
             </label>
           </form>
         </td>
+        <td><a href="/admin/sequences/{{ s.id }}/edit" class="small">Edit</a></td>
       </tr>
       {% endfor %}
     </table>

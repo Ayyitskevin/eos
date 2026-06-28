@@ -4,12 +4,14 @@ import datetime as dt
 import logging
 import re
 
-from . import config, db, mailer
+from . import db, mailer
+from .tenant import get_base_url, get_site_name
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.sequences")
 
 _VAR_RE = re.compile(r"\{(\w+)\}")
+TRIGGER_EVENTS = ("listing.booked", "listing.delivered", "proposal.sent")
 
 
 def _client_for_listing(listing_id: int):
@@ -52,16 +54,16 @@ def build_context(listing_id: int, extra: dict | None = None) -> dict:
     intake = _intake_for_listing(listing_id)
     client_name = row["name"] if row and row["name"] else "there"
     ctx = {
-        "site_name": config.SITE_NAME,
+        "site_name": get_site_name(),
         "client_name": client_name,
         "client_first": client_name.split()[0] if client_name else "there",
         "client_email": row["email"] if row else "",
         "listing_title": row["title"] if row else "",
         "listing_address": ", ".join(p for p in (row["address_line1"], row["city"]) if row and p) if row else "",
-        "gallery_link": f"{config.BASE_URL}/g/{gallery['slug']}" if gallery else "",
+        "gallery_link": f"{get_base_url()}/g/{gallery['slug']}" if gallery else "",
         "gallery_pin": gallery["pin"] if gallery else "",
-        "proposal_link": f"{config.BASE_URL}/p/{proposal['slug']}" if proposal else "",
-        "intake_link": f"{config.BASE_URL}/q/{intake['token']}" if intake else "",
+        "proposal_link": f"{get_base_url()}/p/{proposal['slug']}" if proposal else "",
+        "intake_link": f"{get_base_url()}/q/{intake['token']}" if intake else "",
     }
     if extra:
         ctx.update(extra)
@@ -169,4 +171,36 @@ def cancel_run(run_id: int) -> None:
 
 
 def toggle_sequence(seq_id: int, active: bool) -> None:
-    db.run("UPDATE email_sequences SET active=? WHERE id=?", (1 if active else 0, seq_id))
+    db.run(
+        "UPDATE email_sequences SET active=? WHERE id=? AND studio_id=?",
+        (1 if active else 0, seq_id, STUDIO_ID),
+    )
+
+
+def get_sequence(seq_id: int):
+    from fastapi import HTTPException
+    row = db.one(
+        "SELECT * FROM email_sequences WHERE id=? AND studio_id=?",
+        (seq_id, STUDIO_ID),
+    )
+    if not row:
+        raise HTTPException(status_code=404)
+    return row
+
+
+def update_sequence(
+    seq_id: int,
+    *,
+    name: str,
+    subject: str,
+    body_template: str,
+    delay_hours: int,
+    trigger_event: str,
+) -> None:
+    get_sequence(seq_id)
+    db.run(
+        """UPDATE email_sequences SET name=?, subject=?, body_template=?, delay_hours=?, trigger_event=?
+           WHERE id=? AND studio_id=?""",
+        (name.strip(), subject.strip(), body_template, delay_hours, trigger_event.strip(), seq_id, STUDIO_ID),
+    )
+    db.audit("admin", "sequence.update", f"id={seq_id}")

@@ -36,34 +36,51 @@ def get_user(user_id: int):
     return row
 
 
-def get_by_email(email: str):
+def get_by_email(email: str, *, studio_id: str | None = None):
+    email = email.strip().lower()
+    if studio_id:
+        return db.one(
+            "SELECT * FROM users WHERE email=? AND studio_id=? AND active=1",
+            (email, studio_id),
+        )
     return db.one(
-        "SELECT * FROM users WHERE email=? AND studio_id=? AND active=1",
-        (email.strip().lower(), STUDIO_ID),
+        "SELECT * FROM users WHERE email=? AND active=1 ORDER BY id LIMIT 1",
+        (email,),
     )
 
 
 def list_users():
-    return db.all_("SELECT id, email, name, role, created_at FROM users WHERE studio_id=? ORDER BY email", (STUDIO_ID,))
+    return db.all_(
+        "SELECT id, email, name, role, created_at FROM users WHERE studio_id=? ORDER BY email",
+        (str(STUDIO_ID),),
+    )
 
 
-def create_user(email: str, password: str, *, name: str = "", role: str = "operator") -> int:
+def create_user(
+    email: str,
+    password: str,
+    *,
+    name: str = "",
+    role: str = "operator",
+    studio_id: str | None = None,
+) -> int:
     email = email.strip().lower()
     if not email or not password:
         raise HTTPException(status_code=400, detail="email and password required")
     if role not in ("owner", "operator"):
         raise HTTPException(status_code=400, detail="invalid role")
+    sid = studio_id or str(STUDIO_ID)
     uid = db.run(
         """INSERT INTO users (studio_id, email, password_hash, name, role)
            VALUES (?,?,?,?,?)""",
-        (STUDIO_ID, email, hash_password(password), name.strip(), role),
+        (sid, email, hash_password(password), name.strip(), role),
     )
     db.audit("admin", "user.create", f"id={uid} email={email}")
     return uid
 
 
-def authenticate(email: str, password: str):
-    user = get_by_email(email)
+def authenticate(email: str, password: str, *, studio_id: str | None = None):
+    user = get_by_email(email, studio_id=studio_id)
     if not user or not verify_password(password, user["password_hash"]):
         return None
     return user

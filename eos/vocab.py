@@ -1,6 +1,19 @@
 """RE photography vocabulary — single source of truth for rooms, property types, and channels."""
 
-STUDIO_ID = "default"
+from .tenant import get_studio_id
+
+
+class _StudioId:
+    """Lazy per-request studio id for SQL params (str() resolves tenant context)."""
+
+    def __str__(self) -> str:
+        return get_studio_id()
+
+    def __repr__(self) -> str:
+        return repr(get_studio_id())
+
+
+STUDIO_ID = _StudioId()
 
 LISTING_STATUSES = ("lead", "booked", "shooting", "editing", "delivered", "archived")
 LISTING_STATUS_LABELS = {

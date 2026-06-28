@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Edit sequence · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>Edit sequence</h1>
+    <nav><a href="/admin/sequences">← Sequences</a></nav>
+  </header>
+
+  <form method="post" action="/admin/sequences/{{ seq.id }}/edit" class="form-grid card">
+    <label>Name <input name="name" value="{{ seq.name }}" required></label>
+    <label>Trigger
+      <select name="trigger_event">
+        {% for t in triggers %}
+        <option value="{{ t }}" {% if seq.trigger_event == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Delay (hours) <input name="delay_hours" type="number" min="0" value="{{ seq.delay_hours }}"></label>
+    <label>Subject <input name="subject" value="{{ seq.subject }}" required></label>
+    <label>Body
+      <textarea name="body_template" rows="12" required>{{ seq.body_template }}</textarea>
+    </label>
+    <p class="muted small">Variables: <code>{client_first}</code>, <code>{listing_title}</code>, <code>{gallery_link}</code>, <code>{gallery_pin}</code>, <code>{proposal_link}</code>, <code>{intake_link}</code>, <code>{site_name}</code></p>
+    <button type="submit" class="btn btn-accent">Save sequence</button>
+  </form>
+</main>
+{% endblock %}

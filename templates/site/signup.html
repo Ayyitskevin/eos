@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Start your studio · Eos{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Start your RE photography studio</h1>
+  {% if base_domain %}
+  <p class="muted">You'll get a site at <strong>yourname.{{ base_domain }}</strong> with booking, galleries, and delivery built in.</p>
+  {% endif %}
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/signup" class="form-grid card">
+    <label>Studio name <input name="studio_name" required placeholder="Summit Lens Co."></label>
+    <label>URL slug
+      <input name="slug" required pattern="[a-z0-9-]+" placeholder="summit-lens">
+      {% if base_domain %}<span class="muted small">→ summit-lens.{{ base_domain }}</span>{% endif %}
+    </label>
+    <label>Your name <input name="owner_name" placeholder="Optional"></label>
+    <label>Email <input name="owner_email" type="email" required></label>
+    <label>Password <input name="owner_password" type="password" required minlength="8"></label>
+    <button type="submit" class="btn btn-accent">Create studio</button>
+  </form>
+  <p class="muted center"><a href="/admin/login">Already have an account?</a></p>
+</main>
+{% endblock %}

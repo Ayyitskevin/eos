@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, security, users
+from .. import config, db, security, tenant, users
 from ..render import templates
 
 log = logging.getLogger("eos.routes.auth")
@@ -41,7 +41,7 @@ async def login(
     email = email.strip().lower()
     user = None
     if email:
-        user = users.authenticate(email, password)
+        user = users.authenticate(email, password, studio_id=tenant.get_studio_id())
     elif not config.SAAS_MODE:
         if security.check_admin_password(password):
             user = None  # legacy admin
@@ -66,6 +66,8 @@ async def login(
         )
 
     security.pin_clear(ip, security.ADMIN_BUCKET)
+    if user:
+        tenant.set_studio(user["studio_id"])
     resp = RedirectResponse("/admin", status_code=303)
     name, value = security.set_session_cookie(user["id"] if user else None)
     resp.set_cookie(

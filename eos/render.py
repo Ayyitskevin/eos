@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.templating import Jinja2Templates
 
 from . import config
+from .tenant import get_base_url, get_site_name
 from .vocab import (
     CLIENT_TYPE_LABELS,
     LISTING_STATUS_LABELS,
@@ -14,8 +15,19 @@ from .vocab import (
 ROOT = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=ROOT / "templates")
 
-templates.env.globals["site_name"] = config.SITE_NAME
-templates.env.globals["base_url"] = config.BASE_URL
+class _LazyStr:
+    def __init__(self, fn):
+        self._fn = fn
+
+    def __str__(self) -> str:
+        return self._fn()
+
+    def __html__(self) -> str:
+        return self._fn()
+
+
+templates.env.globals["site_name"] = _LazyStr(get_site_name)
+templates.env.globals["base_url"] = _LazyStr(get_base_url)
 templates.env.globals["listing_status_labels"] = LISTING_STATUS_LABELS
 templates.env.globals["property_type_labels"] = PROPERTY_TYPE_LABELS
 templates.env.globals["client_type_labels"] = CLIENT_TYPE_LABELS

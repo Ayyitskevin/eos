@@ -97,6 +97,67 @@
   </section>
   {% endif %}
 
+  <section class="card" id="integrations">
+    <h2>Integrations &amp; growth</h2>
+    {% if request.query_params.get('token') %}
+    <p class="alert-banner">New API token (copy now — shown once): <code>{{ request.query_params.get('token') }}</code></p>
+    {% endif %}
+    <h3>API tokens</h3>
+    <p class="muted small">Bearer auth for <code>/api/v1/*</code> — use with Zapier or custom scripts.</p>
+    {% if api_tokens %}
+    <ul class="pkg-list">
+      {% for t in api_tokens %}
+      <li>{{ t.label }} · <code>{{ t.token_prefix }}…</code>
+        <form method="post" action="/admin/studio/api-tokens/{{ t.id }}/revoke" class="inline-form">
+          <button type="submit" class="link">Revoke</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <form method="post" action="/admin/studio/api-tokens" class="inline-form">
+      <input name="label" placeholder="Token label" value="Zapier">
+      <button type="submit">Create API token</button>
+    </form>
+
+    <h3>Webhooks</h3>
+    {% if webhooks %}
+    <ul class="pkg-list">
+      {% for w in webhooks %}
+      <li>{{ w.label }} → {{ w.url }}
+        <form method="post" action="/admin/studio/webhooks/{{ w.id }}/delete" class="inline-form">
+          <button type="submit" class="link">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <form method="post" action="/admin/studio/webhooks" class="form-grid compact">
+      <label>Label <input name="label" value="Zapier"></label>
+      <label>HTTPS URL <input name="url" required placeholder="https://hooks.zapier.com/…"></label>
+      <button type="submit">Add webhook</button>
+    </form>
+
+    <h3>Referral codes</h3>
+    {% if referrals %}
+    <table class="list compact">
+      <tr><th>Code</th><th>Credit</th><th>Uses</th></tr>
+      {% for r in referrals %}
+      <tr><td>{{ r.code }}</td><td>${{ "%.0f"|format(r.credit_cents / 100) }}</td><td>{{ r.uses }}{% if r.max_uses %}/{{ r.max_uses }}{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <form method="post" action="/admin/studio/referrals" class="inline-form">
+      <input name="code" placeholder="AGENT25" required>
+      <input name="credit_dollars" type="number" step="1" value="25" style="width:5rem">
+      <input name="max_uses" placeholder="Max uses" style="width:5rem">
+      <button type="submit">Add referral</button>
+    </form>
+    {% if signup_enabled and base_domain %}
+    <p class="muted small">SaaS signup is on — new studios at <code>https://{{ base_domain }}/signup</code></p>
+    {% endif %}
+  </section>
+
   <section class="card">
     <h2>Recent booking inquiries</h2>
     {% if inquiries %}

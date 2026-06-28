@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** through phase 9 — ops reports, kanban, brokerage billing, team assignment, twilight slots, delivery upsells.
+**Shipped:** through phase 10 (v1.0) — multi-tenant SaaS, signup, API/webhooks, sequence editor, referrals.
 
-**Out of scope:** full SaaS multi-tenant (phase 10), Google Calendar / Dropbox integrations.
+**Out of scope:** Google Calendar / Dropbox integrations, per-studio Stripe platform billing.

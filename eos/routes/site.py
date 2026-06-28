@@ -7,7 +7,7 @@ from .. import commerce, config, security, scheduling, studio
 from ..render import templates
 
 router = APIRouter()
-INDEXABLE = {"/", "/book"}
+INDEXABLE = {"/", "/book", "/signup"}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
