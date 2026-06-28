@@ -15,8 +15,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import config, db, jobs
 from .render import ROOT, templates
 from .routes import (
-    appointments, auth, brand_kits, clients, dashboard, delivery, downloads,
-    galleries_admin, invoices_admin, listings, media, pay, site, uploads,
+    appointments, auth, brand_kits, clients, contracts_admin, dashboard, delivery,
+    docs, downloads, emails, galleries_admin, invoices_admin, listings, media, pay,
+    proposals_admin, site, uploads,
 )
 
 logging.basicConfig(
@@ -76,7 +77,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "jobs_pending": jobs.pending_count(),
     }
 
@@ -86,6 +87,7 @@ for r in (
     galleries_admin.router, uploads.router, media.router,
     delivery.router, downloads.router, brand_kits.router,
     invoices_admin.router, pay.router, appointments.router,
+    proposals_admin.router, contracts_admin.router, docs.router, emails.router,
     site.router,
 ):
     app.include_router(r)

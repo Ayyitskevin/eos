@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-head">
+    <p class="brand-mark">Eos</p>
+    <h1>{{ d.title }}</h1>
+    {% if listing %}<p class="muted">{{ listing.title }}</p>{% endif %}
+  </header>
+
+  <section class="doc-body"><pre>{{ d.body }}</pre></section>
+
+  {% if d.status == 'signed' %}
+  <p class="ok">Signed by {{ d.signer_name }} on {{ d.signed_at }}</p>
+  {% elif d.status in ['sent','viewed'] %}
+  <form method="post" action="/c/{{ d.slug }}/sign" class="form-grid card sign-form">
+    <label>Type your full legal name to sign
+      <input name="signer_name" required placeholder="Jane Agent"></label>
+    <button type="submit" class="btn btn-accent">Sign agreement</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

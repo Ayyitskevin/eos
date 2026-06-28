@@ -82,6 +82,39 @@
     </section>
 
     <section class="card">
+      <h2>Proposals</h2>
+      {% if proposals %}
+      <ul class="pkg-list">
+        {% for p in proposals %}
+        <li><a href="/admin/proposals/{{ p.id }}">{{ p.title }}</a> · {{ p.status }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/proposals" class="inline-form">
+        <select name="preset">
+          {% for key, preset in proposal_presets.items() %}
+          <option value="{{ key }}">{{ preset.title }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Create proposal</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Contracts</h2>
+      {% if contracts %}
+      <ul class="pkg-list">
+        {% for c in contracts %}
+        <li><a href="/admin/contracts/{{ c.id }}">{{ c.title }}</a> · {{ c.status }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/contracts">
+        <button type="submit">Generate contract</button>
+      </form>
+    </section>
+
+    <section class="card">
       <h2>Invoices</h2>
       {% if invoices %}
       <ul class="pkg-list">

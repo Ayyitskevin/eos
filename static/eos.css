@@ -209,6 +209,20 @@ button.link:hover { transform: none; text-decoration: underline; }
 .upload-zone { border: 2px dashed var(--line); border-radius: 12px; padding: 1.25rem; }
 .upload-zone input[type=file] { width: 100%; margin-bottom: 0.5rem; }
 
+.section-manage { list-style: none; margin: 0 0 1rem; padding: 0; }
+.section-manage li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
+.gallery-section-block { margin-bottom: 1.5rem; }
+.asset-tile figcaption { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+.move-btns { display: inline-flex; gap: 0.15rem; }
+
+.doc-page { max-width: 720px; margin: 0 auto; padding: 2rem 5vw 4rem; }
+.doc-head { margin-bottom: 1.5rem; }
+.doc-intro { font-size: 1.05rem; line-height: 1.6; }
+.doc-items { margin: 1.5rem 0; }
+.doc-body pre { white-space: pre-wrap; font-family: inherit; font-size: 0.9rem; line-height: 1.55; background: var(--card); border: 1px solid var(--line); padding: 1.25rem; border-radius: 12px; }
+.doc-actions { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+.sign-form { max-width: 400px; }
+
 @media (max-width: 640px) {
   .admin-bar { flex-direction: column; align-items: flex-start; }
   .admin-nav { margin-left: 0; }

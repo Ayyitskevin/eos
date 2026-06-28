@@ -26,5 +26,24 @@
       {% endif %}
     </div>
   </section>
+
+  {% if inv.status != 'draft' %}
+  <section class="card">
+    <h2>Email to client</h2>
+    <p class="muted">Configure Gmail in .env to send, or copy the client link above.</p>
+    <form method="post" action="/admin/email/invoices/{{ inv.id }}" class="form-grid compact">
+      <input type="hidden" name="redirect" value="/admin/invoices/{{ inv.id }}">
+      <label>To <input type="email" name="to" required placeholder="agent@brokerage.com"></label>
+      <label>Subject <input name="subject" value="Invoice — {{ inv.title }}" required></label>
+      <label>Message <textarea name="message" rows="6" required>Hi,
+
+Invoice: {{ base_url }}/i/{{ inv.slug }}
+
+Thank you!
+{{ site_name }}</textarea></label>
+      <button type="submit">Send email</button>
+    </form>
+  </section>
+  {% endif %}
 </main>
 {% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ d.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>{{ d.title }}</h1>
+    <nav><a href="/admin/listings/{{ listing.id }}">← Listing</a></nav>
+  </header>
+
+  <p class="muted">Client link: <code class="slug">{{ base_url }}/p/{{ d.slug }}</code> · {{ d.status }}</p>
+
+  {% if d.status == 'draft' %}
+  <form method="post" action="/admin/proposals/{{ d.id }}" class="form-grid card">
+    <label>Title <input name="title" value="{{ d.title }}" required></label>
+    <label>Intro <textarea name="intro" rows="3">{{ d.intro }}</textarea></label>
+    {% for i in range(8) %}
+    {% set item = items[i] if items|length > i else none %}
+    <div class="row-3">
+      <label>Item <input name="item_label_{{ i }}" value="{{ item.label if item else '' }}"></label>
+      <label>Qty <input name="item_qty_{{ i }}" type="number" min="1" value="{{ item.qty if item else 1 }}"></label>
+      <label>Price $ <input name="item_price_{{ i }}" type="number" step="0.01" value="{{ '%.2f'|format(item.unit_cents / 100) if item and item.unit_cents else '' }}"></label>
+    </div>
+    {% endfor %}
+    <button type="submit">Save draft</button>
+  </form>
+  <form method="post" action="/admin/proposals/{{ d.id }}/send">
+    <button type="submit" class="btn btn-accent">Mark sent (unlocks client link)</button>
+  </form>
+  {% else %}
+  <section class="card">
+    {% if d.intro %}<p>{{ d.intro }}</p>{% endif %}
+    <table class="list compact">
+      <tr><th>Item</th><th>Qty</th><th>Amount</th></tr>
+      {% for i in items %}
+      <tr><td>{{ i.label }}</td><td>{{ i.qty }}</td>
+          <td>{% if i.unit_cents %}${{ "%.2f"|format(i.qty * i.unit_cents / 100) }}{% else %}included{% endif %}</td></tr>
+      {% endfor %}
+      <tr><td colspan="2"><strong>Total</strong></td><td><strong>${{ "%.2f"|format(d.total_cents / 100) }}</strong></td></tr>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if mailer_on and d.status != 'draft' and client %}
+  <section class="card">
+    <h2>Email to client</h2>
+    <form method="post" action="/admin/email/proposals/{{ d.id }}" class="form-grid compact"
+          onsubmit="return confirm('Send to ' + this.to.value + '?')">
+      <input type="hidden" name="redirect" value="/admin/proposals/{{ d.id }}">
+      <label>To <input type="email" name="to" value="{{ client.email }}" required></label>
+      <label>Subject <input name="subject" value="Proposal — {{ d.title }}" required></label>
+      <label>Message <textarea name="message" rows="8" required>Hi {{ client.name.split(' ')[0] }},
+
+Here's your photography proposal:
+
+{{ base_url }}/p/{{ d.slug }}
+
+Thank you!
+{{ site_name }}</textarea></label>
+      <button type="submit">Send email</button>
+    </form>
+  </section>
+  {% elif not mailer_on %}<p class="muted">Set EOS_GMAIL_USER + EOS_GMAIL_APP_PASSWORD to enable email.</p>{% endif %}
+</main>
+{% endblock %}

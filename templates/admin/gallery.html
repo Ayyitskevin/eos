@@ -37,26 +37,63 @@
       <h2>Upload photos</h2>
       <form id="upload-form" class="upload-zone">
         <input type="file" name="files" multiple accept="image/*,.heic,.heif">
-        <p class="muted">JPEG, PNG, HEIC, WebP — lands in first section by default.</p>
         <button type="submit" class="btn btn-accent">Upload</button>
       </form>
       {% if n_pending %}<p class="warn">{{ n_pending }} processing…</p>{% endif %}
       <form method="post" action="/admin/galleries/{{ g.id }}/exports" style="margin-top:1rem">
         <button type="submit">Build MLS / Zillow exports</button>
       </form>
-      <p class="muted">Exports use crop presets{% if listing and listing.client_id %} with agent watermark if brand kit is set{% endif %}.</p>
     </section>
+
+    {% if g.published and mailer_on %}
+    <section class="card">
+      <h2>Email delivery</h2>
+      <form method="post" action="/admin/galleries/{{ g.id }}/email" class="form-grid compact">
+        <label>To <input type="email" name="to" value="{{ g.client_name and '' }}" placeholder="agent@brokerage.com" required></label>
+        <label>Subject <input name="subject" value="Your listing photos are ready — {{ g.title }}" required></label>
+        <label>Message <textarea name="message" rows="7" required>Hi,
+
+Your gallery is ready:
+
+{{ base_url }}/g/{{ g.slug }}
+PIN: {{ g.pin }}
+
+Thank you!
+{{ site_name }}</textarea></label>
+        <button type="submit">Send email</button>
+      </form>
+    </section>
+    {% elif g.published and not mailer_on %}
+    <p class="muted">Configure EOS_GMAIL_* to send delivery emails.</p>
+    {% endif %}
   </div>
 
   <section class="card">
     <h2>Sections</h2>
-    <ol class="section-list">
-      {% for s in sections %}<li>{{ s.name }}</li>{% endfor %}
-    </ol>
+    <ul class="section-manage">
+      {% for s in sections %}
+      <li>
+        <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/rename" class="inline-form">
+          <input name="name" value="{{ s.name }}" required>
+          <button type="submit" class="link">Rename</button>
+        </form>
+        <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/move" class="inline-form">
+          <input type="hidden" name="dir" value="up"><button type="submit" class="link">↑</button>
+        </form>
+        <form method="post" action="/admin/galleries/{{ g.id }}/sections/{{ s.id }}/move" class="inline-form">
+          <input type="hidden" name="dir" value="down"><button type="submit" class="link">↓</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/admin/galleries/{{ g.id }}/sections" class="inline-form">
+      <input name="name" placeholder="New section" required>
+      <button type="submit">Add section</button>
+    </form>
   </section>
 
   {% for s in sections %}
-    {% if by_section[s.id] %}
+  <section class="gallery-section-block">
     <h3 class="section-name">{{ s.name }}</h3>
     <div class="asset-grid">
       {% for a in by_section[s.id] %}
@@ -66,12 +103,29 @@
         {% else %}
         <span class="asset-pending">{{ a.status }}</span>
         {% endif %}
-        <figcaption class="muted">{{ a.filename }}</figcaption>
+        <figcaption>
+          <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="inline-form">
+            <select name="section_id" onchange="this.form.submit()">
+              {% for sec in sections %}
+              <option value="{{ sec.id }}" {% if a.section_id == sec.id %}selected{% endif %}>{{ sec.name }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <span class="move-btns">
+            <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/move" class="inline-form">
+              <input type="hidden" name="dir" value="left"><button type="submit" class="link">←</button>
+            </form>
+            <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/move" class="inline-form">
+              <input type="hidden" name="dir" value="right"><button type="submit" class="link">→</button>
+            </form>
+          </span>
+        </figcaption>
       </figure>
       {% endfor %}
     </div>
-    {% endif %}
+  </section>
   {% endfor %}
+
   {% if unsectioned %}
   <h3 class="section-name">Unsectioned</h3>
   <div class="asset-grid">
@@ -79,15 +133,12 @@
     <figure class="asset-tile">
       {% if a.status == 'ready' %}
       <img src="/admin/galleries/{{ g.id }}/media/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
-      {% else %}
-      <span class="asset-pending">{{ a.status }}</span>
-      {% endif %}
-      <figcaption class="muted">{{ a.filename }}</figcaption>
+      {% else %}<span class="asset-pending">{{ a.status }}</span>{% endif %}
     </figure>
     {% endfor %}
   </div>
   {% endif %}
-  {% if not assets %}<p class="muted">No photos yet — drag files above.</p>{% endif %}
+  {% if not assets %}<p class="muted">No photos yet.</p>{% endif %}
 </main>
 <script>
 document.getElementById('upload-form')?.addEventListener('submit', async (e) => {

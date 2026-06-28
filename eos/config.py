@@ -50,6 +50,10 @@ TIMEZONE = os.environ.get("EOS_TIMEZONE", "America/New_York")
 STRIPE_SECRET_KEY = os.environ.get("EOS_STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("EOS_STRIPE_WEBHOOK_SECRET", "")
 
+GMAIL_USER = os.environ.get("EOS_GMAIL_USER", "")
+GMAIL_APP_PASSWORD = os.environ.get("EOS_GMAIL_APP_PASSWORD", "")
+CONTACT_REPLY_TO = os.environ.get("EOS_CONTACT_REPLY_TO", CONTACT_EMAIL)
+
 DEFAULT_TURNAROUND_HOURS = int(os.environ.get("EOS_DEFAULT_TURNAROUND_HOURS", "24"))
 PIN_MAX_FAILS = int(os.environ.get("EOS_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("EOS_PIN_LOCKOUT_MIN", "15"))

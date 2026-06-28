@@ -30,9 +30,16 @@ Eos inherits the best patterns from two sibling projects:
 - Listing invoices with optional Stripe Checkout
 - Shoot calendar (day + twilight appointments)
 
+### Phase 3 (shipped)
+
+- RE proposals from service packages — client accept/decline at `/p/{slug}`
+- Contracts with typed e-sign at `/c/{slug}`
+- Manual email delivery (Gmail SMTP) for galleries, proposals, contracts, invoices
+- Gallery section reorder, rename, asset move/reorder within sections
+
 ### Still deferred
 
-Questionnaires, contract e-sign, multi-tenant auth, email delivery templates.
+Questionnaires, multi-tenant auth, automated email sequences.
 
 ## Quick start
 
