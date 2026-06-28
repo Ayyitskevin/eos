@@ -2,7 +2,7 @@
 
 import logging
 
-from . import config, db, emails, mailer, studio
+from . import db, emails, mailer, studio, tenant
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.delivery_notify")
@@ -28,7 +28,7 @@ def maybe_send_gallery_email(gallery_id: int) -> bool:
     )
     if not listing or not listing["email"]:
         return False
-    link = f"{config.BASE_URL}/g/{g['slug']}"
+    link = f"{tenant.get_base_url()}/g/{g['slug']}"
     subject, body = emails.gallery_delivery(
         client_name=listing["name"] or "there",
         title=g["title"],
@@ -37,7 +37,7 @@ def maybe_send_gallery_email(gallery_id: int) -> bool:
         expires=g["expires_at"],
     )
     try:
-        mailer.send(listing["email"], subject, body)
+        mailer.send_for_studio(listing["email"], subject, body)
     except Exception:
         log.exception("auto gallery email failed for gallery %s", gallery_id)
         return False

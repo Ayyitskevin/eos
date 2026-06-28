@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import platform_admin, security, tenant
+from .. import invites, platform_admin, security, tenant
 from ..render import templates
 
 router = APIRouter(prefix="/admin/platform")
@@ -73,6 +73,36 @@ async def reactivate_studio(
         admin_user_id=security.current_user_id(request),
     )
     return RedirectResponse("/admin/platform/studios", status_code=303)
+
+
+@router.get("/invites", response_class=HTMLResponse)
+async def invite_list(request: Request, _: None = Depends(platform_admin.require_platform_admin)):
+    return templates.TemplateResponse(
+        request,
+        "admin/platform_invites.html",
+        {"invites": invites.list_codes(), "invite_only": invites.invite_required()},
+    )
+
+
+@router.post("/invites")
+async def invite_create(
+    code: str = Form(""),
+    label: str = Form(""),
+    max_uses: str = Form(""),
+    _: None = Depends(platform_admin.require_platform_admin),
+):
+    max_u = int(max_uses) if max_uses.strip().isdigit() else None
+    invites.create_code(code=code, label=label, max_uses=max_u)
+    return RedirectResponse("/admin/platform/invites", status_code=303)
+
+
+@router.post("/invites/{invite_id}/deactivate")
+async def invite_deactivate(
+    invite_id: int,
+    _: None = Depends(platform_admin.require_platform_admin),
+):
+    invites.deactivate(invite_id)
+    return RedirectResponse("/admin/platform/invites", status_code=303)
 
 
 @router.post("/studios/{studio_id}/plan")

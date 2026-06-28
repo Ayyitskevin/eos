@@ -40,7 +40,7 @@ async def send_email(
     if not to or not subject:
         raise HTTPException(status_code=400, detail="to and subject required")
     try:
-        mailer.send(to, subject, message)
+        mailer.send_for_studio(to, subject, message)
     except Exception:
         log.exception("send failed for %s %s", kind, doc_id)
         raise HTTPException(status_code=502, detail="SMTP send failed — check logs")
@@ -68,7 +68,7 @@ async def email_gallery(
     if not mailer.configured():
         raise HTTPException(status_code=503, detail="email is not configured")
     try:
-        mailer.send(to.strip(), subject.strip(), message)
+        mailer.send_for_studio(to.strip(), subject.strip(), message)
     except Exception:
         log.exception("gallery email failed %s", gallery_id)
         raise HTTPException(status_code=502, detail="SMTP send failed")

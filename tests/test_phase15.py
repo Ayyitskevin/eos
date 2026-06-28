@@ -96,7 +96,7 @@ async def test_demo_landing(app_env):
 def test_monitoring_health(app_env):
     details = monitoring.health_details()
     assert "disk_free_gb" in details
-    assert details["version"] == "1.7.0"
+    assert details["version"] == "1.8.0"
 
 
 def test_platform_admin_email_check(app_env):

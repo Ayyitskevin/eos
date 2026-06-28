@@ -10,10 +10,18 @@
   {% if base_domain %}
   <p class="muted small">Your studio: <strong>yourname.{{ base_domain }}</strong></p>
   {% endif %}
+  {% if invite_required %}
+  <p class="muted small">Beta access — invite code required.</p>
+  {% endif %}
 
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
   <form method="post" action="/signup" class="form-grid card">
+    {% if invite_required %}
+    <label>Invite code <input name="invite_code" required placeholder="BETA-2026" autocapitalize="characters"></label>
+    {% else %}
+    <input type="hidden" name="invite_code" value="">
+    {% endif %}
     <label>Studio name <input name="studio_name" required placeholder="Summit Lens Co."></label>
     <label>URL slug
       <input name="slug" required pattern="[a-z0-9-]+" placeholder="summit-lens">

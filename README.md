@@ -87,7 +87,7 @@ EOS_S3_BUCKET=your-bucket
   billing       Connect        storage
 ```
 
-**v1.7.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · boto3 (prod)
+**v1.8.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · Postmark · boto3 (prod)
 
 ## Platform admin
 
@@ -99,7 +99,7 @@ Suspend tenants, override plans, view usage, impersonate (audit logged).
 
 ```bash
 make lint          # ruff
-make test          # 74 tests
+make test          # 78 tests
 make dogfood       # seed 1420 Maple Dr
 make check-env     # validate .env
 ```
@@ -114,6 +114,7 @@ Short pointer: [AGENTS.md](AGENTS.md)
 
 - [x] Multi-tenant SaaS + Stripe Connect (v1.6)
 - [x] S3/R2 + production deploy (v1.7)
+- [x] Per-tenant email + invite-only beta (v1.8)
 - [ ] PostgreSQL
 - [ ] Per-tenant transactional email
 - [ ] Zillow Showcase / MLS connectors

@@ -25,10 +25,14 @@ def create_studio(
     owner_password: str,
     owner_name: str = "",
     timezone: str = "America/New_York",
+    invite_code: str = "",
 ) -> dict:
     name = name.strip()
     slug = _normalize_slug(slug)
     email = owner_email.strip().lower()
+    from . import invites
+
+    invites.validate(invite_code)
     if not name or not slug or not email or not owner_password:
         raise HTTPException(status_code=400, detail="All fields are required.")
     if not _SLUG_RE.match(slug) or slug in _RESERVED:
@@ -59,6 +63,7 @@ def create_studio(
 
     if config.SIGNUP_ENABLED:
         signup_verify.issue_token(studio_id, email=email)
+    invites.redeem(invite_code)
     db.audit("signup", "studio.create", f"id={studio_id} owner={email}")
     login_url = f"{config.BASE_URL}/admin/login"
     if config.BASE_DOMAIN:

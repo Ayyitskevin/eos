@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Pricing · Eos{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Platform plans</h1>
+  <p class="muted">Studios pay you (platform operator) for hosting. Their clients pay them via Stripe Connect.</p>
+
+  <div class="marketing-grid">
+    <section class="card">
+      <h2>Trial</h2>
+      <p class="lede">14 days free</p>
+      <ul class="check-list small">
+        <li>{{ plans.trial.listings_month }} listings / month</li>
+        <li>{{ plans.trial.team_seats }} team seat</li>
+        <li>{{ plans.trial.storage_gb }} GB storage</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Starter</h2>
+      <p class="muted">Growing solo shooters</p>
+      <ul class="check-list small">
+        <li>{{ plans.starter.listings_month }} listings / month</li>
+        <li>{{ plans.starter.team_seats }} team seat</li>
+        <li>{{ plans.starter.storage_gb }} GB storage</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Pro</h2>
+      <p class="muted">Teams &amp; custom domains</p>
+      <ul class="check-list small">
+        <li>Unlimited listings</li>
+        <li>{{ plans.pro.team_seats }} team seats</li>
+        <li>{{ plans.pro.storage_gb }} GB storage</li>
+        <li>Custom domain + API</li>
+      </ul>
+    </section>
+  </div>
+
+  {% if signup_enabled %}
+  <p class="cta-row center">
+    <a href="/signup" class="btn btn-accent">{% if invite_only %}Request beta access{% else %}Start free trial{% endif %}</a>
+    <a href="/" class="btn secondary">Back</a>
+  </p>
+  {% if invite_only %}
+  <p class="muted small center">Beta is invite-only — contact the platform operator for a code.</p>
+  {% endif %}
+  {% endif %}
+</main>
+{% endblock %}

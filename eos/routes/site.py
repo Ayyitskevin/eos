@@ -7,7 +7,7 @@ from .. import commerce, config, scheduling, security, stripe_checkout, studio, 
 from ..render import templates
 
 router = APIRouter()
-INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo"}
+INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo", "/pricing"}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -31,6 +31,23 @@ def _book_context(error: str | None = None, thanks: bool = False):
         "error": error,
         "thanks": thanks,
     }
+
+
+@router.get("/pricing", response_class=HTMLResponse)
+async def pricing(request: Request):
+    from .. import plan_limits
+
+    if not (config.SAAS_MODE and tenant.get_studio_id() == "default"):
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request,
+        "site/pricing.html",
+        {
+            "signup_enabled": config.SIGNUP_ENABLED,
+            "invite_only": __import__("eos.invites", fromlist=["invite_required"]).invite_required(),
+            "plans": plan_limits.LIMITS,
+        },
+    )
 
 
 @router.get("/", response_class=HTMLResponse)

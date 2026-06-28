@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Invite codes{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>Signup invite codes</h1>
+    <nav><a href="/admin/platform/studios">Studios</a></nav>
+  </header>
+
+  {% if invite_only %}
+  <p class="warn small">Invite-only mode is ON (<code>EOS_SIGNUP_INVITE_ONLY=true</code>).</p>
+  {% else %}
+  <p class="muted small">Open signup — set <code>EOS_SIGNUP_INVITE_ONLY=true</code> to require codes.</p>
+  {% endif %}
+
+  <form method="post" action="/admin/platform/invites" class="card form-grid compact">
+    <h2>Create code</h2>
+    <label>Code <input name="code" placeholder="Leave blank to auto-generate"></label>
+    <label>Label <input name="label" placeholder="Beta batch 1"></label>
+    <label>Max uses <input name="max_uses" type="number" min="1" placeholder="Unlimited if empty"></label>
+    <button type="submit" class="btn">Create</button>
+  </form>
+
+  <table class="data-table">
+    <thead><tr><th>Code</th><th>Label</th><th>Uses</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for i in invites %}
+    <tr>
+      <td><code>{{ i.code }}</code></td>
+      <td>{{ i.label or "—" }}</td>
+      <td>{{ i.uses }}{% if i.max_uses %} / {{ i.max_uses }}{% endif %}</td>
+      <td>{% if i.active %}active{% else %}inactive{% endif %}</td>
+      <td>
+        {% if i.active %}
+        <form method="post" action="/admin/platform/invites/{{ i.id }}/deactivate" class="inline-form">
+          <button type="submit" class="link small">Deactivate</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">No invite codes yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</main>
+{% endblock %}

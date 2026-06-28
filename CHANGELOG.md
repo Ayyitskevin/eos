@@ -2,6 +2,14 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## 1.8.0 — Phase 18 (email + beta signup)
+
+- Per-tenant transactional email — Postmark API or Gmail SMTP; studio-branded From + Reply-To
+- Invite-only signup (`EOS_SIGNUP_INVITE_ONLY`) with platform admin invite codes
+- Onboarding checklist: Stripe Connect, publish/booking, platform billing
+- Public `/pricing` page; marketing links to pricing
+- Platform admin `/admin/platform/invites`
+
 ## 1.7.0 — Phase 17 (production + scale)
 
 - S3/R2 object storage sync for gallery uploads and derivatives (`EOS_S3_*`)

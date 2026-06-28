@@ -1,6 +1,6 @@
 [project]
 name = "eos"
-version = "1.7.0"
+version = "1.8.0"
 description = "Multi-tenant SaaS for real estate photography studios — Aryeo-class alternative"
 requires-python = ">=3.12"
 readme = "README.md"

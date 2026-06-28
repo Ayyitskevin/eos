@@ -29,7 +29,7 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 
 HOST = os.environ.get("EOS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EOS_PORT", "8410"))
@@ -55,6 +55,12 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("EOS_STRIPE_WEBHOOK_SECRET", "")
 GMAIL_USER = os.environ.get("EOS_GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("EOS_GMAIL_APP_PASSWORD", "")
 CONTACT_REPLY_TO = os.environ.get("EOS_CONTACT_REPLY_TO", CONTACT_EMAIL)
+
+EMAIL_PROVIDER = os.environ.get("EOS_EMAIL_PROVIDER", "smtp").lower()
+POSTMARK_API_KEY = os.environ.get("EOS_POSTMARK_API_KEY", "")
+POSTMARK_FROM_EMAIL = os.environ.get("EOS_POSTMARK_FROM_EMAIL", "")
+PLATFORM_EMAIL_NAME = os.environ.get("EOS_PLATFORM_EMAIL_NAME", SITE_NAME)
+SIGNUP_INVITE_ONLY = _b("EOS_SIGNUP_INVITE_ONLY", "false")
 
 DEFAULT_TURNAROUND_HOURS = int(os.environ.get("EOS_DEFAULT_TURNAROUND_HOURS", "24"))
 PIN_MAX_FAILS = int(os.environ.get("EOS_PIN_MAX_FAILS", "5"))

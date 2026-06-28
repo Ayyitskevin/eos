@@ -2,7 +2,7 @@
 
 **Read this before changing code.** Eos is a multi-tenant RE photography SaaS (Aryeo-class). The goal is to **extend** what works, not refactor or break tenant isolation.
 
-**Version:** 1.7.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
+**Version:** 1.8.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
 
 ---
 
@@ -201,7 +201,7 @@ Replace stubs with real implementations behind existing env flags; keep no-op fa
 | P0 | Production deploy on real domain | `docs/DEPLOY.md` |
 | P0 | S3/R2 in production | `EOS_S3_*` — shipped, needs bucket |
 | P1 | PostgreSQL backend | `docs/SCALE.md` — do not half-migrate |
-| P1 | Per-tenant email (Postmark/SES) | Global Gmail is not SaaS-ready |
+| P1 | Per-tenant email polish | Postmark shipped — verify domain + bounce handling |
 | P2 | Zillow Showcase / MLS connectors | Aryeo moat |
 | P2 | Mobile agent PWA | Web portal exists |
 
@@ -280,4 +280,7 @@ EOS_SAAS_MODE=true EOS_SIGNUP_ENABLED=true EOS_BASE_DOMAIN=localhost:8410 make r
 
 ---
 
-*Last updated: Phase 17 (v1.7.0). Update this file when architecture or invariants change.*
+| `EOS_EMAIL_PROVIDER` | postmark/smtp | Transactional email |
+| `EOS_SIGNUP_INVITE_ONLY` | beta | Require invite code at signup |
+
+*Last updated: Phase 18 (v1.8.0). Update this file when architecture or invariants change.*

@@ -137,7 +137,7 @@ def process_due() -> int:
                 if not phone or not sms.send(to_phone=phone, body=body[:500]):
                     raise RuntimeError("SMS delivery failed or no phone")
             else:
-                mailer.send(run["to_email"], subject, body)
+                mailer.send_for_studio(run["to_email"], subject, body)
             db.run(
                 "UPDATE email_sequence_runs SET status='sent', sent_at=datetime('now'), error=NULL WHERE id=?",
                 (run["id"],),

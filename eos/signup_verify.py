@@ -24,7 +24,7 @@ def issue_token(studio_id: str, *, email: str) -> str:
     )
     if mailer.configured():
         url = _verify_url(studio_id, token)
-        mailer.send(
+        mailer.send_platform(
             email,
             f"Verify your Eos studio — {studio_id}",
             f"Click to activate your studio:\n\n{url}\n\nThis link expires in 48 hours.",
