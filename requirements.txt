@@ -7,6 +7,7 @@ aiofiles
 pillow>=11.3
 pillow-heif
 stripe
+cryptography
 pytest
 pytest-asyncio
 httpx

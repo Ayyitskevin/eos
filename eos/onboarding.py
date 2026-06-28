@@ -49,6 +49,8 @@ def create_studio(
     uid = users.create_user(
         email, owner_password, name=owner_name or "Owner", role="owner", studio_id=studio_id,
     )
+    from . import platform_billing
+    platform_billing.provision_new_studio(studio_id, email=email, name=name)
     db.audit("signup", "studio.create", f"id={studio_id} owner={email}")
     login_url = f"{config.BASE_URL}/admin/login"
     if config.BASE_DOMAIN:

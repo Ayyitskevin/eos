@@ -32,6 +32,11 @@ def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
         else:
             end = start + dt.timedelta(minutes=90)
         ranges.append((start - buf, end + buf))
+    try:
+        from .integrations import google_calendar
+        ranges.extend(google_calendar.busy_ranges())
+    except Exception:
+        pass
     return ranges
 
 

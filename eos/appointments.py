@@ -51,6 +51,8 @@ def create_appointment(
         ),
     )
     db.audit("admin", "appointment.create", f"id={aid}")
+    from .integrations import google_calendar
+    google_calendar.enqueue_push(aid)
     return aid
 
 
@@ -68,3 +70,5 @@ def update_appointment(appt_id: int, **fields) -> None:
     params.append(appt_id)
     db.run(f"UPDATE appointments SET {', '.join(parts)} WHERE id=?", tuple(params))
     db.audit("admin", "appointment.update", f"id={appt_id}")
+    from .integrations import google_calendar
+    google_calendar.enqueue_push(appt_id)

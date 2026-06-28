@@ -11,7 +11,19 @@ _stop = threading.Event()
 _thread: threading.Thread | None = None
 
 
+_tick = 0
+
+
+def _integration_sweep() -> None:
+    from .integrations import dropbox, google_calendar
+    g = google_calendar.sweep_all()
+    d = dropbox.sweep_all()
+    if g or d:
+        log.info("integration sweep: google=%d dropbox=%d queued", g, d)
+
+
 def _loop() -> None:
+    global _tick
     while not _stop.wait(config.SEQUENCE_TICK_SECONDS):
         try:
             n = sequences.process_due()
@@ -19,6 +31,13 @@ def _loop() -> None:
                 log.info("sequence scheduler sent %d emails", n)
         except Exception:
             log.exception("sequence sweep failed")
+        _tick += 1
+        if _tick * config.SEQUENCE_TICK_SECONDS >= config.INTEGRATION_TICK_SECONDS:
+            _tick = 0
+            try:
+                _integration_sweep()
+            except Exception:
+                log.exception("integration sweep failed")
 
 
 def start() -> None:

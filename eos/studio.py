@@ -41,6 +41,8 @@ def update_profile(**fields) -> None:
         "pay_to_download", "watermark_until_paid", "auto_deliver_email", "auto_publish_site",
         "twilight_start_min", "twilight_end_min",
         "delivery_upsell_title", "delivery_upsell_body", "delivery_upsell_link",
+        "google_calendar_enabled", "google_calendar_id",
+        "dropbox_enabled", "dropbox_watch_path", "dropbox_default_listing_id",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -50,7 +52,11 @@ def update_profile(**fields) -> None:
         parts.append(f"{k}=?")
         if k == "published":
             params.append(1 if v else 0)
-        elif k in ("booking_enabled", "pay_to_download", "watermark_until_paid", "auto_deliver_email", "auto_publish_site"):
+        elif k in (
+            "booking_enabled", "pay_to_download", "watermark_until_paid",
+            "auto_deliver_email", "auto_publish_site",
+            "google_calendar_enabled", "dropbox_enabled",
+        ):
             params.append(1 if v else 0)
         else:
             params.append(v)

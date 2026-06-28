@@ -109,6 +109,31 @@ def _h_marketing_kit(p: dict) -> None:
         raise
 
 
+def _h_google_calendar_push(p: dict) -> None:
+    from . import tenant
+    from .integrations import google_calendar
+    tenant.set_studio(p["studio_id"])
+    google_calendar.push_appointment(p["appointment_id"])
+
+
+def _h_dropbox_ingest(p: dict) -> None:
+    from . import tenant
+    from .integrations import dropbox
+    tenant.set_studio(p["studio_id"])
+    try:
+        dropbox.ingest_file(
+            log_id=p["log_id"],
+            dropbox_path=p["dropbox_path"],
+            listing_id=p["listing_id"],
+        )
+    except Exception as e:
+        db.run(
+            "UPDATE dropbox_ingest_log SET status='failed', error=? WHERE id=?",
+            (str(e)[:500], p["log_id"]),
+        )
+        raise
+
+
 HANDLERS = {
     "image_derivatives": _h_image,
     "export_crops": _h_exports,
@@ -116,6 +141,8 @@ HANDLERS = {
     "zip_build": _h_zip,
     "bundle_build": _h_bundle,
     "marketing_kit": _h_marketing_kit,
+    "google_calendar_push": _h_google_calendar_push,
+    "dropbox_ingest": _h_dropbox_ingest,
 }
 
 

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Billing · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>Studio billing</h1>
+    <nav><a href="/admin/studio">Studio</a> · <a href="/admin">Pipeline</a></nav>
+  </header>
+
+  {% if thanks %}
+  <p class="alert-banner">Subscription updated — thank you.</p>
+  {% endif %}
+
+  <section class="card">
+    <h2>Current plan</h2>
+    {% if not configured %}
+    <p class="muted">Platform billing is not configured on this server. Set <code>EOS_STRIPE_PLATFORM_SECRET_KEY</code> and price IDs in the environment.</p>
+    {% else %}
+    <dl class="spec-list">
+      <dt>Plan</dt><dd>{{ billing.plan_tier|capitalize }}</dd>
+      <dt>Status</dt><dd>{{ billing.billing_status }}</dd>
+      {% if billing.trial_ends_at %}
+      <dt>Trial ends</dt><dd>{{ billing.trial_ends_at[:16] }}</dd>
+      {% endif %}
+    </dl>
+    {% if billing.stripe_customer_id %}
+    <form method="post" action="/admin/billing/portal" class="inline-form">
+      <button type="submit">Manage subscription</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  {% if configured %}
+  <section class="card">
+    <h2>Choose a plan</h2>
+    <p class="muted small">Billed monthly via Stripe. Client invoice payments use a separate Stripe account.</p>
+    <div class="form-grid">
+      {% for key, plan in plans.items() %}
+      <form method="post" action="/admin/billing/checkout" class="card compact">
+        <h3>{{ plan.label }}</h3>
+        <input type="hidden" name="plan" value="{{ key }}">
+        <button type="submit">Subscribe to {{ plan.label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</main>
+{% endblock %}

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import api_tokens, config, referrals, security, studio, users, webhooks
+from .. import api_tokens, config, platform_billing, referrals, security, studio, users, webhooks
+from ..integrations import dropbox, google_calendar
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -27,6 +28,12 @@ async def studio_settings(request: Request):
             "webhook_events": webhooks.EVENTS,
             "signup_enabled": config.SIGNUP_ENABLED,
             "base_domain": config.BASE_DOMAIN,
+            "google_configured": google_calendar.is_configured(),
+            "google_connected": google_calendar.is_connected(),
+            "dropbox_configured": dropbox.is_configured(),
+            "dropbox_connected": dropbox.is_connected(),
+            "billing_configured": platform_billing.is_configured(),
+            "billing": platform_billing.studio_billing(),
         },
     )
 

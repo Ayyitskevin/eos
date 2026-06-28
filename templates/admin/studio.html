@@ -4,7 +4,7 @@
 <main class="admin-main narrow">
   <header class="admin-bar">
     <h1>Studio settings</h1>
-    <nav><a href="/admin">Pipeline</a></nav>
+    <nav><a href="/admin/billing">Billing</a> · <a href="/admin">Pipeline</a></nav>
   </header>
 
   <form method="post" action="/admin/studio" class="form-grid card">
@@ -155,6 +155,57 @@
     </form>
     {% if signup_enabled and base_domain %}
     <p class="muted small">SaaS signup is on — new studios at <code>https://{{ base_domain }}/signup</code></p>
+    {% endif %}
+
+    <h3>Google Calendar</h3>
+    {% if request.query_params.get('oauth_error') == 'google' %}
+    <p class="alert-banner">Google connection failed — try again.</p>
+    {% endif %}
+    {% if not google_configured %}
+    <p class="muted small">Set <code>EOS_GOOGLE_CLIENT_ID</code>, <code>EOS_GOOGLE_CLIENT_SECRET</code>, and <code>EOS_GOOGLE_REDIRECT_URI</code> on the server.</p>
+    {% elif google_connected %}
+    <p>Connected — appointments sync both ways every {{ 120 }}s; booking slots respect Google busy times.</p>
+    <form method="post" action="/admin/integrations/google/settings" class="inline-form">
+      <label>Calendar ID <input name="google_calendar_id" value="{{ profile.google_calendar_id or 'primary' }}"></label>
+      <button type="submit">Save calendar</button>
+    </form>
+    <form method="post" action="/admin/integrations/google/disconnect" class="inline-form">
+      <button type="submit" class="link">Disconnect Google</button>
+    </form>
+    {% else %}
+    <p class="muted small">2-way sync — Eos appointments push to Google; external events block booking slots.</p>
+    <a href="/admin/integrations/google/connect" class="btn">Connect Google Calendar</a>
+    {% endif %}
+
+    <h3>Dropbox ingest</h3>
+    {% if request.query_params.get('oauth_error') == 'dropbox' %}
+    <p class="alert-banner">Dropbox connection failed — try again.</p>
+    {% endif %}
+    {% if not dropbox_configured %}
+    <p class="muted small">Set <code>EOS_DROPBOX_APP_KEY</code>, <code>EOS_DROPBOX_APP_SECRET</code>, and <code>EOS_DROPBOX_REDIRECT_URI</code> on the server.</p>
+    {% elif dropbox_connected %}
+    <p>Connected — new photos in your watch folder auto-import to listing galleries.</p>
+    <form method="post" action="/admin/integrations/dropbox/settings" class="form-grid compact">
+      <label>Watch folder <input name="dropbox_watch_path" value="{{ profile.dropbox_watch_path or '/Eos Ingest' }}"></label>
+      <label>Default listing ID (files at folder root)
+        <input name="dropbox_default_listing_id" value="{{ profile.dropbox_default_listing_id or '' }}" placeholder="optional">
+      </label>
+      <p class="muted small">Use subfolders named <code>{listing_id}</code> to route files, e.g. <code>/Eos Ingest/42/IMG_001.jpg</code>.</p>
+      <button type="submit">Save Dropbox settings</button>
+    </form>
+    <form method="post" action="/admin/integrations/dropbox/disconnect" class="inline-form">
+      <button type="submit" class="link">Disconnect Dropbox</button>
+    </form>
+    {% else %}
+    <p class="muted small">Watch a Dropbox folder — drop RAWs/JPEGs and they appear in the matching listing gallery.</p>
+    <a href="/admin/integrations/dropbox/connect" class="btn">Connect Dropbox</a>
+    {% endif %}
+
+    {% if billing_configured %}
+    <h3>Platform billing</h3>
+    <p>Plan: <strong>{{ billing.plan_tier }}</strong> · Status: {{ billing.billing_status }}
+      <a href="/admin/billing">Manage billing →</a>
+    </p>
     {% endif %}
   </section>
 

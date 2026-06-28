@@ -102,9 +102,12 @@ Eos inherits the best patterns from two sibling projects:
 - Agent referral codes — booking credit applied at checkout
 - Set `EOS_SIGNUP_ENABLED=true` and `EOS_BASE_DOMAIN` for hosted SaaS
 
-### Still deferred
+### Phase 11 (shipped) — Eos 1.1
 
-Google Calendar sync; Dropbox ingest; per-studio Stripe billing (roadmap).
+- Google Calendar 2-way sync — OAuth connect, push appointments, pull external events, block booking slots
+- Dropbox watch-folder ingest — auto-import photos from `{listing_id}/` subfolders into galleries
+- Per-studio Stripe platform billing — trial on signup, subscription checkout at `/admin/billing`
+- Set `EOS_GOOGLE_*`, `EOS_DROPBOX_*`, and `EOS_STRIPE_PLATFORM_*` env vars for hosted SaaS
 
 ## Quick start
 
