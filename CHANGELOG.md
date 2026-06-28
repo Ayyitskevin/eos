@@ -9,6 +9,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - `docs/DEPLOY.md` and `docs/SCALE.md` — hosted SaaS runbooks
 - `deploy/env.production.example` defaults to SaaS mode
 - README repositioned as open Aryeo-class multi-tenant platform
+- `docs/AI_AGENTS.md` — canonical guide for AI agents (invariants, architecture, safe extension)
 
 ## 1.6.0 — Phase 16 (SaaS pivot)
 

@@ -1,61 +1,63 @@
 # Eos
 
-**Open multi-tenant SaaS for real estate photography studios** — the Aryeo-class alternative you host yourself.
+**Open multi-tenant SaaS for real estate photography studios** — host your own Aryeo-class platform.
 
-Booking → shoot pipeline → branded delivery → agent portals → Stripe Connect payments. Each studio gets `{slug}.yourdomain.com`, optional custom domain, and collects client revenue on their own Stripe account.
+Studios get `{slug}.yourdomain.com`, branded booking and delivery, agent portals, and **Stripe Connect** so they collect client payments on their own accounts. You run the infrastructure and set platform subscription plans.
 
 [![CI](https://github.com/Ayyitskevin/eos/actions/workflows/ci.yml/badge.svg)](https://github.com/Ayyitskevin/eos/actions/workflows/ci.yml)
 
-## Why Eos
-
 | | Aryeo / Spiro | Eos |
 |---|---------------|-----|
-| Hosting | Their cloud | **Your infrastructure** |
-| Client payments | Platform wallet or per-delivery fees | **Stripe Connect per studio** |
-| Data ownership | Vendor lock-in | **SQLite + S3 you control** |
-| Pricing | $0–$179/mo + add-ons | **You set platform plans** |
-| RE workflow | Media delivery first | **Listing-centric pipeline end-to-end** |
+| Hosting | Vendor cloud | **Your server** |
+| Client payments | Platform wallet or per-listing fees | **Stripe Connect per studio** |
+| Data | Vendor-held | **SQLite + S3 you control** |
+| Workflow | Delivery-first | **Listing pipeline end-to-end** |
 
-Built for operators who want SaaS economics without surrendering the stack.
+## What studios get
 
-## Features
+- **Signup & subdomain** — 14-day trial, Starter/Pro plans, billing enforcement
+- **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow
+- **Pipeline** — listing tasks, Kanban, calendar, photographer assignment
+- **Delivery** — PIN galleries, property sites, agent portal, MLS/Zillow crops
+- **Payments** — Connect onboarding at `/admin/stripe/connect`
+- **Integrations** — Google Calendar, Dropbox ingest, API v1, webhooks
 
-- **Multi-tenant SaaS** — signup, subdomains, 14-day trial, Starter/Pro plans, billing enforcement
-- **Stripe Connect** — deposits, invoices, delivery upsells go to each studio's account
-- **Booking** — packages, add-ons, e-sign, deposits, twilight slots, homeowner flow
-- **Pipeline** — listing tasks, Kanban, calendar, photographer assignment, drive-time scheduling
-- **Delivery** — PIN galleries, property microsites, agent portal, MLS/Zillow export crops
-- **Ops** — proposals, contracts, sequences, webhooks, API v1, platform admin console
-- **Scale** — S3/R2 media sync, per-tenant storage metering, seat limits
-
-## Quick start (local)
+## Quick start
 
 ```bash
 git clone https://github.com/Ayyitskevin/eos.git && cd eos
 make install
-cp .env.example .env   # set EOS_SECRET_KEY, EOS_ADMIN_PASSWORD
-make run               # http://127.0.0.1:8410
+cp .env.example .env          # EOS_SECRET_KEY + EOS_ADMIN_PASSWORD
+make run                      # http://127.0.0.1:8410
 make test
 ```
 
-**SaaS mode locally:**
+**Try SaaS mode locally:**
 
 ```bash
 EOS_SAAS_MODE=true EOS_SIGNUP_ENABLED=true EOS_BASE_DOMAIN=localhost:8410 make run
-# Signup: http://127.0.0.1:8410/signup
 ```
 
-## Production deploy (hosted platform)
+Open http://127.0.0.1:8410/signup
+
+## Production (hosted platform)
 
 ```bash
 sudo INSTALL_CADDY=1 deploy/install.sh
-# Edit /opt/eos/.env — see deploy/env.production.example
+sudo nano /opt/eos/.env       # see deploy/env.production.example
 sudo systemctl restart eos
 ```
 
-Full guide: [docs/DEPLOY.md](docs/DEPLOY.md) · Scaling: [docs/SCALE.md](docs/SCALE.md)
+| Step | Detail |
+|------|--------|
+| DNS | `eos.yourdomain.com` + `*.eos.yourdomain.com` → server |
+| TLS | `deploy/Caddyfile` (wildcard) |
+| Stripe | Platform billing + Connect; webhook → `/stripe/platform/webhook` |
+| Media | `EOS_S3_*` for scale (recommended) |
 
-### Minimum SaaS `.env`
+Guides: [docs/DEPLOY.md](docs/DEPLOY.md) · [docs/SCALE.md](docs/SCALE.md)
+
+### Minimum SaaS env
 
 ```bash
 EOS_SAAS_MODE=true
@@ -68,73 +70,59 @@ EOS_STRIPE_PLATFORM_SECRET_KEY=sk_live_...
 EOS_STRIPE_PRICE_STARTER=price_...
 EOS_STRIPE_PRICE_PRO=price_...
 EOS_PLATFORM_ADMIN_EMAILS=you@yourdomain.com
-EOS_S3_BUCKET=your-bucket          # recommended
+EOS_S3_BUCKET=your-bucket
 ```
-
-DNS: apex + `*.eos.yourdomain.com` → server. Caddy config: `deploy/Caddyfile`.
 
 ## Architecture
 
 ```
-                    ┌─────────────────────────┐
-                    │  Caddy (*.BASE_DOMAIN)  │
-                    └───────────┬─────────────┘
-                                │
-                    ┌───────────▼─────────────┐
-                    │  FastAPI (tenant middleware) │
-                    │  SQLite · local/S3 media   │
-                    └───────────┬─────────────┘
-          ┌─────────────────────┼─────────────────────┐
-          ▼                     ▼                     ▼
-   Platform billing      Stripe Connect         S3/R2 sync
-   (studios → you)       (clients → studio)     (media scale)
+  Caddy (*.BASE_DOMAIN)
+         │
+  FastAPI + tenant middleware
+         │
+    SQLite ──────► optional S3/R2 media sync
+         │
+  ┌──────┴──────┬──────────────┐
+  Platform      Stripe         Object
+  billing       Connect        storage
 ```
 
-**Stack:** FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · optional boto3/S3
-
-**Version:** 1.7.0 · Port **8410**
+**v1.7.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · boto3 (prod)
 
 ## Platform admin
 
-Set `EOS_PLATFORM_ADMIN_EMAILS` → `/admin/platform/studios`
+`EOS_PLATFORM_ADMIN_EMAILS` → `/admin/platform/studios`
 
-- List tenants, usage, storage
-- Suspend / reactivate
-- Plan override
-- Impersonate studio (audit logged)
-
-## Studio onboarding flow
-
-1. Signup at `/signup` → `{slug}.yourdomain.com`
-2. Verify email → onboarding wizard
-3. Connect Stripe at `/admin/stripe/connect`
-4. Subscribe (Starter/Pro) at `/admin/billing`
-5. Publish site, enable `/book`, shoot first listing
+Suspend tenants, override plans, view usage, impersonate (audit logged).
 
 ## Development
 
 ```bash
 make lint          # ruff
-make test          # pytest (70+ tests)
-make dogfood       # seed 1420 Maple Dr pipeline
+make test          # 74 tests
+make dogfood       # seed 1420 Maple Dr
 make check-env     # validate .env
 ```
+
+### For AI agents & contributors
+
+**Read [docs/AI_AGENTS.md](docs/AI_AGENTS.md) before changing code.** It documents tenant isolation rules, payment rails, migration patterns, and what not to break.
+
+Short pointer: [AGENTS.md](AGENTS.md)
 
 ## Roadmap
 
 - [x] Multi-tenant SaaS + Stripe Connect (v1.6)
-- [x] S3/R2 media + production deploy docs (v1.7)
-- [ ] PostgreSQL backend
-- [ ] Per-tenant transactional email (Postmark/SES)
+- [x] S3/R2 + production deploy (v1.7)
+- [ ] PostgreSQL
+- [ ] Per-tenant transactional email
 - [ ] Zillow Showcase / MLS connectors
-- [ ] Mobile agent PWA
-
-## License
-
-Private / all rights reserved — contact maintainer for commercial hosting terms.
 
 ## Links
 
-- **Repo:** https://github.com/Ayyitskevin/eos
-- **Changelog:** [CHANGELOG.md](CHANGELOG.md)
-- **Agent notes:** [AGENTS.md](AGENTS.md)
+| | |
+|---|---|
+| Repo | https://github.com/Ayyitskevin/eos |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Agent guide | [docs/AI_AGENTS.md](docs/AI_AGENTS.md) |
+| Deploy | [docs/DEPLOY.md](docs/DEPLOY.md) |

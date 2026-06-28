@@ -1,64 +1,34 @@
 # AGENTS.md — Eos
 
-## What this is
+**AI agents: read [docs/AI_AGENTS.md](docs/AI_AGENTS.md) first.** It is the canonical guide — invariants, architecture, how to add features without breaking multi-tenancy.
 
-Eos is a **multi-tenant RE photography SaaS** (Aryeo competitor): signup, subdomain tenants, platform billing, Stripe Connect client payments, DNS domain verification, platform admin ops.
+## TL;DR
 
-Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL + optional S3, port **8410**. Current version: **1.7.0**.
+- **What:** Multi-tenant RE photography SaaS (Aryeo competitor), v1.7.0, port 8410
+- **Stack:** FastAPI + Jinja/HTMX + SQLite + optional S3
+- **Rule #1:** Every DB query/mutation must scope `studio_id` via `STUDIO_ID`
+- **Rule #2:** Minimal diffs — extend modules, append migrations, run `make test lint`
+- **Rule #3:** Push to `main` after shipping; never commit `.env` or `data/`
 
-## Key paths
+## Quick paths
 
 | Path | Purpose |
 |------|---------|
-| `eos/main.py` | App entry, middleware (tenant, billing, CSRF, request ID) |
-| `eos/tenant.py` | Subdomain + session tenant resolution |
-| `eos/security.py` | Auth, CSRF, rate limits, tenant-bound `require_admin` |
-| `eos/migrations/` | Numbered SQL migrations |
-| `tests/conftest.py` | Shared `app_env` / `app_env_http` fixtures |
-| `Makefile` | `make test`, `make lint`, `make run`, `make dogfood` |
-| `scripts/check-env.py` | Validate env before prod boot |
-| `deploy/` | systemd, nginx, Caddy, backup, install |
+| `docs/AI_AGENTS.md` | **Full agent reference** |
+| `eos/main.py` | Middleware + routers |
+| `eos/tenant.py` | Tenant resolution |
+| `eos/plan_limits.py` | SaaS plan gating |
+| `eos/migrations/` | Append-only SQL |
+| `tests/conftest.py` | Test fixtures |
 
-## Conventions
-
-- **Listing-centric** — everything hangs off `listings`
-- **Tenant isolation** — all queries/mutations must include `studio_id`
-- **Minimal diffs**; match existing module layout
-- Run `make lint` and `make test` before pushing
-
-## Running locally
+## Commands
 
 ```bash
-make install   # or: pip install -r requirements-dev.txt
-make run       # uvicorn with reload
-make test
-make dogfood   # seed 1420 Maple Dr
+make install && make run && make test && make lint
 ```
 
-Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
+## Docs
 
-## GitHub
-
-Repo: https://github.com/Ayyitskevin/eos — **push to `main` after every shipped change**. Never commit `.env` or `data/`. CI runs ruff, pytest+coverage, bandit. If workflow push fails, use GitHub MCP or `gh auth refresh -s workflow`.
-
-## SaaS production env
-
-```bash
-EOS_SAAS_MODE=true
-EOS_SIGNUP_ENABLED=true
-EOS_BASE_DOMAIN=yourdomain.com
-EOS_BILLING_ENFORCE=true
-EOS_STRIPE_PLATFORM_SECRET_KEY=sk_live_...
-EOS_STRIPE_PLATFORM_WEBHOOK_SECRET=whsec_...
-EOS_STRIPE_PRICE_STARTER=price_...
-EOS_STRIPE_PRICE_PRO=price_...
-EOS_PLATFORM_ADMIN_EMAILS=you@company.com
-```
-
-Use `deploy/Caddyfile` for `*.yourdomain.com` wildcard TLS. Studios connect Stripe at `/admin/stripe/connect`. Enable `EOS_S3_*` for media scale.
-
-Production: `sudo INSTALL_CADDY=1 deploy/install.sh` — see `docs/DEPLOY.md`.
-
-## Shipped (v1.7)
-
-Phase 17: S3/R2 object storage, production deploy docs, SaaS-first README. Phase 16: Stripe Connect, DNS verify, platform admin. Phases 1–15 prior. See CHANGELOG.md.
+- Deploy: [docs/DEPLOY.md](docs/DEPLOY.md)
+- Scale: [docs/SCALE.md](docs/SCALE.md)
+- Humans: [README.md](README.md)
