@@ -41,5 +41,13 @@
   {% else %}
   <p class="muted">No listings yet — book your next shoot at <a href="/book">/book</a>.</p>
   {% endif %}
+
+  {% if upsell %}
+  <section class="card upsell-banner" style="margin-top:1.5rem">
+    <h2>{{ upsell.title }}</h2>
+    {% if upsell.body %}<p>{{ upsell.body }}</p>{% endif %}
+    <a class="btn btn-accent" href="{{ upsell.link }}">Book add-ons</a>
+  </section>
+  {% endif %}
 </main>
 {% endblock %}

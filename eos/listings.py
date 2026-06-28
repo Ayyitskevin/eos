@@ -123,6 +123,7 @@ def update_listing(listing_id: int, **fields) -> None:
         "client_id", "title", "status", "property_type",
         "address_line1", "address_line2", "city", "state", "zip", "mls_id",
         "beds", "baths", "sqft", "shoot_date", "due_at", "access_notes", "notes",
+        "assigned_user_id",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -173,3 +174,39 @@ def listing_galleries(listing_id: int):
         "SELECT * FROM galleries WHERE listing_id=? ORDER BY created_at DESC",
         (listing_id,),
     )
+
+
+def kanban_board() -> dict[str, list]:
+    from .vocab import LISTING_STATUSES
+
+    board: dict[str, list] = {}
+    for status in LISTING_STATUSES:
+        if status == "archived":
+            continue
+        board[status] = db.all_(
+            """SELECT l.*, c.name AS client_name,
+                      u.name AS photographer_name,
+                      (SELECT COUNT(*) FROM listing_tasks t WHERE t.listing_id=l.id AND t.done=0) AS tasks_open
+               FROM listings l
+               LEFT JOIN clients c ON c.id=l.client_id
+               LEFT JOIN users u ON u.id=l.assigned_user_id
+               WHERE l.studio_id=? AND l.status=?
+               ORDER BY COALESCE(l.due_at, '9999'), l.created_at DESC""",
+            (STUDIO_ID, status),
+        )
+    return board
+
+
+def advance_status(listing_id: int) -> str | None:
+    """Move listing one step forward in the pipeline; returns new status."""
+    row = get_listing(listing_id)
+    flow = ("lead", "booked", "shooting", "editing", "delivered", "archived")
+    try:
+        idx = flow.index(row["status"])
+    except ValueError:
+        return None
+    if idx >= len(flow) - 1:
+        return row["status"]
+    new_status = flow[idx + 1]
+    update_listing(listing_id, status=new_status)
+    return new_status

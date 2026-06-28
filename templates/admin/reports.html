@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Reports · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Ops reports</h1>
+    <nav>
+      <a href="/admin">Pipeline</a> · <a href="/admin/kanban">Kanban</a>
+    </nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(summary.revenue_mtd_cents / 100) }}</span>
+      <span class="pipeline-label">Revenue MTD</span>
+    </div>
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(summary.revenue_ytd_cents / 100) }}</span>
+      <span class="pipeline-label">Revenue YTD</span>
+    </div>
+    <div class="pipeline-card {% if summary.bookings_mtd %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.bookings_mtd }}</span>
+      <span class="pipeline-label">Bookings MTD</span>
+    </div>
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(summary.aov_cents / 100) }}</span>
+      <span class="pipeline-label">AOV (YTD)</span>
+    </div>
+    <div class="pipeline-card {% if summary.overdue_ar_count %}has-items{% endif %}">
+      <span class="pipeline-count">${{ "%.0f"|format(summary.overdue_ar_cents / 100) }}</span>
+      <span class="pipeline-label">Overdue AR (14d+)</span>
+    </div>
+    <div class="pipeline-card {% if summary.open_ar_count %}has-items{% endif %}">
+      <span class="pipeline-count">${{ "%.0f"|format(summary.open_ar_cents / 100) }}</span>
+      <span class="pipeline-label">Open AR</span>
+    </div>
+  </section>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Top agents</h2>
+      {% if top_agents %}
+      <table class="list compact">
+        <tr><th>Agent</th><th>Listings</th><th>Paid</th><th>Open</th></tr>
+        {% for a in top_agents %}
+        <tr>
+          <td>{{ a.name }}{% if a.company %}<span class="muted"> · {{ a.company }}</span>{% endif %}</td>
+          <td>{{ a.n_listings }}</td>
+          <td>${{ "%.0f"|format(a.revenue_cents / 100) }}</td>
+          <td>{% if a.open_cents %}${{ "%.0f"|format(a.open_cents / 100) }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No agent clients yet.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Brokerage balances</h2>
+      {% if brokerages %}
+      <table class="list compact">
+        <tr><th>Brokerage</th><th>Invoices</th><th>Open</th><th></th></tr>
+        {% for b in brokerages %}
+        <tr>
+          <td>{{ b.name }}</td>
+          <td>{{ b.n_invoices }}</td>
+          <td>${{ "%.0f"|format(b.open_cents / 100) }}</td>
+          <td><a href="/admin/reports/brokerage/{{ b.id }}">Statement</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No open brokerage invoices.</p>{% endif %}
+      <p class="muted small">Brokerages with agent children auto-bill on new invoices.</p>
+    </section>
+
+    <section class="card">
+      <h2>Overdue invoices</h2>
+      {% if overdue %}
+      <table class="list compact">
+        <tr><th>Invoice</th><th>Client</th><th>Amount</th><th>Sent</th></tr>
+        {% for i in overdue %}
+        <tr>
+          <td><a href="/admin/invoices/{{ i.id }}">{{ i.title }}</a></td>
+          <td>{{ i.client_name or "—" }}</td>
+          <td>${{ "%.2f"|format(i.amount_cents / 100) }}</td>
+          <td class="muted">{{ i.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No overdue sent invoices.</p>{% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

@@ -3,7 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, galleries, listing_media, paywall, security
+from .. import config, db, galleries, listing_media, paywall, security, studio
 from ..render import templates
 
 router = APIRouter()
@@ -62,6 +62,11 @@ async def gallery_view(request: Request, slug: str):
     locked = paywall.payment_required(g["listing_id"])
     inv_slug = paywall.unpaid_invoice_slug(g["listing_id"]) if locked else None
     embeds = listing_media.list_for_listing(g["listing_id"]) if g["listing_id"] else []
+    upsell = None
+    if g["listing_id"]:
+        row = db.one("SELECT status FROM listings WHERE id=?", (g["listing_id"],))
+        if row and row["status"] == "delivered":
+            upsell = studio.delivery_upsell()
     return templates.TemplateResponse(
         request, "public/gallery.html",
         {
@@ -71,5 +76,6 @@ async def gallery_view(request: Request, slug: str):
             "pay_url": f"/i/{inv_slug}" if inv_slug else None,
             "payments_on": bool(config.STRIPE_SECRET_KEY),
             "embeds": embeds,
+            "upsell": upsell,
         },
     )

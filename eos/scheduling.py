@@ -42,16 +42,17 @@ def _conflicts(slot_start: dt.datetime, slot_end: dt.datetime, busy: list[tuple[
     return False
 
 
-def open_slots(*, days: int = 14) -> list[dict]:
-    """Return bookable slots: [{value, label}, ...]."""
+def _slot_list(
+    *,
+    days: int,
+    weekdays: set[int],
+    slot_min: int,
+    buffer_min: int,
+    day_start: int,
+    day_end: int,
+    label_prefix: str = "",
+) -> list[dict]:
     profile = studio.get_profile()
-    if not profile["booking_enabled"]:
-        return []
-    weekdays = _parse_weekdays(profile["book_weekdays"] or "0,1,2,3,4,5")
-    slot_min = int(profile["slot_minutes"] or 90)
-    buffer_min = int(profile["buffer_minutes"] or 30)
-    day_start = int(profile["day_start_min"] or 480)
-    day_end = int(profile["day_end_min"] or 1080)
     notice = dt.timedelta(hours=int(profile["min_notice_hours"] or 24))
     now = dt.datetime.now()
     earliest = now + notice
@@ -68,13 +69,49 @@ def open_slots(*, days: int = 14) -> list[dict]:
             if start >= earliest and not _conflicts(start, end, busy):
                 value = start.strftime("%Y-%m-%d %H:%M:%S")
                 label = start.strftime("%a %b %d · %I:%M %p").replace(" 0", " ")
+                if label_prefix:
+                    label = f"{label_prefix}{label}"
                 slots.append({"value": value, "label": label})
             minute += slot_min
     return slots
 
 
-def slot_is_open(starts_at: str) -> bool:
-    return any(s["value"] == starts_at for s in open_slots())
+def open_slots(*, days: int = 14) -> list[dict]:
+    """Return bookable day slots: [{value, label}, ...]."""
+    profile = studio.get_profile()
+    if not profile["booking_enabled"]:
+        return []
+    weekdays = _parse_weekdays(profile["book_weekdays"] or "0,1,2,3,4,5")
+    return _slot_list(
+        days=days,
+        weekdays=weekdays,
+        slot_min=int(profile["slot_minutes"] or 90),
+        buffer_min=int(profile["buffer_minutes"] or 30),
+        day_start=int(profile["day_start_min"] or 480),
+        day_end=int(profile["day_end_min"] or 1080),
+    )
+
+
+def twilight_slots(*, days: int = 14) -> list[dict]:
+    """Evening twilight window slots for add-on bookings."""
+    profile = studio.get_profile()
+    if not profile["booking_enabled"]:
+        return []
+    weekdays = _parse_weekdays(profile["book_weekdays"] or "0,1,2,3,4,5")
+    return _slot_list(
+        days=days,
+        weekdays=weekdays,
+        slot_min=int(profile["slot_minutes"] or 90),
+        buffer_min=int(profile["buffer_minutes"] or 30),
+        day_start=int(profile["twilight_start_min"] or 1020),
+        day_end=int(profile["twilight_end_min"] or 1140),
+        label_prefix="Twilight · ",
+    )
+
+
+def slot_is_open(starts_at: str, *, twilight: bool = False) -> bool:
+    slots = twilight_slots() if twilight else open_slots()
+    return any(s["value"] == starts_at for s in slots)
 
 
 def ends_at_for(starts_at: str) -> str:

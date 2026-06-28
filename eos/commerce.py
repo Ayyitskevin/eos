@@ -86,12 +86,20 @@ def create_booking(
     signer_name: str = "",
     promo_code: str = "",
 ) -> dict:
-    if not scheduling.slot_is_open(scheduled_at):
+    addon_ids = addon_ids or []
+    twilight = False
+    if addon_ids:
+        ph = ",".join("?" * len(addon_ids))
+        twilight = bool(
+            db.one(
+                f"SELECT 1 AS x FROM service_addons WHERE id IN ({ph}) AND slug='twilight' LIMIT 1",
+                tuple(addon_ids),
+            )
+        )
+    if not scheduling.slot_is_open(scheduled_at, twilight=twilight):
         raise HTTPException(status_code=400, detail="slot no longer available")
     if not signer_name.strip():
         raise HTTPException(status_code=400, detail="signature required")
-
-    addon_ids = addon_ids or []
     total_cents, deposit_cents, line_items = calc_total(package_id, addon_ids, promo_code)
     pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
 

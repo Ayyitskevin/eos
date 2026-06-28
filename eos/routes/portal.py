@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, portal
+from .. import config, portal, studio
 from ..render import templates
 
 router = APIRouter()
@@ -20,5 +20,6 @@ async def agent_portal(request: Request, token: str):
             "deliveries": rows,
             "base_url": config.BASE_URL,
             "payments_on": bool(config.STRIPE_SECRET_KEY),
+            "upsell": studio.delivery_upsell(),
         },
     )

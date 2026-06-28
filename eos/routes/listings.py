@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, config, contracts, galleries, invoices, listing_media, listings, marketing_kit, microsites, proposals, questionnaires, security
+from .. import clients, config, contracts, galleries, invoices, listing_media, listings, marketing_kit, microsites, proposals, questionnaires, security, users
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -89,6 +89,7 @@ async def listing_detail(request: Request, listing_id: int):
             "site_slug": row["site_slug"] or microsites.ensure_site_slug(listing_id),
             "site_url": microsites.site_url(listing_id),
             "marketing_kit": marketing_kit.get_status(listing_id),
+            "operators": users.list_users(),
         },
     )
 
@@ -113,11 +114,14 @@ async def listing_update(
     due_at: str = Form(""),
     access_notes: str = Form(""),
     notes: str = Form(""),
+    assigned_user_id: str = Form(""),
 ):
     cid = int(client_id) if client_id.strip().isdigit() else None
+    uid = int(assigned_user_id) if assigned_user_id.strip().isdigit() else None
     listings.update_listing(
         listing_id,
         title=title, status=status, client_id=cid, property_type=property_type,
+        assigned_user_id=uid,
         address_line1=address_line1, address_line2=address_line2,
         city=city, state=state, zip=zip_code, mls_id=mls_id,
         beds=float(beds) if beds.strip() else None,

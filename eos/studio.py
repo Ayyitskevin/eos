@@ -39,6 +39,8 @@ def update_profile(**fields) -> None:
         "booking_enabled", "min_notice_hours", "buffer_minutes", "slot_minutes",
         "day_start_min", "day_end_min", "book_weekdays",
         "pay_to_download", "watermark_until_paid", "auto_deliver_email", "auto_publish_site",
+        "twilight_start_min", "twilight_end_min",
+        "delivery_upsell_title", "delivery_upsell_body", "delivery_upsell_link",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -117,6 +119,17 @@ def list_emails(limit: int = 50):
         "SELECT * FROM emails_log WHERE studio_id=? ORDER BY sent_at DESC LIMIT ?",
         (STUDIO_ID, limit),
     )
+
+
+def delivery_upsell() -> dict | None:
+    p = get_profile()
+    if not (p["delivery_upsell_title"] or p["delivery_upsell_body"]):
+        return None
+    return {
+        "title": p["delivery_upsell_title"] or "Need more for this listing?",
+        "body": p["delivery_upsell_body"],
+        "link": p["delivery_upsell_link"] or "/book",
+    }
 
 
 def list_activity(limit: int = 100):

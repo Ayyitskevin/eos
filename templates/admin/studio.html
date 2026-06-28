@@ -29,6 +29,14 @@
     <label class="checkbox"><input type="checkbox" name="watermark_until_paid" value="true" {% if profile.watermark_until_paid %}checked{% endif %}> Watermark gallery previews until paid</label>
     <label class="checkbox"><input type="checkbox" name="auto_deliver_email" value="true" {% if profile.auto_deliver_email %}checked{% endif %}> Auto-email gallery link on publish (Gmail required)</label>
     <label class="checkbox"><input type="checkbox" name="auto_publish_site" value="true" {% if profile.auto_publish_site %}checked{% endif %}> Auto-publish property site when gallery goes live</label>
+    <h2>Twilight booking</h2>
+    <label>Twilight window start (min from midnight) <input name="twilight_start_min" type="number" value="{{ profile.twilight_start_min or 1020 }}"></label>
+    <label>Twilight window end (min from midnight) <input name="twilight_end_min" type="number" value="{{ profile.twilight_end_min or 1140 }}"></label>
+    <p class="muted small">1020 = 5:00 PM · 1140 = 7:00 PM. Twilight add-on bookings must pick evening slots.</p>
+    <h2>Delivery upsell</h2>
+    <label>Headline <input name="delivery_upsell_title" value="{{ profile.delivery_upsell_title }}" placeholder="Add video or rush delivery?"></label>
+    <label>Message <textarea name="delivery_upsell_body" rows="2" placeholder="Book add-ons for your next listing…">{{ profile.delivery_upsell_body }}</textarea></label>
+    <label>Link <input name="delivery_upsell_link" value="{{ profile.delivery_upsell_link or '/book' }}"></label>
     <button type="submit">Save</button>
   </form>
 

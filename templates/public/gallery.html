@@ -76,5 +76,13 @@
   {% if not assets %}
   <p class="muted center">Photos are being prepared — check back soon.</p>
   {% endif %}
+
+  {% if upsell %}
+  <section class="upsell-banner card">
+    <h2>{{ upsell.title }}</h2>
+    {% if upsell.body %}<p>{{ upsell.body }}</p>{% endif %}
+    <a class="btn btn-accent" href="{{ upsell.link }}">Book add-ons</a>
+  </section>
+  {% endif %}
 </main>
 {% endblock %}

@@ -83,9 +83,18 @@ Eos inherits the best patterns from two sibling projects:
 - Optional lead-capture form on property site
 - Auto-publish property site when gallery goes live (Studio settings)
 
+### Phase 9 (shipped)
+
+- Ops reports at `/admin/reports` — revenue MTD/YTD, AOV, overdue AR, top agents
+- Brokerage billing — invoice parent brokerage with agent attribution; consolidated statements
+- Production Kanban at `/admin/kanban` — pipeline board with one-click advance
+- Photographer assignment on listings and calendar appointments
+- Twilight booking window — evening slots for twilight add-on on `/book`
+- Delivery upsell prompts on gallery, property site, and agent portal
+
 ### Still deferred
 
-Phases 9–10: ops reporting, full SaaS multi-tenant.
+Phase 10: full SaaS multi-tenant; Google Calendar sync; Dropbox ingest (roadmap).
 
 ## Quick start
 

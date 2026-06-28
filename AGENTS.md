@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** through phase 8 — property microsites, MLS bundles, marketing kit graphics.
+**Shipped:** through phase 9 — ops reports, kanban, brokerage billing, team assignment, twilight slots, delivery upsells.
 
-**Out of scope:** ops reporting (phase 9), full SaaS multi-tenant (phase 10).
+**Out of scope:** full SaaS multi-tenant (phase 10), Google Calendar / Dropbox integrations.

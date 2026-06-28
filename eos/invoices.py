@@ -35,18 +35,27 @@ def create_invoice(
     title: str,
     amount_cents: int,
     client_id: int | None = None,
+    bill_to_client_id: int | None = None,
+    agent_client_id: int | None = None,
     line_items: list | None = None,
     notes: str = "",
     invoice_kind: str = "full",
     inquiry_id: int | None = None,
 ) -> int:
+    from . import brokerage
+
+    if client_id and not bill_to_client_id:
+        bill_to, agent = brokerage.resolve_billing(client_id)
+        bill_to_client_id = bill_to
+        agent_client_id = agent_client_id or agent
     iid = db.run(
         """INSERT INTO invoices
-           (studio_id, listing_id, client_id, slug, title, amount_cents, line_items, notes,
-            invoice_kind, inquiry_id)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+           (studio_id, listing_id, client_id, bill_to_client_id, agent_client_id,
+            slug, title, amount_cents, line_items, notes, invoice_kind, inquiry_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
-            STUDIO_ID, listing_id, client_id, security.new_slug(), title.strip(),
+            STUDIO_ID, listing_id, client_id, bill_to_client_id, agent_client_id,
+            security.new_slug(), title.strip(),
             amount_cents, json.dumps(line_items or []), notes.strip(),
             invoice_kind, inquiry_id,
         ),
@@ -77,7 +86,7 @@ def create_deposit_invoice(
 
 
 def update_invoice(invoice_id: int, **fields) -> None:
-    allowed = {"title", "amount_cents", "status", "notes", "client_id"}
+    allowed = {"title", "amount_cents", "status", "notes", "client_id", "bill_to_client_id", "agent_client_id"}
     parts = []
     params: list = []
     for k, v in fields.items():

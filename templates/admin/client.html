@@ -7,6 +7,13 @@
     <nav><a href="/admin/clients">← Clients</a></nav>
   </header>
 
+  {% if c.client_type == 'brokerage' %}
+  <section class="card">
+    <h2>Billing</h2>
+    <p><a href="/admin/reports/brokerage/{{ c.id }}">View consolidated statement</a></p>
+  </section>
+  {% endif %}
+
   {% if portal_link %}
   <section class="card">
     <h2>Agent portal</h2>

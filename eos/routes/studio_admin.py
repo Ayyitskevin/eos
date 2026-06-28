@@ -55,6 +55,11 @@ async def studio_update(
     watermark_until_paid: bool = Form(False),
     auto_deliver_email: bool = Form(False),
     auto_publish_site: bool = Form(False),
+    twilight_start_min: int = Form(1020),
+    twilight_end_min: int = Form(1140),
+    delivery_upsell_title: str = Form(""),
+    delivery_upsell_body: str = Form(""),
+    delivery_upsell_link: str = Form("/book"),
 ):
     studio.update_studio(name=name, contact_email=contact_email)
     studio.update_profile(
@@ -65,6 +70,10 @@ async def studio_update(
         book_weekdays=book_weekdays.strip(),
         pay_to_download=pay_to_download, watermark_until_paid=watermark_until_paid,
         auto_deliver_email=auto_deliver_email, auto_publish_site=auto_publish_site,
+        twilight_start_min=twilight_start_min, twilight_end_min=twilight_end_min,
+        delivery_upsell_title=delivery_upsell_title.strip(),
+        delivery_upsell_body=delivery_upsell_body.strip(),
+        delivery_upsell_link=delivery_upsell_link.strip() or "/book",
     )
     return RedirectResponse("/admin/studio", status_code=303)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import bundles, config, db, marketing_kit, microsites, paywall, security
+from .. import bundles, config, db, marketing_kit, microsites, paywall, security, studio
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -30,11 +30,13 @@ async def listing_site(request: Request, slug: str):
     listing = microsites.get_published_by_slug(slug)
     ctx = microsites.site_context(listing)
     kit = marketing_kit.get_status(listing["id"])
+    upsell = studio.delivery_upsell() if listing["status"] == "delivered" else None
     return templates.TemplateResponse(
         request, "public/listing_site.html",
         {
             **ctx,
             "kit": kit,
+            "upsell": upsell,
             "lead_capture": bool(listing["site_lead_capture"]),
             "thanks": request.query_params.get("thanks") == "1",
             "error": None,

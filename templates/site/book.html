@@ -40,12 +40,24 @@
     <label>Notes <textarea name="message" rows="3" placeholder="Gate code, MLS deadline…"></textarea></label>
 
     <h2>Shoot time</h2>
+    {% if twilight_addon %}<p class="muted small">Twilight add-on? Pick an evening slot labeled <em>Twilight</em>.</p>{% endif %}
     {% if slots %}
     <label>Available slot
       <select name="scheduled_at" required>
-        {% for s in slots %}
-        <option value="{{ s.value }}">{{ s.label }}</option>
-        {% endfor %}
+        {% if day_slots %}
+        <optgroup label="Day shoots">
+          {% for s in day_slots %}
+          <option value="{{ s.value }}">{{ s.label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+        {% if twilight_slots %}
+        <optgroup label="Twilight shoots">
+          {% for s in twilight_slots %}
+          <option value="{{ s.value }}">{{ s.label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
       </select>
     </label>
     {% else %}

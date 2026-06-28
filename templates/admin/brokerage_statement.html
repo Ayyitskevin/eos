@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} statement · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>{{ client.name }}</h1>
+    <nav><a href="/admin/reports">← Reports</a> · <a href="/admin/clients/{{ client.id }}">Client</a></nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card {% if totals.n_open %}has-items{% endif %}">
+      <span class="pipeline-count">${{ "%.0f"|format(totals.open_cents / 100) }}</span>
+      <span class="pipeline-label">Open ({{ totals.n_open }})</span>
+    </div>
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(totals.paid_cents / 100) }}</span>
+      <span class="pipeline-label">Paid ({{ totals.n_paid }})</span>
+    </div>
+  </section>
+
+  <table class="list">
+    <tr><th>Invoice</th><th>Listing</th><th>Agent</th><th>Amount</th><th>Status</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/admin/invoices/{{ r.id }}">{{ r.title }}</a></td>
+      <td>{{ r.listing_title or "—" }}</td>
+      <td>{{ r.agent_name or "—" }}</td>
+      <td>${{ "%.2f"|format(r.amount_cents / 100) }}</td>
+      <td>{{ r.status }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not rows %}<p class="muted">No invoices billed to this brokerage yet.</p>{% endif %}
+</main>
+{% endblock %}

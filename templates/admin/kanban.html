@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Kanban · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main kanban-page">
+  <header class="admin-bar">
+    <h1>Production board</h1>
+    <nav>
+      <a href="/admin">Pipeline</a> · <a href="/admin/reports">Reports</a>
+    </nav>
+  </header>
+
+  <div class="kanban-board">
+    {% for s in statuses %}
+    <section class="kanban-col">
+      <h2>{{ listing_status_labels[s] }} <span class="muted">({{ board[s]|length }})</span></h2>
+      {% for l in board[s] %}
+      <article class="kanban-card">
+        <a href="/admin/listings/{{ l.id }}" class="listing-title">{{ l.title }}</a>
+        {% if l.address_line1 %}<p class="muted small">{{ l.address_line1 }}</p>{% endif %}
+        <p class="muted small">{{ l.client_name or "No client" }}{% if l.photographer_name %} · {{ l.photographer_name }}{% endif %}</p>
+        {% if l.due_at %}<p class="small {% if l.due_at[:10] < today %}warn{% endif %}">Due {{ l.due_at[:16] }}</p>{% endif %}
+        {% if l.tasks_open %}<p class="muted small">{{ l.tasks_open }} tasks open</p>{% endif %}
+        {% if s != 'delivered' and s != 'archived' %}
+        <form method="post" action="/admin/listings/{{ l.id }}/advance" class="inline-form">
+          <button type="submit" class="link">Advance →</button>
+        </form>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

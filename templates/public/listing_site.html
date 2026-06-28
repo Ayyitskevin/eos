@@ -92,6 +92,14 @@
     {% endif %}
   </section>
 
+  {% if upsell %}
+  <section class="property-section upsell-banner card">
+    <h2>{{ upsell.title }}</h2>
+    {% if upsell.body %}<p>{{ upsell.body }}</p>{% endif %}
+    <a class="btn btn-accent" href="{{ upsell.link }}">Book add-ons</a>
+  </section>
+  {% endif %}
+
   {% if lead_capture %}
   <section class="property-section card">
     <h2>Interested in this property?</h2>

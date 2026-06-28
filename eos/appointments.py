@@ -18,10 +18,12 @@ def get_appointment(appt_id: int):
 
 def list_upcoming(*, days: int = 14):
     return db.all_(
-        """SELECT a.*, l.title AS listing_title, c.name AS client_name
+        """SELECT a.*, l.title AS listing_title, c.name AS client_name,
+                  u.name AS photographer_name
            FROM appointments a
            LEFT JOIN listings l ON l.id=a.listing_id
            LEFT JOIN clients c ON c.id=a.client_id
+           LEFT JOIN users u ON u.id=a.assigned_user_id
            WHERE a.studio_id=? AND a.status NOT IN ('canceled','completed')
              AND (a.starts_at IS NULL OR a.starts_at >= datetime('now', ?))
            ORDER BY COALESCE(a.starts_at, '9999')""",
@@ -37,14 +39,15 @@ def create_appointment(
     location: str = "",
     listing_id: int | None = None,
     client_id: int | None = None,
+    assigned_user_id: int | None = None,
 ) -> int:
     aid = db.run(
         """INSERT INTO appointments
-           (studio_id, listing_id, client_id, title, kind, starts_at, location, token)
-           VALUES (?,?,?,?,?,?,?,?)""",
+           (studio_id, listing_id, client_id, title, kind, starts_at, location, token, assigned_user_id)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
         (
             STUDIO_ID, listing_id, client_id, title.strip(), kind,
-            starts_at, location.strip(), security.new_token(),
+            starts_at, location.strip(), security.new_token(), assigned_user_id,
         ),
     )
     db.audit("admin", "appointment.create", f"id={aid}")
@@ -52,7 +55,7 @@ def create_appointment(
 
 
 def update_appointment(appt_id: int, **fields) -> None:
-    allowed = {"title", "kind", "status", "starts_at", "location", "listing_id", "client_id"}
+    allowed = {"title", "kind", "status", "starts_at", "location", "listing_id", "client_id", "assigned_user_id"}
     parts = []
     params: list = []
     for k, v in fields.items():

@@ -13,11 +13,19 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _book_context(error: str | None = None, thanks: bool = False):
     profile = studio.get_profile()
+    addons = studio.list_addons(active_only=True)
+    twilight_addon = next((a for a in addons if a["slug"] == "twilight"), None)
+    day_slots = scheduling.open_slots()
+    twilight_only = scheduling.twilight_slots()
+    slots = day_slots + twilight_only
     return {
         "profile": profile,
         "packages": studio.list_packages(active_only=True),
-        "addons": studio.list_addons(active_only=True),
-        "slots": scheduling.open_slots(),
+        "addons": addons,
+        "twilight_addon": twilight_addon,
+        "slots": slots,
+        "day_slots": day_slots,
+        "twilight_slots": twilight_only,
         "terms": commerce.BOOKING_TERMS.format(site_name=config.SITE_NAME),
         "payments_on": bool(config.STRIPE_SECRET_KEY),
         "error": error,

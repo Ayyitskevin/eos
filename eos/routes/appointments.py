@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import appointments, clients, listings, security
+from .. import appointments, clients, listings, security, users
 from ..appointments import KINDS, STATUSES
 from ..render import templates
 
@@ -18,6 +18,7 @@ async def calendar(request: Request):
             "client_list": clients.list_clients(),
             "kinds": KINDS,
             "statuses": STATUSES,
+            "operators": users.list_users(),
         },
     )
 
@@ -30,12 +31,14 @@ async def create_appt(
     location: str = Form(""),
     listing_id: str = Form(""),
     client_id: str = Form(""),
+    assigned_user_id: str = Form(""),
 ):
     lid = int(listing_id) if listing_id.strip().isdigit() else None
     cid = int(client_id) if client_id.strip().isdigit() else None
+    uid = int(assigned_user_id) if assigned_user_id.strip().isdigit() else None
     aid = appointments.create_appointment(
         title, kind=kind, starts_at=starts_at.strip() or None,
-        location=location, listing_id=lid, client_id=cid,
+        location=location, listing_id=lid, client_id=cid, assigned_user_id=uid,
     )
     return RedirectResponse(f"/admin/calendar", status_code=303)
 
