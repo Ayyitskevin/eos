@@ -33,6 +33,10 @@ pytest tests/ -q
 
 Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
+## GitHub
+
+Repo: https://github.com/Ayyitskevin/eos — **push to `main` after every shipped change** (commit + `git push origin main`). Never commit `.env` or `data/`. If push rejects workflow files, use the GitHub MCP or `gh auth refresh -s workflow`.
+
 ## Shipped (v1.4)
 
 Phases 1–14. Phase 14: portal reschedule, credits, RBAC, SMS, brokerage portal, churn alerts, media namespace. See README.
