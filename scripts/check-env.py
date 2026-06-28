@@ -29,6 +29,9 @@ def main() -> int:
     saas = os.environ.get("EOS_SAAS_MODE", "").lower() in ("1", "true", "yes")
     base_domain = os.environ.get("EOS_BASE_DOMAIN", "")
     cookie_secure = os.environ.get("EOS_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
+    billing_enforce = os.environ.get("EOS_BILLING_ENFORCE", "").lower() in ("1", "true", "yes")
+    platform_stripe = os.environ.get("EOS_STRIPE_PLATFORM_SECRET_KEY", "")
+    s3_bucket = os.environ.get("EOS_S3_BUCKET", "")
 
     if len(secret) < 32 or secret in WEAK_KEYS:
         msg = f"EOS_SECRET_KEY is missing or weak (len={len(secret)})"
@@ -45,10 +48,14 @@ def main() -> int:
             _fail("EOS_BASE_URL must be https:// in production")
         if not cookie_secure:
             _fail("EOS_COOKIE_SECURE must be true in production")
-        if not os.environ.get("EOS_BOOTSTRAP_EMAIL", "").strip():
-            _warn("EOS_BOOTSTRAP_EMAIL not set — email login may be unavailable")
+        if saas and not os.environ.get("EOS_PLATFORM_ADMIN_EMAILS", "").strip():
+            _warn("EOS_PLATFORM_ADMIN_EMAILS not set — no platform super-admin")
+        if saas and billing_enforce and not platform_stripe:
+            _warn("EOS_BILLING_ENFORCE without EOS_STRIPE_PLATFORM_SECRET_KEY — subscriptions disabled")
+        if saas and not s3_bucket:
+            _warn("EOS_S3_BUCKET not set — media stored on local disk only (not recommended at scale)")
 
-    print("env check ok", f"(mode={mode})")
+    print("env check ok", f"(mode={mode}, saas={saas})")
     return 0
 
 

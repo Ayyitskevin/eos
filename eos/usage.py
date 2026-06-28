@@ -64,6 +64,8 @@ def listings_created_this_month() -> int:
 
 
 def studio_storage_bytes(*, studio_id: str | None = None) -> int:
+    from . import object_store
+
     sid = studio_id or str(STUDIO_ID)
     total = 0
     studio_dir = config.MEDIA_DIR / sid
@@ -84,6 +86,9 @@ def studio_storage_bytes(*, studio_id: str | None = None) -> int:
                             total += f.stat().st_size
                         except OSError:
                             pass
+    if object_store.enabled():
+        remote = object_store.studio_storage_bytes(studio_id=sid)
+        total = max(total, remote)
     return total
 
 

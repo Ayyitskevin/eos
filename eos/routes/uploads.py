@@ -61,6 +61,15 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
                VALUES (?,?,?,?,?,?,?)""",
             (gallery_id, section_id, kind, name, stored, size, "pending"),
         )
+        from .. import object_store, tenant
+
+        if object_store.enabled():
+            object_store.sync_gallery_file(
+                dest,
+                studio_id=tenant.get_studio_id(),
+                gallery_id=gallery_id,
+                sub="original",
+            )
         jobs.enqueue("video_ready" if is_video else "image_derivatives", {"asset_id": asset_id})
         accepted.append(asset_id)
 

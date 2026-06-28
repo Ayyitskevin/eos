@@ -2,6 +2,14 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## 1.7.0 — Phase 17 (production + scale)
+
+- S3/R2 object storage sync for gallery uploads and derivatives (`EOS_S3_*`)
+- Production install hardening — systemd ExecStartPre env check, prod requirements
+- `docs/DEPLOY.md` and `docs/SCALE.md` — hosted SaaS runbooks
+- `deploy/env.production.example` defaults to SaaS mode
+- README repositioned as open Aryeo-class multi-tenant platform
+
 ## 1.6.0 — Phase 16 (SaaS pivot)
 
 - Stripe Connect — per-tenant client payments (deposits, invoices, upsells)

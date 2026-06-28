@@ -1,8 +1,10 @@
-# Eos — Caddy reverse proxy with automatic HTTPS
-# Usage: caddy run --config /opt/eos/deploy/Caddyfile
+# Eos — Caddy reverse proxy with automatic HTTPS (multi-tenant SaaS)
+# Copy to /etc/caddy/Caddyfile after deploy/install.sh
 #
-# Replace eos.example.com and *.eos.example.com with your domain.
-# Set EOS_BASE_DOMAIN=eos.example.com in /opt/eos/.env
+# 1. Replace eos.example.com with your apex (marketing + signup)
+# 2. Wildcard *.eos.example.com routes tenant subdomains
+# 3. Set EOS_BASE_DOMAIN=eos.example.com in /opt/eos/.env
+# 4. DNS: A/AAAA for apex AND *.eos.example.com → this server
 
 {
 	email you@example.com

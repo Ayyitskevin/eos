@@ -1,6 +1,7 @@
 [Unit]
-Description=Eos — real estate photography OS
+Description=Eos — real estate photography SaaS
 After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -8,16 +9,17 @@ User=eos
 Group=eos
 WorkingDirectory=/opt/eos
 EnvironmentFile=/opt/eos/.env
-ExecStart=/opt/eos/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410
+Environment=EOS_CHECK_MODE=production
+ExecStartPre=/opt/eos/.venv/bin/python /opt/eos/scripts/check-env.py
+ExecStart=/opt/eos/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 2
 Restart=on-failure
 RestartSec=5
 
-# Hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/eos/data
+ReadWritePaths=/opt/eos/data /opt/eos/backups
 
 [Install]
 WantedBy=multi-user.target

@@ -30,6 +30,20 @@ def zip_path(gallery_id: int, rev: int) -> Path:
     return config.ZIP_DIR / f"g{gallery_id}-r{rev}.zip"
 
 
+def _sync_derivatives(gallery_id: int, dirs: dict[str, Path], base: str) -> None:
+    from . import object_store, tenant
+
+    if not object_store.enabled():
+        return
+    sid = tenant.get_studio_id()
+    for sub, fname in (("web", f"{base}.jpg"), ("thumb", f"{base}.jpg")):
+        path = dirs[sub] / fname
+        if path.is_file():
+            object_store.sync_gallery_file(
+                path, studio_id=sid, gallery_id=gallery_id, sub=sub
+            )
+
+
 def _h_image(p: dict) -> None:
     asset = db.one("SELECT * FROM assets WHERE id=?", (p["asset_id"],))
     if not asset:
@@ -46,6 +60,7 @@ def _h_image(p: dict) -> None:
         config.JPEG_QUALITY,
     )
     db.run("UPDATE assets SET status='ready', width=?, height=? WHERE id=?", (w, h, asset["id"]))
+    _sync_derivatives(asset["gallery_id"], dirs, base)
 
 
 def _h_exports(p: dict) -> None:

@@ -4,7 +4,7 @@
 
 Eos is a **multi-tenant RE photography SaaS** (Aryeo competitor): signup, subdomain tenants, platform billing, Stripe Connect client payments, DNS domain verification, platform admin ops.
 
-Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL, port **8410**. Current version: **1.6.0**.
+Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL + optional S3, port **8410**. Current version: **1.7.0**.
 
 ## Key paths
 
@@ -55,8 +55,10 @@ EOS_STRIPE_PRICE_PRO=price_...
 EOS_PLATFORM_ADMIN_EMAILS=you@company.com
 ```
 
-Use `deploy/Caddyfile` for `*.yourdomain.com` wildcard TLS. Studios connect Stripe at `/admin/stripe/connect`.
+Use `deploy/Caddyfile` for `*.yourdomain.com` wildcard TLS. Studios connect Stripe at `/admin/stripe/connect`. Enable `EOS_S3_*` for media scale.
 
-## Shipped (v1.6)
+Production: `sudo INSTALL_CADDY=1 deploy/install.sh` — see `docs/DEPLOY.md`.
 
-Phase 16 SaaS pivot: Stripe Connect, DNS domain verification, platform admin v2 (suspend/plan override), per-tenant storage metering + seat limits, marketing landing. Phases 1–15 prior. See CHANGELOG.md.
+## Shipped (v1.7)
+
+Phase 17: S3/R2 object storage, production deploy docs, SaaS-first README. Phase 16: Stripe Connect, DNS verify, platform admin. Phases 1–15 prior. See CHANGELOG.md.
