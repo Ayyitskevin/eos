@@ -90,6 +90,8 @@ async def stripe_webhook(request: Request):
                 (int(iid),),
             )
             invoices.mark_paid(int(iid))
+            from .. import upsell as upsell_mod
+            upsell_mod.mark_paid(int(iid))
             if inv:
                 if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
                     automations.on_deposit_paid(inv["inquiry_id"], inv["listing_id"])

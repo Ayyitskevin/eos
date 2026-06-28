@@ -27,8 +27,9 @@ def _loop() -> None:
         if _tick * config.SEQUENCE_TICK_SECONDS >= config.INTEGRATION_TICK_SECONDS:
             _tick = 0
             try:
-                from . import jobs
+                from . import jobs, sms
                 jobs.enqueue("integration_sweep", {})
+                sms.shoot_day_reminders()
             except Exception:
                 log.exception("integration sweep enqueue failed")
 

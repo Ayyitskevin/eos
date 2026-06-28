@@ -40,6 +40,24 @@
     <button type="submit">Save</button>
   </form>
 
+  <form method="post" action="/admin/studio/domain" class="card form-grid compact">
+    <h2>Custom domain (Pro)</h2>
+    <p class="muted small">Point a CNAME to this server, then enter your hostname. Requests resolve to this studio when verified.</p>
+    <label>Hostname <input name="custom_domain" value="{{ studio.custom_domain or '' }}" placeholder="photos.yourstudio.com"></label>
+    {% if studio.custom_domain_verified and studio.custom_domain %}
+    <p class="ok small">Verified — {{ studio.custom_domain }}</p>
+    {% endif %}
+    <button type="submit">Save domain</button>
+  </form>
+
+  {% if usage %}
+  <section class="card compact">
+    <h2>Plan usage ({{ usage.period }})</h2>
+    <p class="small">Listings: {{ usage.listings_created }}{% if usage.listings_cap %} / {{ usage.listings_cap }}{% endif %}
+      · API calls: {{ usage.api_calls }}</p>
+  </section>
+  {% endif %}
+
   <section class="card">
     <h2>Service packages</h2>
     {% for p in packages %}
@@ -88,7 +106,10 @@
       <label>Password <input name="password" type="password" required></label>
       <label>Role
         <select name="role">
-          <option value="operator">Operator</option>
+          <option value="operator">Operator (full)</option>
+          <option value="scheduler">Scheduler</option>
+          <option value="editor">Editor</option>
+          <option value="accountant">Accountant</option>
           <option value="owner">Owner</option>
         </select>
       </label>
@@ -196,17 +217,24 @@
       <p class="muted small">Use subfolders named <code>{listing_id}</code> to route files, e.g. <code>/Eos Ingest/42/IMG_001.jpg</code>.</p>
       <button type="submit">Save Dropbox settings</button>
     </form>
+    <form method="post" action="/admin/integrations/dropbox/scan" class="inline-form">
+      <button type="submit">Scan now</button>
+    </form>
     <form method="post" action="/admin/integrations/dropbox/disconnect" class="inline-form">
       <button type="submit" class="link">Disconnect Dropbox</button>
     </form>
     {% if dropbox_log %}
     <table class="list compact">
-      <tr><th>When</th><th>Path</th><th>Status</th></tr>
+      <tr><th>When</th><th>Path</th><th>Status</th><th></th></tr>
       {% for row in dropbox_log %}
       <tr>
         <td>{{ row.created_at[:16] }}</td>
         <td class="muted">{{ row.dropbox_path }}</td>
         <td>{{ row.status }}{% if row.error %} — {{ row.error }}{% endif %}</td>
+        <td>{% if row.status == 'failed' %}
+          <form method="post" action="/admin/integrations/dropbox/retry/{{ row.id }}" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>{% endif %}</td>
       </tr>
       {% endfor %}
     </table>

@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, onboarding, security
+from .. import config, mailer, onboarding, security
 from ..render import templates
 
 router = APIRouter()
@@ -54,4 +54,6 @@ async def signup_submit(
             status_code=e.status_code,
         )
     security.signup_record(ip)
+    if config.SIGNUP_ENABLED and mailer.configured():
+        return RedirectResponse(f"{config.BASE_URL}/admin/verify-pending", status_code=303)
     return RedirectResponse(result["login_url"], status_code=303)

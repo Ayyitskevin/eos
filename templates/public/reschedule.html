@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Reschedule · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="center-card wide">
+  <p class="brand-mark">Eos</p>
+  <h1>Reschedule shoot</h1>
+  <p><strong>{{ appointment.title }}</strong></p>
+  <p class="muted">Current: {{ appointment.starts_at[:16] if appointment.starts_at else '—' }}</p>
+  <form method="post" action="/portal/{{ portal_token }}/reschedule/{{ appointment.id }}" class="form-grid">
+    <label>Pick a new time
+      <select name="scheduled_at" required>
+        {% for s in slots %}
+        <option value="{{ s.value }}">{{ s.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-accent">Confirm new time</button>
+    <a href="/portal/{{ portal_token }}">Cancel</a>
+  </form>
+</main>
+{% endblock %}

@@ -124,7 +124,16 @@ def process_due() -> int:
             ctx = build_context(run["listing_id"])
             subject = render_template(run["subject"], ctx)
             body = render_template(run["body_template"], ctx)
-            mailer.send(run["to_email"], subject, body)
+            seq = db.one("SELECT channel FROM email_sequences WHERE id=?", (run["sequence_id"],))
+            channel = (seq["channel"] if seq else "email") or "email"
+            if channel == "sms":
+                from . import sms
+                phone_row = db.one("SELECT phone FROM clients WHERE id=?", (run["client_id"],))
+                phone = phone_row["phone"] if phone_row else ""
+                if not phone or not sms.send(to_phone=phone, body=body[:500]):
+                    raise RuntimeError("SMS delivery failed or no phone")
+            else:
+                mailer.send(run["to_email"], subject, body)
             db.run(
                 "UPDATE email_sequence_runs SET status='sent', sent_at=datetime('now'), error=NULL WHERE id=?",
                 (run["id"],),

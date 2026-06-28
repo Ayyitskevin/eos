@@ -33,6 +33,6 @@ pytest tests/ -q
 
 Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
-## Shipped (v1.2)
+## Shipped (v1.4)
 
-Phases 1–11 plus hardening: tenant auth binding, billing gates, CSRF (Sec-Fetch-Site), integration observability, API pagination, CI, backup script.
+Phases 1–14. Phase 14: portal reschedule, credits, RBAC, SMS, brokerage portal, churn alerts, media namespace. See README.

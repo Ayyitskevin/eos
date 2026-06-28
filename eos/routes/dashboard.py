@@ -3,7 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, listings, security, studio
+from .. import churn, config, listings, security, studio
 from ..render import templates
 from ..vocab import LISTING_STATUSES
 
@@ -31,5 +31,6 @@ async def dashboard(request: Request):
             "packages": studio.list_packages(),
             "presets": studio.list_crop_presets(),
             "base_url": config.BASE_URL,
+            "inactive_agents": churn.inactive_agents(),
         },
     )

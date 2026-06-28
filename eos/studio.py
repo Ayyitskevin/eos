@@ -20,7 +20,7 @@ def get_profile():
 
 
 def update_studio(**fields) -> None:
-    allowed = {"name", "contact_email", "timezone"}
+    allowed = {"name", "contact_email", "timezone", "custom_domain", "custom_domain_verified"}
     parts = []
     params: list = []
     for k, v in fields.items():

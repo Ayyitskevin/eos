@@ -103,9 +103,11 @@ async def listing_hero(slug: str):
     asset = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gal["id"]))
     if not asset:
         raise HTTPException(status_code=404)
-    path = config.MEDIA_DIR / str(gal["id"]) / "web" / f"{Path(asset['stored']).stem}.jpg"
+    from .. import media_paths
+    base = media_paths.gallery_dir(gal["id"])
+    path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
-        path = config.MEDIA_DIR / str(gal["id"]) / "original" / asset["stored"]
+        path = base / "original" / asset["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
@@ -123,7 +125,9 @@ async def listing_photo(slug: str, asset_id: int):
     )
     if not asset:
         raise HTTPException(status_code=404)
-    path = config.MEDIA_DIR / str(gal["id"]) / "web" / f"{Path(asset['stored']).stem}.jpg"
+    from .. import media_paths
+    base = media_paths.gallery_dir(gal["id"])
+    path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})

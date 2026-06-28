@@ -68,7 +68,11 @@ async def login(
     security.pin_clear(ip, security.ADMIN_BUCKET)
     if user:
         tenant.set_studio(user["studio_id"])
-    resp = RedirectResponse("/admin", status_code=303)
+    from .. import onboarding_wizard
+    dest = "/admin"
+    if user and onboarding_wizard.should_redirect() and not onboarding_wizard.status()["done"]:
+        dest = "/admin/onboarding"
+    resp = RedirectResponse(dest, status_code=303)
     name, value = security.set_session_cookie(user["id"] if user else None)
     resp.set_cookie(
         name, value,

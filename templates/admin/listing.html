@@ -74,6 +74,25 @@
       </table>
     </section>
 
+    <section class="card" id="revision">
+      <h2>Revision rounds</h2>
+      {% if l.revision_round %}
+      <p>Round <strong>{{ l.revision_round }}</strong>{% if l.revision_notes %} — {{ l.revision_notes }}{% endif %}</p>
+      {% endif %}
+      {% if agent_favorite_count %}
+      <p>{{ agent_favorite_count }} photo{{ 's' if agent_favorite_count != 1 else '' }} starred by agent for MLS.</p>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/revision" class="form-grid compact">
+        <label>Revision notes <textarea name="notes" rows="2" placeholder="Agent requested sky replacement on exterior…">{{ l.revision_notes or '' }}</textarea></label>
+        <button type="submit">Open revision round</button>
+      </form>
+      {% if l.revision_round %}
+      <form method="post" action="/admin/listings/{{ l.id }}/revision/complete" class="inline-form">
+        <button type="submit" class="link">Mark revision complete &amp; re-deliver</button>
+      </form>
+      {% endif %}
+    </section>
+
     <section class="card" id="tasks">
       <h2>Delivery checklist</h2>
       <ul class="checklist">

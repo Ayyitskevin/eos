@@ -67,7 +67,7 @@ def create_user(
     email = email.strip().lower()
     if not email or not password:
         raise HTTPException(status_code=400, detail="email and password required")
-    if role not in ("owner", "operator"):
+    if role not in ("owner", "operator", "scheduler", "editor", "accountant"):
         raise HTTPException(status_code=400, detail="invalid role")
     sid = studio_id or str(STUDIO_ID)
     uid = db.run(

@@ -41,7 +41,10 @@
       <div class="grid">
         {% for a in by_section[s.id] %}
         {% if a.status == 'ready' %}
-        <figure class="tile">
+        <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
+          <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
+            <button type="submit" class="fav-btn" title="Star for MLS" aria-label="Favorite">{{ "★" if a.agent_favorite else "☆" }}</button>
+          </form>
           {% if payment_locked %}
           <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
           {% else %}
@@ -60,7 +63,10 @@
     <div class="grid">
       {% for a in unsectioned %}
       {% if a.status == 'ready' %}
-      <figure class="tile">
+      <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
+        <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
+          <button type="submit" class="fav-btn" title="Star for MLS" aria-label="Favorite">{{ "★" if a.agent_favorite else "☆" }}</button>
+        </form>
         {% if payment_locked %}
         <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
         {% else %}
@@ -77,11 +83,32 @@
   <p class="muted center">Photos are being prepared — check back soon.</p>
   {% endif %}
 
-  {% if upsell %}
+  {% if upsell_addons %}
+  <section class="upsell-banner card">
+    <h2>{{ upsell.title or 'Add-ons for this listing' }}</h2>
+    {% if upsell and upsell.body %}<p>{{ upsell.body }}</p>{% endif %}
+    <form method="post" action="/g/{{ g.slug }}/upsell" class="form-grid compact">
+      {% for addon in upsell_addons %}
+      <label class="checkbox radio-card">
+        <input type="checkbox" name="addon_ids" value="{{ addon.id }}">
+        <span><strong>{{ addon.name }}</strong> — ${{ "%.0f"|format(addon.price_cents / 100) }}</span>
+      </label>
+      {% endfor %}
+      <button type="submit" class="btn btn-accent">Checkout add-ons</button>
+    </form>
+  </section>
+  {% elif upsell %}
   <section class="upsell-banner card">
     <h2>{{ upsell.title }}</h2>
     {% if upsell.body %}<p>{{ upsell.body }}</p>{% endif %}
     <a class="btn btn-accent" href="{{ upsell.link }}">Book add-ons</a>
+  </section>
+  {% endif %}
+
+  {% if favorites %}
+  <section class="card" style="margin-top:1.5rem">
+    <h2>Your MLS picks ({{ favorites|length }})</h2>
+    <p class="muted small">Starred photos are highlighted for your photographer.</p>
   </section>
   {% endif %}
 </main>

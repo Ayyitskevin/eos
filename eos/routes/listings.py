@@ -66,10 +66,14 @@ async def listing_detail(request: Request, listing_id: int):
     client = None
     if row["client_id"]:
         client = clients.get_client(row["client_id"])
+    fav_count = 0
+    for g in listings.listing_galleries(listing_id):
+        fav_count += len(galleries.agent_favorites(g["id"]))
     return templates.TemplateResponse(
         request, "admin/listing.html",
         {
             "l": row,
+            "agent_favorite_count": fav_count,
             "address": listings.format_address(row),
             "client": client,
             "shots": listings.listing_shots(listing_id),
@@ -184,6 +188,19 @@ async def listing_site_settings(
 async def listing_build_marketing_kit(listing_id: int):
     marketing_kit.enqueue_build(listing_id)
     return RedirectResponse(f"/admin/listings/{listing_id}#site", status_code=303)
+
+
+@router.post("/listings/{listing_id}/revision")
+async def listing_revision(listing_id: int, notes: str = Form("")):
+    listings.request_revision(listing_id, notes=notes)
+    return RedirectResponse(f"/admin/listings/{listing_id}#revision", status_code=303)
+
+
+@router.post("/listings/{listing_id}/revision/complete")
+async def listing_revision_complete(listing_id: int):
+    listings.complete_revision(listing_id)
+    listings.update_listing(listing_id, status="delivered")
+    return RedirectResponse(f"/admin/listings/{listing_id}#revision", status_code=303)
 
 
 @router.post("/listings/{listing_id}/gallery")

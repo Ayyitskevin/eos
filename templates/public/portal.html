@@ -8,6 +8,22 @@
     <p class="muted">Your listing deliveries and invoices</p>
   </header>
 
+  {% if upcoming %}
+  <section class="card" style="margin-bottom:1.5rem">
+    <h2>Upcoming shoots</h2>
+    <ul class="pkg-list">
+      {% for a in upcoming %}
+      <li>{{ a.starts_at[:16] if a.starts_at else '—' }} — {{ a.title }}
+        <a href="/portal/{{ portal_token }}/reschedule/{{ a.id }}">Reschedule</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if rescheduled %}
+  <p class="alert-banner ok">Shoot rescheduled — you'll receive a confirmation email.</p>
+  {% endif %}
+
   {% if deliveries %}
   <table class="list">
     <tr><th>Listing</th><th>Status</th><th>Site</th><th>Gallery</th><th>Payment</th></tr>

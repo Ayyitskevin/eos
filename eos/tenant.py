@@ -35,7 +35,14 @@ def _refresh_branding(studio_id: str) -> None:
         _base_url.set(config.BASE_URL)
         return
     _site_name.set(row["name"])
-    if config.BASE_DOMAIN and row["slug"] and studio_id != "default":
+    studio_row = db.one(
+        "SELECT slug, custom_domain, custom_domain_verified FROM studio WHERE id=?",
+        (studio_id,),
+    )
+    if studio_row and studio_row["custom_domain"] and studio_row["custom_domain_verified"]:
+        scheme = "https" if config.COOKIE_SECURE else "http"
+        _base_url.set(f"{scheme}://{studio_row['custom_domain']}")
+    elif config.BASE_DOMAIN and row["slug"] and studio_id != "default":
         scheme = "https" if config.COOKIE_SECURE else "http"
         port = ""
         if ":" in config.BASE_URL and not config.COOKIE_SECURE:
@@ -72,8 +79,24 @@ def studio_id_for_slug(slug: str) -> str | None:
     return row["id"] if row else None
 
 
+def studio_id_for_custom_domain(host: str | None) -> str | None:
+    if not host:
+        return None
+    host = host.split(":")[0].lower()
+    row = db.one(
+        """SELECT id FROM studio
+           WHERE lower(custom_domain)=? AND custom_domain_verified=1 AND active=1""",
+        (host,),
+    )
+    return row["id"] if row else None
+
+
 def resolve_tenant(request: Request) -> str:
-    sub = subdomain_from_host(request.headers.get("host"))
+    host = request.headers.get("host")
+    custom = studio_id_for_custom_domain(host)
+    if custom:
+        return custom
+    sub = subdomain_from_host(host)
     if sub:
         sid = studio_id_for_slug(sub)
         if sid:

@@ -31,6 +31,17 @@
     {% endif %}
   </section>
 
+  <section class="card">
+    <h2>Usage this month</h2>
+    <dl class="spec-list">
+      <dt>Listings created</dt>
+      <dd>{{ usage.listings_created }}{% if usage.listings_cap %} / {{ usage.listings_cap }}{% else %} (unlimited){% endif %}</dd>
+      <dt>API calls</dt><dd>{{ usage.api_calls }}</dd>
+      <dt>Storage tracked</dt><dd>{{ "%.1f"|format(usage.storage_bytes / 1048576) }} MB</dd>
+    </dl>
+    <p class="muted small">Starter plans cap monthly listings; Pro unlocks custom domains and higher API limits.</p>
+  </section>
+
   {% if configured %}
   <section class="card">
     <h2>Choose a plan</h2>

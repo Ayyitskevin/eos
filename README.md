@@ -109,6 +109,31 @@ Eos inherits the best patterns from two sibling projects:
 - Per-studio Stripe platform billing — trial on signup, subscription checkout at `/admin/billing`
 - Set `EOS_GOOGLE_*`, `EOS_DROPBOX_*`, and `EOS_STRIPE_PLATFORM_*` env vars for hosted SaaS
 
+### Phase 14 (shipped) — Eos 1.4 scale & retention
+
+- Agent self-reschedule from portal — pick open slot, confirm without calling
+- Team calendar — photographer color coding + filter (extends Phase 13 calendar)
+- Agent credit balances — ledger, apply at booking checkout
+- Dropbox scan-now + retry failed ingests in Studio settings
+- Signup email verification + onboarding wizard for new SaaS studios
+- CSV report export at `/admin/reports/export.csv`
+- Granular RBAC — scheduler, editor, accountant roles
+- Twilio SMS shoot-day reminders + SMS sequence channel
+- Brokerage self-serve portal at `/portal/brokerage/{token}`
+- Churn alerts — inactive agents (90+ days) on dashboard
+- Studio-namespaced media storage (`media/{studio_id}/{gallery_id}/`)
+
+### Phase 13 (shipped) — Eos 1.3 operations & monetization
+
+- Visual shoot calendar — month/week views, drag-to-reschedule, photographer filter
+- Google Calendar busy blocks shown on calendar and in sidebar
+- Agent MLS favorites — star photos in gallery; revision rounds on listings
+- Plan-tier limits — listings/month, API tokens, webhooks; usage metering on billing page
+- Custom domain routing — Pro studios map `custom_domain` to tenant (CNAME + verify in Studio)
+- API writes — `POST/PATCH /api/v1/listings`, `POST /api/v1/bookings`, inbound `/api/v1/inbound/{event}`
+- Delivery upsell checkout — add-ons from gallery with Stripe Checkout
+- IPTC/EXIF metadata on MLS export crops (address, agent, MLS ID)
+
 ### Phase 12 (shipped) — Eos 1.2 hardening
 
 - Tenant-bound admin sessions — cross-subdomain access blocked

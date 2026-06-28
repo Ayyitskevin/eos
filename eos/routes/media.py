@@ -14,7 +14,8 @@ VARIANTS = {"thumb", "web", "original", "export"}
 
 
 def _asset_path(gallery_id: int, asset, variant: str) -> Path:
-    base = config.MEDIA_DIR / str(gallery_id)
+    from .. import media_paths
+    base = media_paths.gallery_dir(gallery_id)
     stem = Path(asset["stored"]).stem
     if variant == "original":
         return base / "original" / asset["stored"]

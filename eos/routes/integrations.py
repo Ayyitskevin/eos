@@ -57,6 +57,22 @@ async def dropbox_disconnect(_: None = Depends(security.require_admin)):
     return RedirectResponse("/admin/studio#integrations", status_code=303)
 
 
+@router.post("/admin/integrations/dropbox/scan")
+async def dropbox_scan_now(_: None = Depends(security.require_admin)):
+    from .. import jobs, tenant
+    jobs.enqueue("dropbox_scan", {"studio_id": tenant.get_studio_id()})
+    return RedirectResponse("/admin/studio#integrations", status_code=303)
+
+
+@router.post("/admin/integrations/dropbox/retry/{log_id}")
+async def dropbox_retry(log_id: int, _: None = Depends(security.require_admin)):
+    try:
+        dropbox.retry_failed(log_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return RedirectResponse("/admin/studio#integrations", status_code=303)
+
+
 @router.post("/admin/integrations/dropbox/settings")
 async def dropbox_settings(
     _: None = Depends(security.require_admin),

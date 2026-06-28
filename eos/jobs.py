@@ -15,12 +15,14 @@ MAX_ATTEMPTS = 3
 
 
 def _gallery_dirs(gallery_id: int) -> dict[str, Path]:
-    base = config.MEDIA_DIR / str(gallery_id)
-    return {k: base / k for k in ("original", "web", "thumb")}
+    from . import media_paths
+    base = media_paths.gallery_dir(gallery_id)
+    return {k: media_paths.gallery_subdir(gallery_id, k) for k in ("original", "web", "thumb")}
 
 
 def crops_dir(gallery_id: int) -> Path:
-    return config.MEDIA_DIR / str(gallery_id) / "exports"
+    from . import media_paths
+    return media_paths.exports_dir(gallery_id)
 
 
 def zip_path(gallery_id: int, rev: int) -> Path:
@@ -60,8 +62,21 @@ def _h_exports(p: dict) -> None:
     out.mkdir(parents=True, exist_ok=True)
     src = _gallery_dirs(asset["gallery_id"])["original"] / asset["stored"]
     gal = db.one("SELECT listing_id FROM galleries WHERE id=?", (asset["gallery_id"],))
-    overlay = brand_kits.overlay_for_listing(gal["listing_id"] if gal else None)
-    imaging.make_crops(str(src), out, stem, config.JPEG_QUALITY, active, overlay=overlay)
+    listing_id = gal["listing_id"] if gal else None
+    overlay = brand_kits.overlay_for_listing(listing_id)
+    metadata = None
+    if listing_id:
+        from .tenant import get_site_name
+        listing = db.one(
+            """SELECT l.*, c.name AS client_name FROM listings l
+               LEFT JOIN clients c ON c.id=l.client_id WHERE l.id=?""",
+            (listing_id,),
+        )
+        metadata = imaging.listing_export_metadata(listing, site_name=get_site_name())
+    imaging.make_crops(
+        str(src), out, stem, config.JPEG_QUALITY, active,
+        overlay=overlay, metadata=metadata,
+    )
 
 
 def _h_zip(p: dict) -> None:
@@ -116,6 +131,13 @@ def _h_google_calendar_push(p: dict) -> None:
     google_calendar.push_appointment(p["appointment_id"])
 
 
+def _h_dropbox_scan(p: dict) -> None:
+    from . import tenant
+    from .integrations import dropbox
+    tenant.set_studio(p["studio_id"])
+    dropbox.scan_now()
+
+
 def _h_integration_sweep(p: dict) -> None:
     from .integrations import dropbox, google_calendar
     g = google_calendar.sweep_all()
@@ -150,6 +172,7 @@ HANDLERS = {
     "marketing_kit": _h_marketing_kit,
     "google_calendar_push": _h_google_calendar_push,
     "dropbox_ingest": _h_dropbox_ingest,
+    "dropbox_scan": _h_dropbox_scan,
     "integration_sweep": _h_integration_sweep,
 }
 

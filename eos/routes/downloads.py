@@ -60,7 +60,8 @@ async def download_asset(request: Request, slug: str, asset_id: int):
     )
     if not a:
         raise HTTPException(status_code=404)
-    path = config.MEDIA_DIR / str(g["id"]) / "original" / a["stored"]
+    from .. import media_paths
+    path = media_paths.gallery_dir(g["id"]) / "original" / a["stored"]
     if not path.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(path, filename=a["filename"], media_type="application/octet-stream")

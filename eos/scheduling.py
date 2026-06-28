@@ -114,6 +114,20 @@ def twilight_slots(*, days: int = 14) -> list[dict]:
     )
 
 
+def reschedule_slots(*, days: int = 14) -> list[dict]:
+    """Open slots for agent self-reschedule (ignores booking_enabled gate)."""
+    profile = studio.get_profile()
+    weekdays = _parse_weekdays(profile["book_weekdays"] or "0,1,2,3,4,5")
+    return _slot_list(
+        days=days,
+        weekdays=weekdays,
+        slot_min=int(profile["slot_minutes"] or 90),
+        buffer_min=int(profile["buffer_minutes"] or 30),
+        day_start=int(profile["day_start_min"] or 480),
+        day_end=int(profile["day_end_min"] or 1080),
+    )
+
+
 def slot_is_open(starts_at: str, *, twilight: bool = False) -> bool:
     slots = twilight_slots() if twilight else open_slots()
     return any(s["value"] == starts_at for s in slots)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import api_tokens, config, db, integration_events, platform_billing, referrals, security, studio, users, webhooks
+from .. import api_tokens, config, db, integration_events, plan_limits, platform_billing, referrals, security, studio, usage, users, webhooks
 from ..vocab import STUDIO_ID
 from ..integrations import dropbox, google_calendar
 from ..render import templates
@@ -35,6 +35,8 @@ async def studio_settings(request: Request):
             "dropbox_connected": dropbox.is_connected(),
             "billing_configured": platform_billing.is_configured(),
             "billing": platform_billing.studio_billing(),
+            "usage": usage.snapshot(),
+            "plan_limits": plan_limits.limits_for(),
             "integration_events": integration_events.list_recent(15),
             "dropbox_log": db.all_(
                 """SELECT * FROM dropbox_ingest_log WHERE studio_id=?
@@ -94,6 +96,20 @@ async def studio_update(
         delivery_upsell_title=delivery_upsell_title.strip(),
         delivery_upsell_body=delivery_upsell_body.strip(),
         delivery_upsell_link=delivery_upsell_link.strip() or "/book",
+    )
+    return RedirectResponse("/admin/studio", status_code=303)
+
+
+@router.post("/studio/domain")
+async def studio_domain(custom_domain: str = Form("")):
+    domain = custom_domain.strip().lower()
+    if domain:
+        plan_limits.check_custom_domain()
+        if "://" in domain or "/" in domain:
+            raise HTTPException(status_code=400, detail="Enter hostname only, e.g. photos.yourstudio.com")
+    studio.update_studio(
+        custom_domain=domain or None,
+        custom_domain_verified=1 if domain else 0,
     )
     return RedirectResponse("/admin/studio", status_code=303)
 

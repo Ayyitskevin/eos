@@ -71,8 +71,53 @@ def _apply_overlay(crop: Image.Image, overlay: dict) -> Image.Image:
     return base.convert("RGB")
 
 
+def _save_jpeg_with_metadata(img: Image.Image, path, *, quality: int, metadata: dict | None) -> None:
+    exif_bytes = b""
+    if metadata:
+        try:
+            import piexif
+            desc = (metadata.get("description") or "")[:2000]
+            artist = (metadata.get("artist") or "")[:200]
+            copyright_ = (metadata.get("copyright") or "")[:200]
+            zeroth = {}
+            if desc:
+                zeroth[piexif.ImageIFD.ImageDescription] = desc.encode("utf-8")
+            if artist:
+                zeroth[piexif.ImageIFD.Artist] = artist.encode("utf-8")
+            if copyright_:
+                zeroth[piexif.ImageIFD.Copyright] = copyright_.encode("utf-8")
+            if zeroth:
+                exif_dict = {"0th": zeroth}
+                exif_bytes = piexif.dump(exif_dict)
+        except Exception as e:
+            log.warning("EXIF metadata embed failed: %s", e)
+    kwargs = {"quality": quality, "progressive": True, "optimize": True}
+    if exif_bytes:
+        kwargs["exif"] = exif_bytes
+    img.save(path, "JPEG", **kwargs)
+
+
+def listing_export_metadata(listing_row, *, site_name: str = "") -> dict | None:
+    if not listing_row:
+        return None
+    from .listings import format_address
+
+    address = format_address(listing_row)
+    parts = [address]
+    if listing_row.get("mls_id"):
+        parts.append(f"MLS {listing_row['mls_id']}")
+    agent = listing_row.get("client_name") or ""
+    studio = site_name or "Eos Studio"
+    return {
+        "description": " · ".join(p for p in parts if p),
+        "artist": agent,
+        "copyright": f"{agent} / {studio}".strip(" /"),
+    }
+
+
 def make_crops(src_path: str, out_dir, stem: str, quality: int,
-               presets, overlay: dict | None = None) -> list[str]:
+               presets, overlay: dict | None = None,
+               metadata: dict | None = None) -> list[str]:
     written = []
     with Image.open(src_path) as im:
         im = ImageOps.exif_transpose(im)
@@ -85,7 +130,7 @@ def make_crops(src_path: str, out_dir, stem: str, quality: int,
             if ps["brand_overlay"] and overlay:
                 crop = _apply_overlay(crop, overlay)
             out = out_dir / f"{stem}_{ps['slug']}.jpg"
-            crop.save(out, "JPEG", quality=quality, progressive=True, optimize=True)
+            _save_jpeg_with_metadata(crop, out, quality=quality, metadata=metadata)
             written.append(out.name)
     return written
 

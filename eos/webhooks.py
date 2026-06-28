@@ -26,6 +26,9 @@ def list_subscriptions():
 
 
 def create_subscription(*, label: str, url: str, events: list[str]) -> int:
+    from . import plan_limits
+
+    plan_limits.check_webhook(current_count=len(list_subscriptions()))
     url = url.strip()
     if not url.startswith("https://"):
         raise ValueError("webhook URL must be https")

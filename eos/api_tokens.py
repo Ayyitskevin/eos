@@ -17,6 +17,9 @@ def _hash(token: str) -> str:
 
 
 def create_token(*, label: str = "API") -> tuple[int, str]:
+    from . import plan_limits
+
+    plan_limits.check_api_token(current_count=len(list_tokens()))
     raw = f"eos_{secrets.token_urlsafe(32)}"
     prefix = raw[:12]
     tid = db.run(
@@ -53,4 +56,6 @@ def authenticate_request(request: Request) -> str:
         "UPDATE api_tokens SET last_used_at=datetime('now') WHERE token_hash=?",
         (_hash(raw),),
     )
+    from . import usage
+    usage.bump("api_calls")
     return row["studio_id"]

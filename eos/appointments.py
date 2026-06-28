@@ -57,8 +57,39 @@ def create_appointment(
     return aid
 
 
+def list_for_calendar(
+    *,
+    range_start: str,
+    range_end: str,
+    photographer_id: int | None = None,
+):
+    from . import calendar_view
+
+    start = calendar_view.parse_anchor(range_start)
+    end = calendar_view.parse_anchor(range_end)
+    return calendar_view.list_events(
+        range_start=start, range_end=end, photographer_id=photographer_id,
+    )
+
+
+def reschedule_appointment(appt_id: int, *, starts_at: str) -> None:
+    row = get_appointment(appt_id)
+    if row.get("external_source") == "google":
+        raise HTTPException(status_code=400, detail="Google Calendar events cannot be rescheduled here.")
+    from . import scheduling
+    twilight = row["kind"] == "twilight"
+    open_vals = {s["value"] for s in scheduling.reschedule_slots()}
+    if starts_at not in open_vals and not scheduling.slot_is_open(starts_at, twilight=twilight):
+        raise HTTPException(status_code=409, detail="That time slot is not available.")
+    ends_at = scheduling.ends_at_for(starts_at)
+    update_appointment(appt_id, starts_at=starts_at, ends_at=ends_at)
+
+
 def update_appointment(appt_id: int, **fields) -> None:
-    allowed = {"title", "kind", "status", "starts_at", "location", "listing_id", "client_id", "assigned_user_id"}
+    allowed = {
+        "title", "kind", "status", "starts_at", "ends_at", "location",
+        "listing_id", "client_id", "assigned_user_id",
+    }
     parts = []
     params: list = []
     for k, v in fields.items():

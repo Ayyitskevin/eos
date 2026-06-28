@@ -30,6 +30,18 @@
     {% endfor %}
   </section>
 
+  {% if inactive_agents %}
+  <details class="alert-banner">
+    <summary>{{ inactive_agents|length }} agent{{ "s" if inactive_agents|length != 1 }} inactive 90+ days</summary>
+    <ul class="due-list">
+      {% for a in inactive_agents %}
+      <li><a href="/admin/clients/{{ a.id }}">{{ a.name }}</a>
+        {% if a.last_listing_at %}<span class="muted">last booked {{ a.last_listing_at[:10] }}</span>{% else %}<span class="muted">never booked</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+
   {% if due_soon %}
   <details class="alert-banner" open>
     <summary>{{ due_soon|length }} listing{{ "s" if due_soon|length != 1 }} due within 48h</summary>

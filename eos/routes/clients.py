@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import brand_kits, clients, portal, security
 from ..render import templates
-from ..vocab import CLIENT_TYPES
+from ..vocab import CLIENT_TYPES, CLIENT_TYPE_LABELS
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
 
@@ -44,16 +44,24 @@ async def client_detail(request: Request, client_id: int):
         (client_id,),
     )
     portal_link = portal.portal_url(client_id) if c["email"] else None
+    brokerage_link = None
+    if c["client_type"] == "brokerage":
+        brokerage_link = portal.brokerage_portal_url(client_id)
+    from .. import credits
     return templates.TemplateResponse(
         request, "admin/client.html",
         {
             "c": c,
+            "credit_balance": credits.balance(client_id),
+            "credit_ledger": credits.ledger(client_id),
+            "brokerage_link": brokerage_link,
             "children": kids,
             "listings": listings_rows,
             "all_clients": clients.list_clients(),
             "client_types": CLIENT_TYPES,
             "brand_kit": brand_kits.get_kit(client_id),
             "portal_link": portal_link,
+            "client_type_labels": CLIENT_TYPE_LABELS,
         },
     )
 
@@ -78,4 +86,15 @@ async def client_update(
         email=email, phone=phone, license_number=license_number,
         notes=notes, parent_id=pid,
     )
+    return RedirectResponse(f"/admin/clients/{client_id}", status_code=303)
+
+
+@router.post("/clients/{client_id}/credit")
+async def client_add_credit(
+    client_id: int,
+    amount_dollars: float = Form(...),
+    note: str = Form(""),
+):
+    from .. import credits
+    credits.add_credit(client_id, amount_cents=round(amount_dollars * 100), note=note)
     return RedirectResponse(f"/admin/clients/{client_id}", status_code=303)

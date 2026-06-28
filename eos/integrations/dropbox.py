@@ -222,16 +222,16 @@ def ingest_file(*, log_id: int, dropbox_path: str, listing_id: int) -> None:
     token = _token()
     if not token:
         raise RuntimeError("dropbox not connected")
+    from .. import media_paths
     gallery_id = _gallery_for_listing(listing_id)
-    base = config.MEDIA_DIR / str(gallery_id)
     for sub in ("original", "web", "thumb"):
-        (base / sub).mkdir(parents=True, exist_ok=True)
+        media_paths.gallery_subdir(gallery_id, sub)
     filename = Path(dropbox_path).name
     ext = Path(filename).suffix.lower()
     if ext not in PHOTO_EXTS:
         raise RuntimeError(f"unsupported type: {ext}")
     stored = f"{uuid.uuid4().hex}{ext}"
-    dest = base / "original" / stored
+    dest = media_paths.gallery_subdir(gallery_id, "original") / stored
     headers = {
         "Authorization": f"Bearer {token}",
         "Dropbox-API-Arg": json.dumps({"path": dropbox_path}),
@@ -260,6 +260,29 @@ def ingest_file(*, log_id: int, dropbox_path: str, listing_id: int) -> None:
         (asset_id, log_id),
     )
     db.audit("integration", "dropbox.ingest", f"path={dropbox_path} asset={asset_id}")
+
+
+def retry_failed(log_id: int) -> None:
+    row = db.one(
+        "SELECT * FROM dropbox_ingest_log WHERE id=? AND studio_id=? AND status='failed'",
+        (log_id, STUDIO_ID),
+    )
+    if not row:
+        raise ValueError("log entry not found or not failed")
+    db.run("UPDATE dropbox_ingest_log SET status='queued', error=NULL WHERE id=?", (log_id,))
+    jobs.enqueue(
+        "dropbox_ingest",
+        {
+            "studio_id": str(STUDIO_ID),
+            "log_id": log_id,
+            "dropbox_path": row["dropbox_path"],
+            "listing_id": row["listing_id"],
+        },
+    )
+
+
+def scan_now() -> int:
+    return scan_folder()
 
 
 def sweep_all() -> int:

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .. import brokerage, clients, reports, security
 from ..render import templates
@@ -18,6 +18,17 @@ async def reports_dashboard(request: Request):
             "brokerages": reports.brokerages_with_balance(),
             "client_list": clients.list_clients(),
         },
+    )
+
+
+@router.get("/reports/export.csv")
+async def reports_csv(_: None = Depends(security.require_admin)):
+    from .. import reports_export
+    body = reports_export.full_csv()
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="eos-reports.csv"'},
     )
 
 

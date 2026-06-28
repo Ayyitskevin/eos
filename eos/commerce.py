@@ -105,10 +105,15 @@ def create_booking(
         raise HTTPException(status_code=400, detail="slot no longer available")
     if not signer_name.strip():
         raise HTTPException(status_code=400, detail="signature required")
-    total_cents, deposit_cents, line_items, referral_id = calc_total(package_id, addon_ids, promo_code)
     pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
 
     client_id = _find_or_create_client(name, email, phone)
+    total_cents, deposit_cents, line_items, referral_id = calc_total(package_id, addon_ids, promo_code)
+    from . import credits
+    total_cents, credit_applied = credits.apply_at_checkout(client_id, total_cents)
+    if credit_applied:
+        line_items.append({"label": "Account credit", "qty": 1, "unit_cents": -credit_applied})
+        deposit_cents = min(deposit_cents, total_cents)
     title, addr = _parse_address(property_address)
     listing_id = listings.create_listing(
         title,

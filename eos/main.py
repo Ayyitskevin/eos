@@ -20,6 +20,7 @@ from .routes import (
     microsites as microsite_routes,
     reports as reports_routes, kanban as kanban_routes,
     signup as signup_routes, api_v1, integrations, platform_billing as platform_billing_routes,
+    upsell_routes, onboarding_routes as onboarding_routes,
     delivery, docs, downloads, emails, galleries_admin, invoices_admin, listings,
     media, pay, proposals_admin, questionnaires, sequences_admin, site, studio_admin,
     today, uploads,
@@ -45,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Eos", version="1.2.0", lifespan=lifespan,
+    title="Eos", version="1.4.0", lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -73,6 +74,9 @@ async def tenant_context(request: Request, call_next):
     blocked = billing_gate.check_access(request)
     if blocked:
         return blocked
+    if request.url.path.startswith("/admin"):
+        from . import rbac
+        rbac.check_route(request)
     security.validate_csrf(request)
     return await call_next(request)
 
@@ -107,7 +111,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "1.2.0",
+        "version": "1.4.0",
         "jobs_pending": jobs.pending_count(),
     }
 
@@ -122,6 +126,7 @@ for r in (
     activity.router, sequences_admin.router, booking.router, portal_routes.router,
     microsite_routes.router, reports_routes.router, kanban_routes.router,
     signup_routes.router, api_v1.router, integrations.router,
-    platform_billing_routes.router, site.router,
+    platform_billing_routes.router, upsell_routes.router,
+    onboarding_routes.router, site.router,
 ):
     app.include_router(r)

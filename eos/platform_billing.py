@@ -43,7 +43,7 @@ def studio_billing() -> dict:
         "billing_status": row["billing_status"],
         "stripe_customer_id": row["stripe_customer_id"],
         "stripe_subscription_id": row["stripe_subscription_id"],
-        "trial_ends_at": row.get("trial_ends_at"),
+        "trial_ends_at": row["trial_ends_at"] if row and "trial_ends_at" in row.keys() else None,
     }
 
 

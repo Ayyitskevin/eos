@@ -86,6 +86,9 @@ def create_listing(
     notes: str = "",
     seed_defaults: bool = True,
 ) -> int:
+    from . import plan_limits, usage
+
+    plan_limits.check_listing_create(current_month_count=usage.listings_created_this_month())
     lid = db.run(
         """INSERT INTO listings
            (studio_id, client_id, title, property_type,
@@ -113,6 +116,7 @@ def create_listing(
                 "INSERT INTO listing_tasks (studio_id, listing_id, label) VALUES (?,?,?)",
                 (STUDIO_ID, lid, label),
             )
+    usage.bump("listings_created")
     db.audit("admin", "listing.create", f"id={lid} title={title.strip()}")
     return lid
 
@@ -123,7 +127,7 @@ def update_listing(listing_id: int, **fields) -> None:
         "client_id", "title", "status", "property_type",
         "address_line1", "address_line2", "city", "state", "zip", "mls_id",
         "beds", "baths", "sqft", "shoot_date", "due_at", "access_notes", "notes",
-        "assigned_user_id",
+        "assigned_user_id", "revision_round", "revision_notes",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -195,6 +199,21 @@ def kanban_board() -> dict[str, list]:
             (STUDIO_ID, status),
         )
     return board
+
+
+def request_revision(listing_id: int, *, notes: str = "") -> None:
+    row = get_listing(listing_id)
+    update_listing(
+        listing_id,
+        status="editing",
+        revision_round=(row["revision_round"] or 0) + 1,
+        revision_notes=notes.strip(),
+    )
+    db.audit("admin", "listing.revision", f"id={listing_id} round={(row['revision_round'] or 0) + 1}")
+
+
+def complete_revision(listing_id: int) -> None:
+    update_listing(listing_id, revision_notes="")
 
 
 def advance_status(listing_id: int) -> str | None:

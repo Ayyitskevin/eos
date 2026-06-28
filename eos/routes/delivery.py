@@ -57,16 +57,20 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
 
 
 async def gallery_view(request: Request, slug: str):
+    from .. import upsell as upsell_mod
+
     g = galleries.get_gallery_by_slug(slug)
     sections, by_section, unsectioned = galleries.assets_by_section(g["id"])
     locked = paywall.payment_required(g["listing_id"])
     inv_slug = paywall.unpaid_invoice_slug(g["listing_id"]) if locked else None
     embeds = listing_media.list_for_listing(g["listing_id"]) if g["listing_id"] else []
-    upsell = None
+    upsell_banner = None
+    upsell_addons = []
     if g["listing_id"]:
         row = db.one("SELECT status FROM listings WHERE id=?", (g["listing_id"],))
         if row and row["status"] == "delivered":
-            upsell = studio.delivery_upsell()
+            upsell_banner = studio.delivery_upsell()
+            upsell_addons = upsell_mod.list_delivery_addons()
     return templates.TemplateResponse(
         request, "public/gallery.html",
         {
@@ -76,6 +80,17 @@ async def gallery_view(request: Request, slug: str):
             "pay_url": f"/i/{inv_slug}" if inv_slug else None,
             "payments_on": bool(config.STRIPE_SECRET_KEY),
             "embeds": embeds,
-            "upsell": upsell,
+            "upsell": upsell_banner,
+            "upsell_addons": upsell_addons,
+            "favorites": galleries.agent_favorites(g["id"]),
         },
     )
+
+
+@router.post("/g/{slug}/favorite/{asset_id}")
+async def gallery_favorite(request: Request, slug: str, asset_id: int):
+    g = galleries.get_gallery_by_slug(slug)
+    if not security.gallery_unlocked(request, g["id"]):
+        raise HTTPException(status_code=403)
+    galleries.toggle_agent_favorite(asset_id, gallery_id=g["id"])
+    return RedirectResponse(f"/g/{slug}", status_code=303)

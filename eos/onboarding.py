@@ -51,6 +51,9 @@ def create_studio(
     )
     from . import platform_billing
     platform_billing.provision_new_studio(studio_id, email=email, name=name)
+    from . import signup_verify
+    if config.SIGNUP_ENABLED:
+        signup_verify.issue_token(studio_id, email=email)
     db.audit("signup", "studio.create", f"id={studio_id} owner={email}")
     login_url = f"{config.BASE_URL}/admin/login"
     if config.BASE_DOMAIN:

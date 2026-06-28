@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} · Brokerage portal{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>{{ client.name }}</h1>
+    <p class="muted">Brokerage billing &amp; agent deliveries</p>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(totals.open_cents / 100) }}</span>
+      <span class="pipeline-label">Open AR</span>
+    </div>
+    <div class="pipeline-card has-items">
+      <span class="pipeline-count">${{ "%.0f"|format(totals.paid_cents / 100) }}</span>
+      <span class="pipeline-label">Paid YTD</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Open invoices</h2>
+    {% if statement_rows %}
+    <table class="list compact">
+      <tr><th>Invoice</th><th>Agent</th><th>Listing</th><th>Amount</th><th>Status</th></tr>
+      {% for r in statement_rows %}
+      <tr>
+        <td>{{ r.title }}</td>
+        <td>{{ r.agent_name or '—' }}</td>
+        <td>{{ r.listing_title or '—' }}</td>
+        <td>${{ "%.2f"|format(r.amount_cents / 100) }}</td>
+        <td>{{ r.status }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No invoices on file.</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Recent agent deliveries</h2>
+    {% if deliveries %}
+    <table class="list compact">
+      <tr><th>Listing</th><th>Agent</th><th>Status</th><th>Gallery</th></tr>
+      {% for d in deliveries %}
+      <tr>
+        <td>{{ d.title }}</td>
+        <td>{{ d.agent_name }}</td>
+        <td>{{ d.status }}</td>
+        <td>{% if d.gallery_published %}<a href="{{ base_url }}/g/{{ d.gallery_slug }}">View</a>{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No deliveries yet.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

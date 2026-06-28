@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Add-ons · {{ order.listing_title }}{% endblock %}
+{% block content %}
+<main class="center-card wide">
+  <p class="brand-mark">Eos</p>
+  <h1>Add-ons for {{ order.listing_title }}</h1>
+  <p class="price-lg">${{ "%.2f"|format(order.amount_cents / 100) }}</p>
+  {% if payments_on %}
+  <form method="post" action="/upsell/{{ order.token }}/pay">
+    <button type="submit" class="btn btn-accent">Pay with card</button>
+  </form>
+  {% else %}
+  <p class="muted">Online payment is not configured — contact your photographer.</p>
+  {% endif %}
+</main>
+{% endblock %}

@@ -45,3 +45,7 @@ def deliveries(client_id: int) -> list:
 
 def portal_url(client_id: int) -> str:
     return f"{config.BASE_URL}/portal/{ensure_token(client_id)}"
+
+
+def brokerage_portal_url(client_id: int) -> str:
+    return f"{config.BASE_URL}/portal/brokerage/{ensure_token(client_id)}"

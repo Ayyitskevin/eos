@@ -103,6 +103,6 @@ async def test_invoice_and_appointment(app_env):
         )
         assert appt.status_code == 303
 
-        cal = await client.get("/admin/calendar", headers={"cookie": cookie})
+        cal = await client.get("/admin/calendar?date=2026-07-01", headers={"cookie": cookie})
         assert cal.status_code == 200
         assert "Twilight shoot" in cal.text

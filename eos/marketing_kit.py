@@ -40,9 +40,11 @@ def _cover_path(listing_id: int) -> str | None:
     asset = db.one("SELECT * FROM assets WHERE id=? AND gallery_id=?", (asset_id, gal["id"]))
     if not asset:
         return None
-    path = config.MEDIA_DIR / str(gal["id"]) / "web" / f"{Path(asset['stored']).stem}.jpg"
+    from . import media_paths
+    base = media_paths.gallery_dir(gal["id"])
+    path = base / "web" / f"{Path(asset['stored']).stem}.jpg"
     if not path.is_file():
-        path = config.MEDIA_DIR / str(gal["id"]) / "original" / asset["stored"]
+        path = base / "original" / asset["stored"]
     return str(path) if path.is_file() else None
 
 

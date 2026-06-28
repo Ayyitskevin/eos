@@ -1,25 +1,30 @@
-"""Enforce platform billing status for SaaS tenants."""
+"""Enforce platform billing status and signup verification for SaaS tenants."""
 
 import datetime as dt
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 
-from . import config, db, tenant
+from . import config, db, signup_verify, tenant
 
 _BILLING_PATHS = {"/admin/billing", "/admin/logout"}
 _BILLING_PREFIXES = ("/stripe/platform/",)
+_ADMIN_PUBLIC = {"/admin/login", "/admin/logout", "/admin/verify-pending"}
 
 
 def check_access(request: Request) -> RedirectResponse | None:
+    path = request.url.path
+    if path.startswith("/admin") and path not in _ADMIN_PUBLIC:
+        sid = tenant.get_studio_id()
+        if sid != "default" and signup_verify.needs_verification(sid):
+            return RedirectResponse("/admin/verify-pending", status_code=303)
     if not config.BILLING_ENFORCE:
         return None
-    path = request.url.path
     if path in _BILLING_PATHS or path.startswith(_BILLING_PREFIXES):
         return None
     if not path.startswith("/admin"):
         return None
-    if path == "/admin/login":
+    if path in _ADMIN_PUBLIC:
         return None
     sid = tenant.get_studio_id()
     if sid == "default":

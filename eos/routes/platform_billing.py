@@ -6,7 +6,7 @@ import stripe
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, platform_billing, security
+from .. import config, plan_limits, platform_billing, security, usage
 from ..render import templates
 
 log = logging.getLogger("eos.routes.platform_billing")
@@ -22,6 +22,8 @@ async def billing_page(request: Request, _: None = Depends(security.require_admi
             "plans": platform_billing.PLANS,
             "configured": platform_billing.is_configured(),
             "thanks": request.query_params.get("thanks"),
+            "usage": usage.snapshot(),
+            "plan_limits": plan_limits.limits_for(),
         },
     )
 

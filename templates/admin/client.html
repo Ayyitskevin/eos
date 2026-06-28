@@ -11,8 +11,28 @@
   <section class="card">
     <h2>Billing</h2>
     <p><a href="/admin/reports/brokerage/{{ c.id }}">View consolidated statement</a></p>
+    {% if brokerage_link %}
+    <p class="muted small">Self-serve portal: <code class="slug">{{ brokerage_link }}</code></p>
+    {% endif %}
   </section>
   {% endif %}
+
+  <section class="card">
+    <h2>Account credit</h2>
+    <p>Balance: <strong>${{ "%.2f"|format(credit_balance / 100) }}</strong></p>
+    <form method="post" action="/admin/clients/{{ c.id }}/credit" class="inline-form">
+      <input name="amount_dollars" type="number" step="0.01" min="0" placeholder="Amount ($)" required>
+      <input name="note" placeholder="Note">
+      <button type="submit">Add credit</button>
+    </form>
+    {% if credit_ledger %}
+    <ul class="pkg-list small">
+      {% for e in credit_ledger[:5] %}
+      <li>{{ e.created_at[:10] }} — {{ "%+.2f"|format(e.delta_cents / 100) }} {% if e.note %}({{ e.note }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
 
   {% if portal_link %}
   <section class="card">

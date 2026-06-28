@@ -94,6 +94,26 @@ def update_gallery_settings(
     db.audit("admin", "gallery.update", f"id={gallery_id}")
 
 
+def toggle_agent_favorite(asset_id: int, *, gallery_id: int) -> bool:
+    row = db.one(
+        "SELECT agent_favorite FROM assets WHERE id=? AND gallery_id=?",
+        (asset_id, gallery_id),
+    )
+    if not row:
+        raise HTTPException(status_code=404)
+    new_val = 0 if row["agent_favorite"] else 1
+    db.run("UPDATE assets SET agent_favorite=? WHERE id=?", (new_val, asset_id))
+    return bool(new_val)
+
+
+def agent_favorites(gallery_id: int) -> list:
+    return db.all_(
+        """SELECT * FROM assets WHERE gallery_id=? AND agent_favorite=1
+           ORDER BY section_id, position, id""",
+        (gallery_id,),
+    )
+
+
 def assets_by_section(gallery_id: int) -> tuple[list, dict, list]:
     sections = gallery_sections(gallery_id)
     assets = gallery_assets(gallery_id)

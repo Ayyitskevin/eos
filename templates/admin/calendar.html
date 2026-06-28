@@ -1,65 +1,201 @@
 {% extends "base.html" %}
 {% block title %}Calendar · {{ site_name }}{% endblock %}
+{% block head %}
+<script src="/static/calendar.js?v={{ static_rev }}" defer></script>
+{% endblock %}
 {% block content %}
-<main class="admin-main">
+<main class="admin-main calendar-page">
   <header class="admin-bar">
     <h1>Shoot calendar</h1>
-    <nav><a href="/admin">Pipeline</a></nav>
+    <nav class="calendar-nav">
+      <a href="/admin/calendar?view={{ view }}&date={{ nav.prev }}&photographer={{ photographer_id or '' }}">←</a>
+      <strong>{{ nav.label }}</strong>
+      <a href="/admin/calendar?view={{ view }}&date={{ nav.next }}&photographer={{ photographer_id or '' }}">→</a>
+      <a href="/admin/calendar?view=month&date={{ anchor.isoformat() }}&photographer={{ photographer_id or '' }}"
+         class="{% if view == 'month' %}active{% endif %}">Month</a>
+      <a href="/admin/calendar?view=week&date={{ anchor.isoformat() }}&photographer={{ photographer_id or '' }}"
+         class="{% if view == 'week' %}active{% endif %}">Week</a>
+      <a href="/admin">Pipeline</a>
+    </nav>
   </header>
 
-  <form method="post" action="/admin/appointments" class="card form-grid compact">
-    <h2>Schedule shoot</h2>
-    <label>Title <input name="title" required placeholder="123 Oak St — day shoot"></label>
-    <label>Kind
-      <select name="kind">
-        {% for k in kinds %}
-        <option value="{{ k }}">{{ k|replace('_',' ')|title }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Starts <input name="starts_at" type="datetime-local" required></label>
-    <label>Location <input name="location" placeholder="Property address"></label>
-    <label>Listing
-      <select name="listing_id">
-        <option value="">— none —</option>
-        {% for l in listings %}
-        <option value="{{ l.id }}">{{ l.title }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Client
-      <select name="client_id">
-        <option value="">— none —</option>
-        {% for c in client_list %}
-        <option value="{{ c.id }}">{{ c.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+  <form method="get" action="/admin/calendar" class="calendar-filters card compact">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="hidden" name="date" value="{{ anchor.isoformat() }}">
     <label>Photographer
-      <select name="assigned_user_id">
-        <option value="">— unassigned —</option>
+      <select name="photographer" onchange="this.form.submit()">
+        <option value="">All</option>
         {% for u in operators %}
-        <option value="{{ u.id }}">{{ u.name or u.email }}</option>
+        <option value="{{ u.id }}" {% if photographer_id == u.id %}selected{% endif %}>{{ u.name or u.email }}</option>
         {% endfor %}
       </select>
     </label>
-    <button type="submit" class="btn btn-accent">Add to calendar</button>
+    {% if google_connected %}
+    <span class="legend-item legend-busy">■ Google busy</span>
+    <span class="legend-item legend-google">■ Synced event</span>
+    {% endif %}
   </form>
 
-  <table class="list">
-    <tr><th>When</th><th>Title</th><th>Kind</th><th>Photographer</th><th>Client</th><th>Listing</th><th>Status</th></tr>
-    {% for a in appointments %}
-    <tr>
-      <td>{{ a.starts_at[:16] if a.starts_at else "—" }}</td>
-      <td>{{ a.title }}</td>
-      <td>{{ a.kind }}</td>
-      <td>{{ a.photographer_name or "—" }}</td>
-      <td>{{ a.client_name or "—" }}</td>
-      <td>{{ a.listing_title or "—" }}</td>
-      <td>{{ a.status }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% if not appointments %}<p class="muted">No upcoming shoots scheduled.</p>{% endif %}
+  <div class="calendar-layout">
+    <section class="calendar-grid-wrap card">
+      {% if view == 'month' and month_grid %}
+      <div class="cal-month-head">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+      <div class="cal-month">
+        {% for week in month_grid %}
+        {% for day in week %}
+        <div class="cal-day {% if not day %}cal-day-empty{% endif %}{% if day %}{% set key_today = anchor.year ~ '-' ~ ('%02d'|format(anchor.month)) ~ '-' ~ ('%02d'|format(day)) %}{% if key_today == anchor.isoformat() %} cal-day-today{% endif %}{% endif %}"
+             {% if day %}data-date="{{ anchor.year }}-{{ '%02d'|format(anchor.month) }}-{{ '%02d'|format(day) }}"{% endif %}>
+          {% if day %}
+          <span class="cal-day-num">{{ day }}</span>
+          {% set key = anchor.year ~ '-' ~ ('%02d'|format(anchor.month)) ~ '-' ~ ('%02d'|format(day)) %}
+          {% for b in busy_by_day.get(key, []) %}
+          <div class="cal-event cal-busy" title="{{ b.title }}">{{ b.time_label }}</div>
+          {% endfor %}
+          {% for ev in by_day.get(key, []) %}
+          <a href="/admin/calendar?view={{ view }}&date={{ anchor.isoformat() }}&photographer={{ photographer_id or '' }}&edit={{ ev.id }}"
+             class="cal-event cal-{{ ev.style }} cal-hue-{{ ev.photographer_hue }} draggable-event"
+             draggable="true"
+             data-appt-id="{{ ev.id }}"
+             data-starts-at="{{ ev.starts_at }}"
+             title="{{ ev.title }}">
+            {{ ev.time_label }} {{ ev.title[:24] }}{% if ev.title|length > 24 %}…{% endif %}
+          </a>
+          {% endfor %}
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% elif grid_days %}
+      <div class="cal-week">
+        {% for d in grid_days %}
+        {% set key = d.isoformat() %}
+        <div class="cal-week-col" data-date="{{ key }}">
+          <div class="cal-week-head {% if d == anchor %}cal-day-today{% endif %}">
+            {{ d.strftime('%a %b %d') }}
+          </div>
+          {% for b in busy_by_day.get(key, []) %}
+          <div class="cal-event cal-busy">{{ b.time_label }} · Busy</div>
+          {% endfor %}
+          {% for ev in by_day.get(key, []) %}
+          <a href="/admin/calendar?view=week&date={{ anchor.isoformat() }}&photographer={{ photographer_id or '' }}&edit={{ ev.id }}"
+             class="cal-event cal-{{ ev.style }} cal-hue-{{ ev.photographer_hue }} draggable-event"
+             draggable="true"
+             data-appt-id="{{ ev.id }}"
+             data-starts-at="{{ ev.starts_at }}">
+            <strong>{{ ev.time_label }}</strong> {{ ev.title }}
+            {% if ev.photographer_name %}<span class="muted small">{{ ev.photographer_name }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="calendar-side">
+      {% if edit_appt %}
+      <form method="post" action="/admin/appointments/{{ edit_appt.id }}" class="card form-grid compact">
+        <h2>Edit shoot</h2>
+        {% if edit_appt.external_source == 'google' %}
+        <p class="warn small">Synced from Google Calendar — edit in Google or disconnect sync.</p>
+        {% endif %}
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="date" value="{{ anchor.isoformat() }}">
+        <input type="hidden" name="photographer" value="{{ photographer_id or '' }}">
+        <label>Title <input name="title" value="{{ edit_appt.title }}" required></label>
+        <label>Kind
+          <select name="kind">
+            {% for k in kinds %}
+            <option value="{{ k }}" {% if edit_appt.kind == k %}selected{% endif %}>{{ k|replace('_',' ')|title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Status
+          <select name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if edit_appt.status == s %}selected{% endif %}>{{ s|title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Starts <input name="starts_at" type="datetime-local"
+               value="{{ edit_appt.starts_at[:16].replace(' ', 'T') if edit_appt.starts_at else '' }}"
+               {% if edit_appt.external_source == 'google' %}readonly{% endif %}></label>
+        <label>Location <input name="location" value="{{ edit_appt.location or '' }}"></label>
+        <label>Photographer
+          <select name="assigned_user_id">
+            <option value="">— unassigned —</option>
+            {% for u in operators %}
+            <option value="{{ u.id }}" {% if edit_appt.assigned_user_id == u.id %}selected{% endif %}>{{ u.name or u.email }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Listing
+          <select name="listing_id">
+            <option value="">— none —</option>
+            {% for l in listings %}
+            <option value="{{ l.id }}" {% if edit_appt.listing_id == l.id %}selected{% endif %}>{{ l.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="btn btn-accent">Save</button>
+      </form>
+      {% else %}
+      <form method="post" action="/admin/appointments" class="card form-grid compact">
+        <h2>Schedule shoot</h2>
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="date" value="{{ anchor.isoformat() }}">
+        <input type="hidden" name="photographer" value="{{ photographer_id or '' }}">
+        <label>Title <input name="title" required placeholder="123 Oak St — day shoot"></label>
+        <label>Kind
+          <select name="kind">
+            {% for k in kinds %}
+            <option value="{{ k }}">{{ k|replace('_',' ')|title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Starts <input name="starts_at" type="datetime-local" required></label>
+        <label>Location <input name="location" placeholder="Property address"></label>
+        <label>Listing
+          <select name="listing_id">
+            <option value="">— none —</option>
+            {% for l in listings %}
+            <option value="{{ l.id }}">{{ l.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Photographer
+          <select name="assigned_user_id">
+            <option value="">— unassigned —</option>
+            {% for u in operators %}
+            <option value="{{ u.id }}" {% if photographer_id == u.id %}selected{% endif %}>{{ u.name or u.email }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="btn btn-accent">Add to calendar</button>
+      </form>
+      {% endif %}
+
+      {% if busy %}
+      <section class="card compact">
+        <h2>Google busy blocks</h2>
+        <ul class="busy-list">
+          {% for b in busy[:12] %}
+          <li><span class="muted">{{ b.starts_at[:16] }}</span> {{ b.title }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+
+  <form id="reschedule-form" method="post" action="" class="hidden">
+    <input type="hidden" name="starts_at" id="reschedule-starts">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="hidden" name="date" value="{{ anchor.isoformat() }}">
+    <input type="hidden" name="photographer" value="{{ photographer_id or '' }}">
+  </form>
 </main>
 {% endblock %}

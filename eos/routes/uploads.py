@@ -32,9 +32,9 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
     if _free_gb() < config.MIN_FREE_GB:
         raise HTTPException(status_code=507, detail="low disk space — upload refused")
 
-    base = config.MEDIA_DIR / str(gallery_id)
+    from .. import media_paths
     for sub in ("original", "web", "thumb"):
-        (base / sub).mkdir(parents=True, exist_ok=True)
+        media_paths.gallery_subdir(gallery_id, sub)
 
     accepted, rejected = [], []
     for f in files:
@@ -44,7 +44,7 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
             rejected.append(name)
             continue
         stored = f"{uuid.uuid4().hex}{ext}"
-        dest = base / "original" / stored
+        dest = media_paths.gallery_subdir(gallery_id, "original") / stored
         size = 0
         with dest.open("wb") as out:
             while chunk := await f.read(1 << 20):

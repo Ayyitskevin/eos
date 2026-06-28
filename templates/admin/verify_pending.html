@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Verify email · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="center-card wide">
+  <p class="brand-mark">Eos</p>
+  <h1>Check your email</h1>
+  <p>We sent a verification link to activate your studio. Click the link in your inbox, then sign in here.</p>
+  {% if contact_email %}<p class="muted small">Sent to {{ contact_email }}</p>{% endif %}
+  <p><a href="/admin/login">Back to login</a></p>
+</main>
+{% endblock %}
