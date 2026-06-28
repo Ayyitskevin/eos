@@ -43,6 +43,7 @@ def update_profile(**fields) -> None:
         "delivery_upsell_title", "delivery_upsell_body", "delivery_upsell_link",
         "google_calendar_enabled", "google_calendar_id",
         "dropbox_enabled", "dropbox_watch_path", "dropbox_default_listing_id",
+        "drive_time_enabled", "drive_buffer_min",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []
@@ -55,7 +56,7 @@ def update_profile(**fields) -> None:
         elif k in (
             "booking_enabled", "pay_to_download", "watermark_until_paid",
             "auto_deliver_email", "auto_publish_site",
-            "google_calendar_enabled", "dropbox_enabled",
+            "google_calendar_enabled", "dropbox_enabled", "drive_time_enabled",
         ):
             params.append(1 if v else 0)
         else:

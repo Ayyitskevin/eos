@@ -7,7 +7,7 @@ from .. import commerce, config, security, scheduling, studio
 from ..render import templates
 
 router = APIRouter()
-INDEXABLE = {"/", "/book", "/signup"}
+INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo"}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -103,6 +103,56 @@ async def book_submit(
             status_code=e.status_code,
         )
 
+    if result["pay_slug"] and config.STRIPE_SECRET_KEY:
+        return RedirectResponse(f"/i/{result['pay_slug']}", status_code=303)
+    return RedirectResponse(f"/booking/{result['order_token']}", status_code=303)
+
+
+@router.get("/book/homeowner", response_class=HTMLResponse)
+async def book_homeowner_form(request: Request):
+    ctx = _book_context()
+    ctx["terms"] = commerce.BOOKING_TERMS.format(site_name=config.SITE_NAME)
+    return templates.TemplateResponse(request, "site/book_homeowner.html", ctx)
+
+
+@router.post("/book/homeowner")
+async def book_homeowner_submit(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    property_address: str = Form(...),
+    package_id: int = Form(...),
+    scheduled_at: str = Form(...),
+    signer_name: str = Form(...),
+    sqft: int = Form(0),
+    message: str = Form(""),
+):
+    ip = security.client_ip(request)
+    if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_BOOK):
+        raise HTTPException(status_code=429, detail="too many requests")
+    email = email.strip().lower()
+    if not _EMAIL.match(email):
+        return templates.TemplateResponse(
+            request, "site/book_homeowner.html",
+            _book_context(error="Invalid email."),
+            status_code=400,
+        )
+    security.inquiry_record(ip, security.INQUIRY_BUCKET_BOOK)
+    try:
+        result = commerce.create_booking(
+            name=name, email=email, phone=phone,
+            property_address=property_address, package_id=package_id,
+            scheduled_at=scheduled_at, sqft=sqft or None, message=message,
+            signer_name=signer_name, client_type="homeowner",
+        )
+    except HTTPException as e:
+        detail = e.detail if isinstance(e.detail, str) else "Booking failed."
+        return templates.TemplateResponse(
+            request, "site/book_homeowner.html",
+            _book_context(error=detail),
+            status_code=e.status_code,
+        )
     if result["pay_slug"] and config.STRIPE_SECRET_KEY:
         return RedirectResponse(f"/i/{result['pay_slug']}", status_code=303)
     return RedirectResponse(f"/booking/{result['order_token']}", status_code=303)

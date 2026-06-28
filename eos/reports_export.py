@@ -31,3 +31,31 @@ def agents_csv() -> str:
 
 def full_csv() -> str:
     return summary_csv() + "\n\n" + agents_csv()
+
+
+def quickbooks_csv() -> str:
+    """QuickBooks-friendly expense/sales export — invoices paid in last 90 days."""
+    from . import db
+    from .vocab import STUDIO_ID
+
+    rows = db.all_(
+        """SELECT i.paid_at, i.title, i.amount_cents, c.name AS client_name, l.title AS listing_title
+           FROM invoices i
+           LEFT JOIN clients c ON c.id=i.client_id
+           LEFT JOIN listings l ON l.id=i.listing_id
+           WHERE i.studio_id=? AND i.status='paid' AND i.paid_at >= datetime('now', '-90 days')
+           ORDER BY i.paid_at""",
+        (STUDIO_ID,),
+    )
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Date", "Name", "Memo", "Amount"])
+    for r in rows:
+        memo = f"{r['listing_title'] or ''} — {r['title']}".strip(" —")
+        w.writerow([
+            (r["paid_at"] or "")[:10],
+            r["client_name"] or "Client",
+            memo,
+            f"{(r['amount_cents'] or 0) / 100:.2f}",
+        ])
+    return buf.getvalue()

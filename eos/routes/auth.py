@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, security, tenant, users
+from .. import admin_oauth, config, db, security, tenant, users
 from ..render import templates
 
 log = logging.getLogger("eos.routes.auth")
@@ -15,7 +15,12 @@ async def login_form(request: Request):
     has_users = bool(db.one("SELECT 1 AS x FROM users WHERE active=1 LIMIT 1"))
     return templates.TemplateResponse(
         request, "admin/login.html",
-        {"error": None, "saas_mode": config.SAAS_MODE or has_users},
+        {
+            "error": None,
+            "saas_mode": config.SAAS_MODE or has_users,
+            "google_login": admin_oauth.is_configured(),
+            "google_login_url": admin_oauth.login_url(studio_id=tenant.get_studio_id()) if admin_oauth.is_configured() else None,
+        },
     )
 
 

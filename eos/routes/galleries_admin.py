@@ -56,6 +56,13 @@ async def build_exports(gallery_id: int):
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
+@router.post("/galleries/{gallery_id}/ai-cull")
+async def ai_cull(gallery_id: int):
+    galleries.get_gallery(gallery_id)
+    jobs.enqueue("ai_cull", {"gallery_id": gallery_id})
+    return RedirectResponse(f"/admin/galleries/{gallery_id}?ai_cull=1", status_code=303)
+
+
 @router.post("/galleries/{gallery_id}/settings")
 async def gallery_settings(
     gallery_id: int,

@@ -186,6 +186,22 @@ async def api_inbound_event(event_name: str, request: Request, _: str = Depends(
     raise HTTPException(status_code=404, detail="unknown inbound event")
 
 
+@router.post("/mls/export-ready")
+async def api_mls_export_ready(request: Request, _: str = Depends(_api_tenant)):
+    """MLS push webhook stub — logs payload for partner integration."""
+    import json
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    lid = payload.get("listing_id")
+    db.run(
+        "INSERT INTO mls_push_log (studio_id, listing_id, payload, status) VALUES (?,?,?,?)",
+        (str(STUDIO_ID), int(lid) if lid else None, json.dumps(payload), "received"),
+    )
+    return {"ok": True, "message": "MLS export logged — configure partner connector for auto-upload"}
+
+
 @router.get("/health")
 async def api_health():
     return {"ok": True}

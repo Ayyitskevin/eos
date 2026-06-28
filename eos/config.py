@@ -29,6 +29,8 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
+APP_VERSION = "1.5.0"
+
 HOST = os.environ.get("EOS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EOS_PORT", "8410"))
 BASE_URL = os.environ.get("EOS_BASE_URL", f"http://localhost:{PORT}")
@@ -76,6 +78,15 @@ INTEGRATION_TICK_SECONDS = int(os.environ.get("EOS_INTEGRATION_TICK_SECONDS", "1
 GOOGLE_CLIENT_ID = os.environ.get("EOS_GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("EOS_GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.environ.get("EOS_GOOGLE_REDIRECT_URI", "")
+GOOGLE_ADMIN_REDIRECT_URI = os.environ.get(
+    "EOS_GOOGLE_ADMIN_REDIRECT_URI",
+    f"http://localhost:{PORT}/oauth/google/admin/callback",
+)
+
+SENTRY_DSN = os.environ.get("EOS_SENTRY_DSN", "")
+SENTRY_ENVIRONMENT = os.environ.get("EOS_SENTRY_ENVIRONMENT", "production")
+PLATFORM_ADMIN_EMAILS = os.environ.get("EOS_PLATFORM_ADMIN_EMAILS", "")
+DEMO_ENABLED = _b("EOS_DEMO_ENABLED", "true")
 
 DROPBOX_APP_KEY = os.environ.get("EOS_DROPBOX_APP_KEY", "")
 DROPBOX_APP_SECRET = os.environ.get("EOS_DROPBOX_APP_SECRET", "")

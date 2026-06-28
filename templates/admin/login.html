@@ -13,5 +13,8 @@
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <button type="submit">Sign in</button>
   </form>
+  {% if google_login and google_login_url %}
+  <p style="margin-top:1rem"><a href="{{ google_login_url }}" class="btn secondary">Sign in with Google</a></p>
+  {% endif %}
 </main>
 {% endblock %}

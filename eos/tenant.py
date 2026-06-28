@@ -92,6 +92,14 @@ def studio_id_for_custom_domain(host: str | None) -> str | None:
 
 
 def resolve_tenant(request: Request) -> str:
+    from . import platform_admin
+    imp = platform_admin.impersonated_studio_id(request)
+    if imp:
+        return imp
+    if request.url.path.startswith("/demo"):
+        from . import config, demo_sandbox
+        if config.DEMO_ENABLED:
+            return demo_sandbox.DEMO_STUDIO_ID
     host = request.headers.get("host")
     custom = studio_id_for_custom_domain(host)
     if custom:
@@ -101,6 +109,10 @@ def resolve_tenant(request: Request) -> str:
         sid = studio_id_for_slug(sub)
         if sid:
             return sid
+    if host and host.split(":")[0].lower() == "demo" and not config.BASE_DOMAIN:
+        from . import demo_sandbox
+        if config.DEMO_ENABLED:
+            return demo_sandbox.DEMO_STUDIO_ID
     uid = security.current_user_id(request)
     if uid:
         row = db.one("SELECT studio_id FROM users WHERE id=? AND active=1", (uid,))

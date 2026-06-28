@@ -36,6 +36,8 @@ async def admin_media(gallery_id: int, variant: str, asset_id: int):
     )
     if not a:
         raise HTTPException(status_code=404)
+    if a["kind"] == "video" and variant != "original":
+        raise HTTPException(status_code=404)
     path = _asset_path(gallery_id, a, variant)
     if not path.is_file():
         raise HTTPException(status_code=404)
@@ -45,7 +47,7 @@ async def admin_media(gallery_id: int, variant: str, asset_id: int):
 
 @router.get("/media/{slug}/{variant}/{asset_id}")
 async def public_media(request: Request, slug: str, variant: str, asset_id: int):
-    if variant not in ("thumb", "web"):
+    if variant not in ("thumb", "web", "original"):
         raise HTTPException(status_code=404)
     g = get_gallery_by_slug(slug)
     if not g["published"]:
@@ -58,6 +60,14 @@ async def public_media(request: Request, slug: str, variant: str, asset_id: int)
     )
     if not a:
         raise HTTPException(status_code=404)
+    if a["kind"] == "video":
+        if variant != "original":
+            raise HTTPException(status_code=404)
+        path = _asset_path(g["id"], a, "original")
+        if not path.is_file():
+            raise HTTPException(status_code=404)
+        mt = mimetypes.guess_type(str(path))[0] or "video/mp4"
+        return FileResponse(path, media_type=mt, headers={"Cache-Control": "private, max-age=86400"})
     path = _asset_path(g["id"], a, variant)
     if not path.is_file():
         raise HTTPException(status_code=404)

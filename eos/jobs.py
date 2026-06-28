@@ -145,6 +145,27 @@ def _h_integration_sweep(p: dict) -> None:
     log.info("integration sweep: google=%d dropbox=%d queued", g, d)
 
 
+def _h_video_ready(p: dict) -> None:
+    asset = db.one("SELECT * FROM assets WHERE id=?", (p["asset_id"],))
+    if not asset:
+        return
+    db.run("UPDATE assets SET status='ready' WHERE id=?", (asset["id"],))
+
+
+def _h_ai_cull(p: dict) -> None:
+    """Stub AI cull — pick first photo per section as agent favorite."""
+    gid = p["gallery_id"]
+    sections = db.all_("SELECT id FROM sections WHERE gallery_id=? ORDER BY position", (gid,))
+    for sec in sections:
+        row = db.one(
+            """SELECT id FROM assets WHERE gallery_id=? AND section_id=? AND kind='photo'
+               ORDER BY position, id LIMIT 1""",
+            (gid, sec["id"]),
+        )
+        if row:
+            db.run("UPDATE assets SET agent_favorite=1 WHERE id=?", (row["id"],))
+
+
 def _h_dropbox_ingest(p: dict) -> None:
     from . import tenant
     from .integrations import dropbox
@@ -174,6 +195,8 @@ HANDLERS = {
     "dropbox_ingest": _h_dropbox_ingest,
     "dropbox_scan": _h_dropbox_scan,
     "integration_sweep": _h_integration_sweep,
+    "video_ready": _h_video_ready,
+    "ai_cull": _h_ai_cull,
 }
 
 

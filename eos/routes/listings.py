@@ -119,13 +119,15 @@ async def listing_update(
     access_notes: str = Form(""),
     notes: str = Form(""),
     assigned_user_id: str = Form(""),
+    photographer_pay_cents: str = Form(""),
 ):
     cid = int(client_id) if client_id.strip().isdigit() else None
     uid = int(assigned_user_id) if assigned_user_id.strip().isdigit() else None
+    pay = int(float(photographer_pay_cents) * 100) if photographer_pay_cents.strip() else None
     listings.update_listing(
         listing_id,
         title=title, status=status, client_id=cid, property_type=property_type,
-        assigned_user_id=uid,
+        assigned_user_id=uid, photographer_pay_cents=pay,
         address_line1=address_line1, address_line2=address_line2,
         city=city, state=state, zip=zip_code, mls_id=mls_id,
         beds=float(beds) if beds.strip() else None,

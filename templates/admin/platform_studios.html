@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Platform studios{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <h1>Platform studios</h1>
+  {% if impersonating %}
+  <p class="warn">Impersonating <strong>{{ impersonating }}</strong> (viewing as {{ current_studio }})</p>
+  <form method="post" action="/admin/platform/impersonate/clear"><button type="submit" class="btn secondary">Stop impersonating</button></form>
+  {% endif %}
+  <table class="data-table">
+    <thead><tr><th>Studio</th><th>Plan</th><th>Listings</th><th>Users</th><th></th></tr></thead>
+    <tbody>
+    {% for s in studios %}
+    <tr>
+      <td><strong>{{ s.name }}</strong><br><span class="muted">{{ s.slug or s.id }}{% if s.is_demo %} · demo{% endif %}</span></td>
+      <td>{{ s.plan_tier }} / {{ s.billing_status }}</td>
+      <td>{{ s.n_listings }}</td>
+      <td>{{ s.n_users }}</td>
+      <td>
+        {% if s.id != current_studio or impersonating %}
+        <form method="post" action="/admin/platform/impersonate"><input type="hidden" name="studio_id" value="{{ s.id }}"><button type="submit" class="btn small">View as</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</main>
+{% endblock %}

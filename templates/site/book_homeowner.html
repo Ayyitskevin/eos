@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Book for your home · {{ site_name }}{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Book photography for your home</h1>
+  <p class="muted">Selling FSBO or getting ready to list? Book directly — we'll coordinate access and deliver MLS-ready photos.</p>
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if not slots %}<p class="muted">Online scheduling is temporarily unavailable — contact us directly.</p>{% endif %}
+
+  <form method="post" action="/book/homeowner" class="form-grid card">
+    <h2>Package</h2>
+    {% for p in packages %}
+    <label class="radio-card">
+      <input type="radio" name="package_id" value="{{ p.id }}" required {% if loop.first %}checked{% endif %}>
+      <span><strong>{{ p.name }}</strong> — ${{ "%.0f"|format(p.price_cents / 100) }}
+        <br><span class="muted">{{ p.description }}</span>
+      </span>
+    </label>
+    {% endfor %}
+
+    <h2>Your home</h2>
+    <label>Your name <input name="name" required></label>
+    <label>Email <input name="email" type="email" required></label>
+    <label>Phone <input name="phone" type="tel" required></label>
+    <label>Property address <input name="property_address" required placeholder="1420 Maple Dr, Austin TX"></label>
+    <label>Square feet <input name="sqft" type="number" min="0"></label>
+    <label>Access notes <textarea name="message" rows="3" placeholder="Lockbox, pets, best time to arrive…"></textarea></label>
+
+    <h2>Schedule</h2>
+    {% if slots %}
+    <label>Time slot
+      <select name="scheduled_at" required>
+        {% for s in slots %}<option value="{{ s.value }}">{{ s.label }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>Signature (type your name) <input name="signer_name" required></label>
+    <p class="muted small">{{ terms }}</p>
+    <button type="submit" class="btn" {% if not slots %}disabled{% endif %}>Request booking</button>
+  </form>
+</main>
+{% endblock %}

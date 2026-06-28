@@ -4,7 +4,7 @@ import datetime as dt
 
 from fastapi import HTTPException
 
-from . import config, db, security
+from . import config, db, security, studio
 from .vocab import (
     DEFAULT_LISTING_TASKS,
     DEFAULT_SHOT_LIST,
@@ -118,6 +118,12 @@ def create_listing(
             )
     usage.bump("listings_created")
     db.audit("admin", "listing.create", f"id={lid} title={title.strip()}")
+    try:
+        from . import drive_time
+        if studio.get_profile()["drive_time_enabled"]:
+            drive_time.geocode_listing(lid)
+    except Exception:
+        pass
     return lid
 
 
@@ -127,7 +133,7 @@ def update_listing(listing_id: int, **fields) -> None:
         "client_id", "title", "status", "property_type",
         "address_line1", "address_line2", "city", "state", "zip", "mls_id",
         "beds", "baths", "sqft", "shoot_date", "due_at", "access_notes", "notes",
-        "assigned_user_id", "revision_round", "revision_notes",
+        "assigned_user_id", "revision_round", "revision_notes", "photographer_pay_cents",
     }
     parts = ["updated_at=datetime('now')"]
     params: list = []

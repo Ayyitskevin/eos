@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from .. import config, db, galleries, jobs, security
-from ..imaging import PHOTO_EXTS
+from ..imaging import PHOTO_EXTS, VIDEO_EXTS
 
 log = logging.getLogger("eos.routes.uploads")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -40,7 +40,8 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
     for f in files:
         name = _SAFE_NAME.sub("_", Path(f.filename or "upload").name)
         ext = Path(name).suffix.lower()
-        if ext not in PHOTO_EXTS:
+        is_video = ext in VIDEO_EXTS
+        if ext not in PHOTO_EXTS and not is_video:
             rejected.append(name)
             continue
         stored = f"{uuid.uuid4().hex}{ext}"
@@ -50,12 +51,13 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
             while chunk := await f.read(1 << 20):
                 out.write(chunk)
                 size += len(chunk)
+        kind = "video" if is_video else "photo"
         asset_id = db.run(
-            """INSERT INTO assets (gallery_id, section_id, kind, filename, stored, bytes)
-               VALUES (?,?,?,?,?,?)""",
-            (gallery_id, section_id, "photo", name, stored, size),
+            """INSERT INTO assets (gallery_id, section_id, kind, filename, stored, bytes, status)
+               VALUES (?,?,?,?,?,?,?)""",
+            (gallery_id, section_id, kind, name, stored, size, "pending"),
         )
-        jobs.enqueue("image_derivatives", {"asset_id": asset_id})
+        jobs.enqueue("video_ready" if is_video else "image_derivatives", {"asset_id": asset_id})
         accepted.append(asset_id)
 
     if accepted:

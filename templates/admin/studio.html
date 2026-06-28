@@ -20,6 +20,8 @@
     <label class="checkbox"><input type="checkbox" name="booking_enabled" value="true" {% if profile.booking_enabled %}checked{% endif %}> Enable self-serve booking at /book</label>
     <label>Min notice (hours) <input name="min_notice_hours" type="number" value="{{ profile.min_notice_hours or 24 }}"></label>
     <label>Buffer between shoots (min) <input name="buffer_minutes" type="number" value="{{ profile.buffer_minutes or 30 }}"></label>
+    <label class="checkbox"><input type="checkbox" name="drive_time_enabled" value="true" {% if profile.drive_time_enabled %}checked{% endif %}> Drive-time aware scheduling (geocode listings, block travel gaps)</label>
+    <label>Drive buffer (min) <input name="drive_buffer_min" type="number" value="{{ profile.drive_buffer_min or 30 }}"></label>
     <label>Slot length (min) <input name="slot_minutes" type="number" value="{{ profile.slot_minutes or 90 }}"></label>
     <label>Day starts (min from midnight) <input name="day_start_min" type="number" value="{{ profile.day_start_min or 480 }}"></label>
     <label>Day ends (min from midnight) <input name="day_end_min" type="number" value="{{ profile.day_end_min or 1080 }}"></label>

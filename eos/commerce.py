@@ -17,7 +17,7 @@ MLS/marketing usage rights apply as described in the photography services agreem
 """
 
 
-def _find_or_create_client(name: str, email: str, phone: str) -> int:
+def _find_or_create_client(name: str, email: str, phone: str, *, client_type: str = "agent") -> int:
     from . import portal
     email = email.strip().lower()
     row = db.one(
@@ -27,7 +27,7 @@ def _find_or_create_client(name: str, email: str, phone: str) -> int:
     if row:
         portal.ensure_token(row["id"])
         return row["id"]
-    return clients.create_client(name, email=email, phone=phone, client_type="agent")
+    return clients.create_client(name, email=email, phone=phone, client_type=client_type)
 
 
 def _parse_address(raw: str) -> tuple[str, str]:
@@ -90,6 +90,7 @@ def create_booking(
     message: str = "",
     signer_name: str = "",
     promo_code: str = "",
+    client_type: str = "agent",
 ) -> dict:
     addon_ids = addon_ids or []
     twilight = False
@@ -107,7 +108,7 @@ def create_booking(
         raise HTTPException(status_code=400, detail="signature required")
     pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
 
-    client_id = _find_or_create_client(name, email, phone)
+    client_id = _find_or_create_client(name, email, phone, client_type=client_type)
     total_cents, deposit_cents, line_items, referral_id = calc_total(package_id, addon_ids, promo_code)
     from . import credits
     total_cents, credit_applied = credits.apply_at_checkout(client_id, total_cents)

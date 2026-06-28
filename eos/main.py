@@ -12,7 +12,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import billing_gate, bootstrap, config, db, jobs, scheduler, security, tenant
+from . import billing_gate, bootstrap, config, db, demo_sandbox, jobs, monitoring, scheduler, security, tenant
 from .render import ROOT, templates
 from .routes import (
     activity, appointments, auth, booking, brand_kits, clients, contracts_admin, dashboard,
@@ -21,6 +21,8 @@ from .routes import (
     reports as reports_routes, kanban as kanban_routes,
     signup as signup_routes, api_v1, integrations, platform_billing as platform_billing_routes,
     upsell_routes, onboarding_routes as onboarding_routes,
+    platform_admin as platform_admin_routes, demo as demo_routes,
+    oauth_admin as oauth_admin_routes,
     delivery, docs, downloads, emails, galleries_admin, invoices_admin, listings,
     media, pay, proposals_admin, questionnaires, sequences_admin, site, studio_admin,
     today, uploads,
@@ -36,7 +38,10 @@ log = logging.getLogger("eos.app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.migrate()
+    monitoring.init()
     bootstrap.maybe_bootstrap()
+    if config.DEMO_ENABLED:
+        demo_sandbox.ensure_demo()
     jobs.start()
     scheduler.start()
     log.info("Eos up on :%s · data=%s · saas=%s", config.PORT, config.DATA_DIR, config.SAAS_MODE)
@@ -46,7 +51,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Eos", version="1.4.0", lifespan=lifespan,
+    title="Eos", version=config.APP_VERSION, lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -77,6 +82,9 @@ async def tenant_context(request: Request, call_next):
     if request.url.path.startswith("/admin"):
         from . import rbac
         rbac.check_route(request)
+        if request.method == "POST" and demo_sandbox.is_read_only():
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Demo studio is read-only"}, status_code=403)
     security.validate_csrf(request)
     return await call_next(request)
 
@@ -108,12 +116,8 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
 
 @app.get("/healthz")
 async def healthz():
-    return {
-        "ok": True,
-        "service": "eos",
-        "version": "1.4.0",
-        "jobs_pending": jobs.pending_count(),
-    }
+    details = monitoring.health_details()
+    return {"service": "eos", **details}
 
 
 for r in (
@@ -127,6 +131,7 @@ for r in (
     microsite_routes.router, reports_routes.router, kanban_routes.router,
     signup_routes.router, api_v1.router, integrations.router,
     platform_billing_routes.router, upsell_routes.router,
-    onboarding_routes.router, site.router,
+    onboarding_routes.router, platform_admin_routes.router, demo_routes.router,
+    oauth_admin_routes.router, site.router,
 ):
     app.include_router(r)

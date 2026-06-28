@@ -40,6 +40,9 @@
         <button type="submit" class="btn btn-accent">Upload</button>
       </form>
       {% if n_pending %}<p class="warn">{{ n_pending }} processing…</p>{% endif %}
+      <form method="post" action="/admin/galleries/{{ g.id }}/ai-cull" class="inline-form" style="margin-top:1rem">
+        <button type="submit" class="btn secondary">AI cull (pick favorites)</button>
+      </form>
       <form method="post" action="/admin/galleries/{{ g.id }}/exports" style="margin-top:1rem">
         <button type="submit">Build MLS / Zillow exports</button>
       </form>

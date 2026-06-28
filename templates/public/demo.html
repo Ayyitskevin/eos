@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Try Eos Demo{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <h1>Eos demo studio</h1>
+  <p class="muted">Explore a fully seeded listing pipeline — calendar, gallery, agent portal, and property site. Read-only; no changes persist in production mode.</p>
+  <p><a class="btn" href="{{ demo_url }}/admin/login">Open demo admin</a></p>
+  <p class="muted small">Login: <code>demo@eos.app</code> / <code>demo-view-only</code></p>
+  <p><a href="{{ demo_url }}/l/1420-maple-dr">Property site</a> · <a href="{{ demo_url }}/portal/df-agent-sarah">Agent portal</a></p>
+</main>
+{% endblock %}

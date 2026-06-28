@@ -16,6 +16,8 @@ def _parse_weekdays(raw: str) -> set[int]:
 
 
 def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
+    profile = studio.get_profile()
+    drive_buf = int(profile["drive_buffer_min"] or 30) if profile["drive_time_enabled"] else 0
     rows = db.all_(
         """SELECT starts_at, ends_at FROM appointments
            WHERE studio_id=? AND status IN ('proposed','confirmed')
@@ -37,6 +39,12 @@ def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
         ranges.extend(google_calendar.busy_ranges())
     except Exception:
         pass
+    if drive_buf:
+        from . import drive_time
+        today = dt.date.today()
+        for offset in range(14):
+            day = today + dt.timedelta(days=offset)
+            ranges.extend(drive_time.travel_ranges_for_day(day, drive_buf))
     return ranges
 
 

@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover
 log = logging.getLogger("eos.imaging")
 
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".tif", ".tiff"}
+VIDEO_EXTS = {".mp4", ".mov", ".webm", ".m4v"}
 
 _SRGB = ImageCms.createProfile("sRGB")
 

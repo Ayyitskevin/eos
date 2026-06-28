@@ -82,6 +82,8 @@ async def studio_update(
     delivery_upsell_title: str = Form(""),
     delivery_upsell_body: str = Form(""),
     delivery_upsell_link: str = Form("/book"),
+    drive_time_enabled: bool = Form(False),
+    drive_buffer_min: int = Form(30),
 ):
     studio.update_studio(name=name, contact_email=contact_email)
     studio.update_profile(
@@ -96,6 +98,7 @@ async def studio_update(
         delivery_upsell_title=delivery_upsell_title.strip(),
         delivery_upsell_body=delivery_upsell_body.strip(),
         delivery_upsell_link=delivery_upsell_link.strip() or "/book",
+        drive_time_enabled=drive_time_enabled, drive_buffer_min=drive_buffer_min,
     )
     return RedirectResponse("/admin/studio", status_code=303)
 
