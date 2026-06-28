@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Activity · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Activity log</h1>
+    <nav><a href="/admin/sent">Sent emails</a> · <a href="/admin">Pipeline</a></nav>
+  </header>
+  <table class="list">
+    <tr><th>When</th><th>Actor</th><th>Action</th><th>Detail</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td class="muted">{{ r.created_at[:19] }}</td>
+      <td>{{ r.actor }}</td>
+      <td>{{ r.action }}</td>
+      <td>{{ r.detail or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not rows %}<p class="muted">No activity yet.</p>{% endif %}
+</main>
+{% endblock %}

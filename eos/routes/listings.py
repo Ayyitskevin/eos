@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import clients, contracts, galleries, invoices, listings, proposals, security
+from .. import clients, config, contracts, galleries, invoices, listings, proposals, questionnaires, security
 from ..render import templates
 from ..vocab import LISTING_STATUSES, PROPERTY_TYPES
 
@@ -82,6 +82,8 @@ async def listing_detail(request: Request, listing_id: int):
             "proposals": proposals.list_for_listing(listing_id),
             "contracts": contracts.list_for_listing(listing_id),
             "proposal_presets": proposals.package_presets(),
+            "questionnaires": questionnaires.list_for_listing(listing_id),
+            "base_url": config.BASE_URL,
         },
     )
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, galleries, jobs, listings, security, studio
+from .. import automations, config, db, galleries, jobs, listings, security, studio
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -67,6 +67,7 @@ async def gallery_settings(
     listing_id: str = Form(""),
 ):
     lid = int(listing_id) if listing_id.strip().isdigit() else None
+    old = galleries.get_gallery(gallery_id)
     galleries.update_gallery_settings(
         gallery_id,
         title=title,
@@ -76,6 +77,21 @@ async def gallery_settings(
         published=published,
         listing_id=lid,
     )
+    if published and not old["published"]:
+        n = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,))
+        automations.on_gallery_published(lid or old["listing_id"], n["n"] if n else 0)
+    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+
+
+@router.post("/galleries/{gallery_id}/assets/{asset_id}/cover")
+async def set_cover(gallery_id: int, asset_id: int):
+    g = galleries.get_gallery(gallery_id)
+    a = db.one("SELECT id FROM assets WHERE id=? AND gallery_id=? AND kind='photo'", (asset_id, gallery_id))
+    if not a:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
+    new = None if g["cover_asset_id"] == asset_id else asset_id
+    db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

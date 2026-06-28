@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sent emails · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Sent emails</h1>
+    <nav><a href="/admin/activity">Activity</a> · <a href="/admin">Pipeline</a></nav>
+  </header>
+  <table class="list">
+    <tr><th>When</th><th>To</th><th>Kind</th><th>Subject</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td class="muted">{{ r.sent_at[:19] }}</td>
+      <td>{{ r.to_email }}</td>
+      <td>{{ r.doc_kind }}</td>
+      <td>{{ r.subject }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not rows %}<p class="muted">No emails sent yet.</p>{% endif %}
+</main>
+{% endblock %}

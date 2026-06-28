@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, invoices, listings, security
+from .. import automations, config, invoices, listings, security
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -44,5 +44,7 @@ async def send_invoice(invoice_id: int):
 
 @router.post("/invoices/{invoice_id}/paid")
 async def mark_paid(invoice_id: int):
+    inv = invoices.get_invoice(invoice_id)
     invoices.mark_paid(invoice_id)
+    automations.on_invoice_paid(inv["listing_id"])
     return RedirectResponse(f"/admin/invoices/{invoice_id}", status_code=303)

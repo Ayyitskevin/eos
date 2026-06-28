@@ -104,6 +104,11 @@ Thank you!
         <span class="asset-pending">{{ a.status }}</span>
         {% endif %}
         <figcaption>
+          {% if a.status == 'ready' %}
+          <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/cover" class="inline-form">
+            <button type="submit" class="link">{% if g.cover_asset_id == a.id %}★ cover{% else %}Set cover{% endif %}</button>
+          </form>
+          {% endif %}
           <form method="post" action="/admin/galleries/{{ g.id }}/assets/{{ a.id }}/section" class="inline-form">
             <select name="section_id" onchange="this.form.submit()">
               {% for sec in sections %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Today · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Today — {{ today }}</h1>
+    <nav><a href="/admin">Pipeline</a> · <a href="/admin/calendar">Calendar</a></nav>
+  </header>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Shoots today</h2>
+      {% if shoots %}
+      <ul class="pkg-list">
+        {% for s in shoots %}
+        <li><strong>{{ s.starts_at[11:16] if s.starts_at else "—" }}</strong> {{ s.title }}
+          {% if s.listing_title %}<span class="muted">· {{ s.listing_title }}</span>{% endif %}
+          {% if s.client_name %}<span class="muted">· {{ s.client_name }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">No shoots scheduled today.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Due for delivery today</h2>
+      {% if due_today %}
+      <ul class="pkg-list">
+        {% for l in due_today %}
+        <li><a href="/admin/listings/{{ l.id }}">{{ l.title }}</a>
+          <span class="muted">{{ l.client_name or "" }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">Nothing due today.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Pending pre-shoot intake</h2>
+      {% if pending_intake %}
+      <ul class="pkg-list">
+        {% for q in pending_intake %}
+        <li><a href="/q/{{ q.token }}" target="_blank">{{ q.listing_title }}</a>
+          <span class="muted">sent {{ q.sent_at[:10] if q.sent_at else "" }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">All intake forms completed.</p>{% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

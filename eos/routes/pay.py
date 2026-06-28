@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, invoices, security
+from .. import automations, config, db, invoices, security
 from ..render import templates
 
 log = logging.getLogger("eos.routes.pay")
@@ -80,6 +80,9 @@ async def stripe_webhook(request: Request):
         sess = event["data"]["object"]
         iid = sess.get("metadata", {}).get("invoice_id")
         if iid:
+            inv = db.one("SELECT listing_id FROM invoices WHERE id=?", (int(iid),))
             invoices.mark_paid(int(iid))
+            if inv:
+                automations.on_invoice_paid(inv["listing_id"])
             log.info("invoice %s paid via stripe", iid)
     return {"ok": True}

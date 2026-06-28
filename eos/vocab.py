@@ -89,3 +89,16 @@ DEFAULT_LISTING_TASKS = [
 ]
 
 EXPORT_CHANNELS = ("mls", "zillow", "realtor", "instagram", "print")
+
+# Pre-shoot questionnaire fields (RE intake — not Hestia wedding forms).
+QUESTIONNAIRE_FIELDS = {
+    "lockbox_code": {"label": "Lockbox / access code", "type": "text"},
+    "gate_code": {"label": "Gate / alarm code", "type": "text"},
+    "agent_on_site": {"label": "Agent on-site?", "type": "select", "options": ("Yes", "No", "Remote only")},
+    "staging_ready": {"label": "Staging / cleanliness ready?", "type": "select", "options": ("Yes", "Mostly", "Needs work")},
+    "pets": {"label": "Pets on property", "type": "text"},
+    "lights_on": {"label": "All lights on + blinds open?", "type": "select", "options": ("Yes", "Please handle on arrival", "N/A")},
+    "preferred_time": {"label": "Preferred shoot window", "type": "text"},
+    "mls_go_live": {"label": "MLS go-live date", "type": "date"},
+    "special_requests": {"label": "Must-have shots or notes", "type": "textarea"},
+}

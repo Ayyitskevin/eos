@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Studio · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main narrow">
+  <header class="admin-bar">
+    <h1>Studio settings</h1>
+    <nav><a href="/admin">Pipeline</a></nav>
+  </header>
+
+  <form method="post" action="/admin/studio" class="form-grid card">
+    <h2>Business</h2>
+    <label>Studio name <input name="name" value="{{ studio.name }}" required></label>
+    <label>Contact email <input name="contact_email" type="email" value="{{ studio.contact_email }}"></label>
+    <h2>Public site</h2>
+    <label>Headline <input name="headline" value="{{ profile.headline }}"></label>
+    <label>About <textarea name="about" rows="4">{{ profile.about }}</textarea></label>
+    <label>Service area <input name="service_area" value="{{ profile.service_area }}" placeholder="Austin metro"></label>
+    <label class="checkbox"><input type="checkbox" name="published" value="true" {% if profile.published %}checked{% endif %}> Publish marketing site</label>
+    <button type="submit">Save</button>
+  </form>
+
+  <section class="card">
+    <h2>Recent booking inquiries</h2>
+    {% if inquiries %}
+    <table class="list compact">
+      <tr><th>When</th><th>Name</th><th>Address</th><th>Email</th></tr>
+      {% for i in inquiries %}
+      <tr>
+        <td>{{ i.created_at[:16] }}</td>
+        <td>{{ i.name }}</td>
+        <td>{{ i.property_address or "—" }}</td>
+        <td>{{ i.email }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No inquiries yet — share /book on your site.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

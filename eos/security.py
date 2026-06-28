@@ -107,3 +107,25 @@ def check_admin_password(password: str) -> bool:
     if not config.ADMIN_PASSWORD:
         return False
     return secrets.compare_digest(password, config.ADMIN_PASSWORD)
+
+
+INQUIRY_BUCKET_BOOK = -3
+INQUIRY_WINDOW_SEC = 3600
+INQUIRY_MAX_PER_WINDOW = 3
+
+
+def inquiry_throttled(ip: str, bucket: int) -> bool:
+    cutoff = time.time() - INQUIRY_WINDOW_SEC
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, bucket, cutoff),
+    )
+    return row["n"] >= INQUIRY_MAX_PER_WINDOW
+
+
+def inquiry_record(ip: str, bucket: int) -> None:
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+        (ip, bucket, time.time()),
+    )
+    db.run("DELETE FROM pin_attempts WHERE ts < ?", (time.time() - max(86400, INQUIRY_WINDOW_SEC),))

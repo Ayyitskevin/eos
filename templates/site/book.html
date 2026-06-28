@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Book a shoot · {{ site_name }}{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Book a listing shoot</h1>
+  {% if profile.service_area %}<p class="muted">Serving {{ profile.service_area }}</p>{% endif %}
+
+  {% if thanks %}
+  <p class="ok">Thanks — we'll be in touch shortly.</p>
+  {% else %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/book" class="form-grid card">
+    <label>Name <input name="name" required></label>
+    <label>Email <input name="email" type="email" required></label>
+    <label>Phone <input name="phone" type="tel"></label>
+    <label>Property address <input name="property_address" placeholder="123 Oak St, Austin TX"></label>
+    <label>Notes <textarea name="message" rows="4" placeholder="MLS deadline, package preference, twilight interest…"></textarea></label>
+    <button type="submit" class="btn btn-accent">Request booking</button>
+  </form>
+  {% endif %}
+  <p><a href="/">← Back</a></p>
+</main>
+{% endblock %}

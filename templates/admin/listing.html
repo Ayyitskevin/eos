@@ -81,6 +81,22 @@
       </ul>
     </section>
 
+    <section class="card" id="questionnaire">
+      <h2>Pre-shoot intake</h2>
+      {% if questionnaires %}
+      <ul class="pkg-list">
+        {% for q in questionnaires %}
+        <li><a href="/q/{{ q.token }}" target="_blank">Intake link</a>
+          · {{ q.status }}{% if q.completed_at %} ({{ q.completed_at[:10] }}){% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form method="post" action="/admin/listings/{{ l.id }}/questionnaire">
+        <button type="submit">Generate intake link</button>
+      </form>
+      <p class="muted">Send to agent/homeowner before the shoot — answers merge into access notes.</p>
+    </section>
+
     <section class="card">
       <h2>Proposals</h2>
       {% if proposals %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Pre-shoot intake · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="doc-page">
+  <header class="doc-head">
+    <p class="brand-mark">Eos</p>
+    <h1>Pre-shoot intake</h1>
+    <p class="muted">{{ listing.title }}{% if address %} · {{ address }}{% endif %}</p>
+  </header>
+
+  {% if q.status == 'completed' %}
+  <p class="ok">Thank you — your answers are saved. We'll see you at the property!</p>
+  {% else %}
+  <form method="post" action="/q/{{ q.token }}" class="form-grid card">
+    {% for key, field in fields.items() %}
+    <label>{{ field.label }}
+      {% if field.type == 'textarea' %}
+      <textarea name="{{ key }}" rows="3">{{ answers.get(key, '') }}</textarea>
+      {% elif field.type == 'select' %}
+      <select name="{{ key }}">
+        <option value="">— select —</option>
+        {% for opt in field.options %}
+        <option value="{{ opt }}" {% if answers.get(key) == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input name="{{ key }}" type="{{ field.type }}" value="{{ answers.get(key, '') }}">
+      {% endif %}
+    </label>
+    {% endfor %}
+    <button type="submit" class="btn btn-accent">Submit intake form</button>
+  </form>
+  {% endif %}
+</main>
+{% endblock %}

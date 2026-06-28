@@ -15,9 +15,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import config, db, jobs
 from .render import ROOT, templates
 from .routes import (
-    appointments, auth, brand_kits, clients, contracts_admin, dashboard, delivery,
-    docs, downloads, emails, galleries_admin, invoices_admin, listings, media, pay,
-    proposals_admin, site, uploads,
+    activity, appointments, auth, brand_kits, clients, contracts_admin, dashboard,
+    delivery, docs, downloads, emails, galleries_admin, invoices_admin, listings,
+    media, pay, proposals_admin, questionnaires, site, studio_admin, today, uploads,
 )
 
 logging.basicConfig(
@@ -53,7 +53,7 @@ _ERROR_MESSAGES = {
 async def common_headers(request: Request, call_next):
     resp = await call_next(request)
     p = request.url.path
-    if not (p in site.INDEXABLE or p.startswith("/static/")):
+    if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/"))):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -77,7 +77,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "jobs_pending": jobs.pending_count(),
     }
 
@@ -88,6 +88,7 @@ for r in (
     delivery.router, downloads.router, brand_kits.router,
     invoices_admin.router, pay.router, appointments.router,
     proposals_admin.router, contracts_admin.router, docs.router, emails.router,
-    site.router,
+    questionnaires.admin, questionnaires.router, studio_admin.router, today.router,
+    activity.router, site.router,
 ):
     app.include_router(r)

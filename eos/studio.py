@@ -19,6 +19,20 @@ def get_profile():
     return row
 
 
+def update_studio(**fields) -> None:
+    allowed = {"name", "contact_email", "timezone"}
+    parts = []
+    params: list = []
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        parts.append(f"{k}=?")
+        params.append(v.strip() if isinstance(v, str) else v)
+    if parts:
+        params.append(STUDIO_ID)
+        db.run(f"UPDATE studio SET {', '.join(parts)} WHERE id=?", tuple(params))
+
+
 def update_profile(**fields) -> None:
     allowed = {"headline", "about", "service_area", "published"}
     parts = ["updated_at=datetime('now')"]
@@ -44,4 +58,25 @@ def list_crop_presets():
     return db.all_(
         "SELECT * FROM crop_presets WHERE studio_id=? AND active=1 ORDER BY sort",
         (STUDIO_ID,),
+    )
+
+
+def list_inquiries(limit: int = 50):
+    return db.all_(
+        "SELECT * FROM inquiries WHERE studio_id=? ORDER BY created_at DESC LIMIT ?",
+        (STUDIO_ID, limit),
+    )
+
+
+def list_emails(limit: int = 50):
+    return db.all_(
+        "SELECT * FROM emails_log WHERE studio_id=? ORDER BY sent_at DESC LIMIT ?",
+        (STUDIO_ID, limit),
+    )
+
+
+def list_activity(limit: int = 100):
+    return db.all_(
+        "SELECT * FROM audit_log WHERE studio_id=? OR studio_id IS NULL ORDER BY created_at DESC LIMIT ?",
+        (STUDIO_ID, limit),
     )

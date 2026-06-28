@@ -38,6 +38,6 @@ Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
 ## Phase boundaries
 
-**Shipped:** phase 2 + proposals, contracts/e-sign, manual email delivery, gallery section management.
+**Shipped:** through phase 4 — questionnaires, booking, today view, studio settings, activity/sent logs, automations, cover image.
 
-**Out of scope:** questionnaires, multi-tenant auth, automated drip campaigns.
+**Out of scope:** multi-tenant auth, automated drip campaigns.

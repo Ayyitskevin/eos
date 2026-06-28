@@ -37,9 +37,19 @@ Eos inherits the best patterns from two sibling projects:
 - Manual email delivery (Gmail SMTP) for galleries, proposals, contracts, invoices
 - Gallery section reorder, rename, asset move/reorder within sections
 
+### Phase 4 (shipped)
+
+- RE pre-shoot questionnaire at `/q/{token}` — merges into listing access notes
+- Public booking form at `/book` with inquiry inbox in Studio settings
+- Today view — shoots, deliveries due, pending intake
+- Studio settings — publish marketing site, headline, service area
+- Activity log + sent emails history
+- Listing automations (questionnaire → shooting, publish gallery → delivered)
+- Gallery cover image for client delivery header
+
 ### Still deferred
 
-Questionnaires, multi-tenant auth, automated email sequences.
+Multi-tenant auth, automated drip email sequences.
 
 ## Quick start
 
