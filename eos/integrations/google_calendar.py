@@ -9,7 +9,7 @@ import urllib.parse
 import httpx
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from .. import config, db, jobs, oauth_store, security, studio
+from .. import config, db, integration_events, jobs, oauth_store, security, studio
 from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.integrations.google")
@@ -164,8 +164,9 @@ def push_appointment(appt_id: int) -> None:
             "UPDATE appointments SET google_event_id=?, google_synced_at=datetime('now') WHERE id=?",
             (event_id, appt_id),
         )
-    except Exception:
+    except Exception as e:
         log.exception("google push failed appt=%s studio=%s", appt_id, STUDIO_ID)
+        integration_events.log_event("google", "push.failed", detail=str(e), ok=False)
 
 
 def pull_changes() -> int:
@@ -233,8 +234,9 @@ def pull_changes() -> int:
             else:
                 db.run(
                     """INSERT INTO appointments
-                       (studio_id, title, kind, status, starts_at, ends_at, location, token, google_event_id, google_synced_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))""",
+                       (studio_id, title, kind, status, starts_at, ends_at, location, token,
+                        google_event_id, google_synced_at, external_source)
+                       VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),'google')""",
                     (
                         STUDIO_ID, title, "other", "confirmed", starts_at, ends_at,
                         ev.get("location") or "", security.new_token(), eid,
@@ -243,8 +245,13 @@ def pull_changes() -> int:
                 imported += 1
         if data.get("nextSyncToken"):
             oauth_store.set_sync_token(PROVIDER, data["nextSyncToken"])
-    except Exception:
+        integration_events.set_sync_status("google", ok=True)
+        if imported:
+            integration_events.log_event("google", "pull.imported", detail=f"{imported} events")
+    except Exception as e:
         log.exception("google pull failed studio=%s", STUDIO_ID)
+        integration_events.set_sync_status("google", ok=False, error=str(e))
+        integration_events.log_event("google", "pull.failed", detail=str(e), ok=False)
     return imported
 
 

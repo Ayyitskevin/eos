@@ -25,6 +25,7 @@ def list_upcoming(*, days: int = 14):
            LEFT JOIN clients c ON c.id=a.client_id
            LEFT JOIN users u ON u.id=a.assigned_user_id
            WHERE a.studio_id=? AND a.status NOT IN ('canceled','completed')
+             AND (a.external_source IS NULL OR a.external_source != 'google')
              AND (a.starts_at IS NULL OR a.starts_at >= datetime('now', ?))
            ORDER BY COALESCE(a.starts_at, '9999')""",
         (STUDIO_ID, f"-{days} days"),
@@ -67,8 +68,8 @@ def update_appointment(appt_id: int, **fields) -> None:
         params.append(v.strip() if isinstance(v, str) else v)
     if not parts:
         return
-    params.append(appt_id)
-    db.run(f"UPDATE appointments SET {', '.join(parts)} WHERE id=?", tuple(params))
+    params.extend([appt_id, STUDIO_ID])
+    db.run(f"UPDATE appointments SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "appointment.update", f"id={appt_id}")
     from .integrations import google_calendar
     google_calendar.enqueue_push(appt_id)

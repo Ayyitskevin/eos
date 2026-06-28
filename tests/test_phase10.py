@@ -97,7 +97,8 @@ async def test_api_token_lists_tenant_listings(app_env):
         r = await client.get("/api/v1/listings", headers={"authorization": f"Bearer {raw}"})
         assert r.status_code == 200
         data = r.json()
-        assert any(row["title"] == "API Listing" for row in data)
+        items = data["items"] if isinstance(data, dict) else data
+        assert any(row["title"] == "API Listing" for row in items)
 
 
 def test_sequence_update(app_env):

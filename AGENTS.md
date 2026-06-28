@@ -2,7 +2,7 @@
 
 ## What this is
 
-Eos is a **real estate photography** studio OS: listing pipeline, RE shot lists, room-section galleries, MLS export presets. Solo-operator today; `studio_id` on every table for future SaaS.
+Eos is a **real estate photography** studio OS: listing pipeline, RE shot lists, room-section galleries, MLS export presets, multi-tenant SaaS (v1.2).
 
 Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL, port **8410**.
 
@@ -10,34 +10,29 @@ Stack: **FastAPI + Jinja2 + HTMX**, SQLite WAL, port **8410**.
 
 | Path | Purpose |
 |------|---------|
-| `eos/main.py` | App entry, middleware, router mount |
-| `eos/vocab.py` | RE vocabulary — rooms, statuses, default shot list |
-| `eos/listings.py` | Listing spine — create, shot list, tasks |
-| `eos/galleries.py` | Delivery galleries — room sections, PIN |
-| `eos/clients.py` | Agent/broker hierarchy |
-| `eos/migrations/` | Numbered SQL migrations (Hestia pattern) |
-| `templates/admin/` | Pipeline, listings, clients, galleries |
-| `static/eos.css` | Dawn/light design system |
+| `eos/main.py` | App entry, middleware (tenant, billing, CSRF, request ID) |
+| `eos/tenant.py` | Subdomain + session tenant resolution |
+| `eos/security.py` | Auth, CSRF, rate limits, tenant-bound `require_admin` |
+| `eos/billing_gate.py` | SaaS billing enforcement |
+| `eos/integrations/` | Google Calendar, Dropbox |
+| `eos/platform_billing.py` | Per-studio Stripe subscriptions |
+| `eos/migrations/` | Numbered SQL migrations |
 
 ## Conventions
 
-- **Listing-centric** — never generic `projects`; everything hangs off `listings`
-- **RE vertical locked** — no F&B licensing, press, platekit, album proofing
-- **Mise patterns** for security (PIN lockout, signed cookies), slugs, env config
-- **Hestia patterns** for migrations ledger, service packages, tasks checklist
-- Minimal diffs; match existing naming and module layout
+- **Listing-centric** — everything hangs off `listings`
+- **Tenant isolation** — all queries/mutations must include `studio_id`; admin sessions bound to tenant
+- **Minimal diffs**; match existing module layout
 
 ## Running locally
 
 ```bash
 uvicorn eos.main:app --host 127.0.0.1 --port 8410
-pytest tests/ -v
+pytest tests/ -q
 ```
 
 Required env: `EOS_SECRET_KEY`, `EOS_ADMIN_PASSWORD`. Data defaults to `./data`.
 
-## Phase boundaries
+## Shipped (v1.2)
 
-**Shipped:** through phase 10 (v1.0) — multi-tenant SaaS, signup, API/webhooks, sequence editor, referrals.
-
-**Out of scope:** Google Calendar / Dropbox integrations, per-studio Stripe platform billing.
+Phases 1–11 plus hardening: tenant auth binding, billing gates, CSRF (Sec-Fetch-Site), integration observability, API pagination, CI, backup script.

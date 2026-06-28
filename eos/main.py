@@ -12,7 +12,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import bootstrap, config, db, jobs, scheduler, tenant
+from . import billing_gate, bootstrap, config, db, jobs, scheduler, security, tenant
 from .render import ROOT, templates
 from .routes import (
     activity, appointments, auth, booking, brand_kits, clients, contracts_admin, dashboard,
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Eos", version="1.1.0", lifespan=lifespan,
+    title="Eos", version="1.2.0", lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
@@ -58,14 +58,30 @@ _ERROR_MESSAGES = {
 
 
 @app.middleware("http")
+async def request_id(request: Request, call_next):
+    import uuid
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    request.state.request_id = rid
+    resp = await call_next(request)
+    resp.headers["X-Request-Id"] = rid
+    return resp
+
+
+@app.middleware("http")
 async def tenant_context(request: Request, call_next):
     tenant.bind_request(request)
+    blocked = billing_gate.check_access(request)
+    if blocked:
+        return blocked
+    security.validate_csrf(request)
     return await call_next(request)
 
 
 @app.middleware("http")
 async def common_headers(request: Request, call_next):
     resp = await call_next(request)
+    if request.url.path.startswith("/admin"):
+        security.set_csrf_cookie(resp)
     p = request.url.path
     if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/", "/api/", "/oauth/"))):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
@@ -91,7 +107,7 @@ async def healthz():
     return {
         "ok": True,
         "service": "eos",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "jobs_pending": jobs.pending_count(),
     }
 

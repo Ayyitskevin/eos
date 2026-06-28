@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import api_tokens, config, platform_billing, referrals, security, studio, users, webhooks
+from .. import api_tokens, config, db, integration_events, platform_billing, referrals, security, studio, users, webhooks
+from ..vocab import STUDIO_ID
 from ..integrations import dropbox, google_calendar
 from ..render import templates
 
@@ -34,6 +35,12 @@ async def studio_settings(request: Request):
             "dropbox_connected": dropbox.is_connected(),
             "billing_configured": platform_billing.is_configured(),
             "billing": platform_billing.studio_billing(),
+            "integration_events": integration_events.list_recent(15),
+            "dropbox_log": db.all_(
+                """SELECT * FROM dropbox_ingest_log WHERE studio_id=?
+                   ORDER BY created_at DESC LIMIT 15""",
+                (str(STUDIO_ID),),
+            ) if dropbox.is_connected() else [],
         },
     )
 

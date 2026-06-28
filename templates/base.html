@@ -11,5 +11,18 @@
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% block content %}{% endblock %}
+<script>
+(function () {
+  if (!location.pathname.startsWith('/admin')) return;
+  document.querySelectorAll('form[method="post"]').forEach(function (f) {
+    if (f.querySelector('input[name="_csrf"]')) return;
+    var m = document.cookie.match(/(?:^|; )eos_csrf=([^;]+)/);
+    if (!m) return;
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = '_csrf'; i.value = decodeURIComponent(m[1]);
+    f.appendChild(i);
+  });
+})();
+</script>
 </body>
 </html>

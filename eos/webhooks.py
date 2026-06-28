@@ -6,13 +6,14 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-import urllib.request
+import httpx
 
 from . import db, security
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.webhooks")
-_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="eos-hook")
+_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="eos-hook")
+_TIMEOUT = 10.0
 
 EVENTS = ("booking.created", "listing.delivered", "invoice.paid")
 
@@ -49,23 +50,35 @@ def _sign(secret: str, body: bytes) -> str:
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def _post(url: str, secret: str, payload: dict) -> None:
+def _post(sub_id: int, studio_id: str, url: str, secret: str, payload: dict) -> None:
     body = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "X-Eos-Event": payload.get("event", ""),
-            "X-Eos-Signature": _sign(secret, body),
-        },
-        method="POST",
+    delivery_id = db.run(
+        """INSERT INTO webhook_deliveries (subscription_id, studio_id, event, status)
+           VALUES (?,?,?,'pending')""",
+        (sub_id, studio_id, payload.get("event", "")),
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status >= 400:
-                log.warning("webhook %s returned %s", url, resp.status)
+        resp = httpx.post(
+            url,
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Eos-Event": payload.get("event", ""),
+                "X-Eos-Signature": _sign(secret, body),
+            },
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            raise RuntimeError(f"HTTP {resp.status_code}")
+        db.run(
+            "UPDATE webhook_deliveries SET status='ok' WHERE id=?",
+            (delivery_id,),
+        )
     except Exception as e:
+        db.run(
+            "UPDATE webhook_deliveries SET status='failed', error=? WHERE id=?",
+            (str(e)[:500], delivery_id),
+        )
         log.error("webhook %s failed: %s", url, e)
 
 
@@ -85,4 +98,4 @@ def dispatch(event: str, payload: dict, *, studio_id: str | None = None) -> None
             events = list(EVENTS)
         if event not in events:
             continue
-        _pool.submit(_post, sub["url"], sub["secret"], body)
+        _pool.submit(_post, sub["id"], sid, sub["url"], sub["secret"], body)

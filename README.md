@@ -109,6 +109,18 @@ Eos inherits the best patterns from two sibling projects:
 - Per-studio Stripe platform billing — trial on signup, subscription checkout at `/admin/billing`
 - Set `EOS_GOOGLE_*`, `EOS_DROPBOX_*`, and `EOS_STRIPE_PLATFORM_*` env vars for hosted SaaS
 
+### Phase 12 (shipped) — Eos 1.2 hardening
+
+- Tenant-bound admin sessions — cross-subdomain access blocked
+- `studio_id` guards on uploads, emails, invoices, appointments
+- Legacy admin password disabled in SaaS / multi-studio mode
+- Billing enforcement (`EOS_BILLING_ENFORCE`) with trial expiry
+- CSRF protection (Sec-Fetch-Site), signup rate limiting
+- Integration event log + Dropbox ingest history in Studio settings
+- Webhook delivery log, httpx timeouts, integration sweep via job queue
+- API pagination (`/api/v1/listings`, `/api/v1/bookings`), `/api/v1/me`
+- GitHub Actions CI, `deploy/backup.sh`
+
 ## Quick start
 
 ```bash

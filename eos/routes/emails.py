@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse
 
-from .. import config, db, emails, mailer, security
+from .. import config, db, emails, galleries, mailer, security
 from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.routes.emails")
@@ -29,7 +29,7 @@ async def send_email(
     if kind not in DOC_TABLES:
         raise HTTPException(status_code=404)
     doc_kind, listing_col = DOC_TABLES[kind]
-    d = db.one(f"SELECT * FROM {kind} WHERE id=?", (doc_id,))
+    d = db.one(f"SELECT * FROM {kind} WHERE id=? AND studio_id=?", (doc_id, STUDIO_ID))
     if not d:
         raise HTTPException(status_code=404)
     if kind != "galleries" and d["status"] == "draft":
@@ -62,9 +62,7 @@ async def email_gallery(
     message: str = Form(...),
     template: str = Form("gallery_delivery"),
 ):
-    g = db.one("SELECT * FROM galleries WHERE id=?", (gallery_id,))
-    if not g:
-        raise HTTPException(status_code=404)
+    g = galleries.get_gallery(gallery_id)
     if not g["published"]:
         raise HTTPException(status_code=400, detail="publish the gallery first")
     if not mailer.configured():

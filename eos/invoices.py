@@ -24,8 +24,8 @@ def get_invoice_by_slug(slug: str):
 
 def list_for_listing(listing_id: int):
     return db.all_(
-        "SELECT * FROM invoices WHERE listing_id=? ORDER BY created_at DESC",
-        (listing_id,),
+        "SELECT * FROM invoices WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC",
+        (listing_id, STUDIO_ID),
     )
 
 
@@ -96,20 +96,20 @@ def update_invoice(invoice_id: int, **fields) -> None:
         params.append(v)
     if not parts:
         return
-    params.append(invoice_id)
-    db.run(f"UPDATE invoices SET {', '.join(parts)} WHERE id=?", tuple(params))
+    params.extend([invoice_id, STUDIO_ID])
+    db.run(f"UPDATE invoices SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "invoice.update", f"id={invoice_id}")
 
 
 def mark_sent(invoice_id: int) -> None:
     db.run(
-        "UPDATE invoices SET status='sent' WHERE id=? AND status='draft'",
-        (invoice_id,),
+        "UPDATE invoices SET status='sent' WHERE id=? AND studio_id=? AND status='draft'",
+        (invoice_id, STUDIO_ID),
     )
 
 
 def mark_paid(invoice_id: int) -> None:
     db.run(
-        "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=?",
-        (invoice_id,),
+        "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=? AND studio_id=?",
+        (invoice_id, STUDIO_ID),
     )

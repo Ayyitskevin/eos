@@ -116,6 +116,13 @@ def _h_google_calendar_push(p: dict) -> None:
     google_calendar.push_appointment(p["appointment_id"])
 
 
+def _h_integration_sweep(p: dict) -> None:
+    from .integrations import dropbox, google_calendar
+    g = google_calendar.sweep_all()
+    d = dropbox.sweep_all()
+    log.info("integration sweep: google=%d dropbox=%d queued", g, d)
+
+
 def _h_dropbox_ingest(p: dict) -> None:
     from . import tenant
     from .integrations import dropbox
@@ -143,6 +150,7 @@ HANDLERS = {
     "marketing_kit": _h_marketing_kit,
     "google_calendar_push": _h_google_calendar_push,
     "dropbox_ingest": _h_dropbox_ingest,
+    "integration_sweep": _h_integration_sweep,
 }
 
 

@@ -121,9 +121,88 @@ def set_session_cookie(user_id: int | None = None) -> tuple[str, str]:
     return ADMIN_COOKIE, sign(f"user:{user_id}")
 
 
+def legacy_admin_allowed() -> bool:
+    from . import config, db
+
+    if config.SAAS_MODE or config.SIGNUP_ENABLED:
+        return False
+    n = db.one("SELECT COUNT(*) AS n FROM studio WHERE active=1")
+    return (n["n"] if n else 0) <= 1
+
+
 def require_admin(request: Request) -> None:
     if not is_admin(request):
         raise HTTPException(status_code=303, headers={"Location": "/admin/login"})
+    from . import tenant
+
+    uid = current_user_id(request)
+    tid = tenant.get_studio_id()
+    if uid:
+        row = db.one("SELECT studio_id FROM users WHERE id=? AND active=1", (uid,))
+        if not row or row["studio_id"] != tid:
+            raise HTTPException(status_code=403, detail="session does not match this studio")
+    elif tid != "default" or not legacy_admin_allowed():
+        raise HTTPException(status_code=303, headers={"Location": "/admin/login"})
+
+
+CSRF_COOKIE = "eos_csrf"
+CSRF_FORM = "_csrf"
+
+
+def set_csrf_cookie(response, token: str | None = None) -> str:
+    tok = token or new_token()
+    response.set_cookie(
+        CSRF_COOKIE, sign(tok),
+        max_age=86400, httponly=False, secure=config.COOKIE_SECURE,
+        samesite="lax", path="/",
+    )
+    return tok
+
+
+def validate_csrf(request: Request) -> None:
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    path = request.url.path
+    if path in ("/admin/login", "/admin/logout") or path.startswith(("/stripe/", "/oauth/", "/api/")):
+        return
+    if not path.startswith("/admin"):
+        return
+    site = request.headers.get("sec-fetch-site", "")
+    if site and site not in ("same-origin", "same-site", "none"):
+        raise HTTPException(status_code=403, detail="cross-site request blocked")
+    cookie = request.cookies.get(CSRF_COOKIE)
+    if not cookie:
+        return
+    body_tok = ""
+    if request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded"):
+        # validated in route layer for multipart; Sec-Fetch-Site is primary guard
+        pass
+    header_tok = request.headers.get("x-eos-csrf", "")
+    if header_tok and unsign(cookie) == header_tok:
+        return
+    if body_tok and unsign(cookie) == body_tok:
+        return
+
+
+SIGNUP_BUCKET = -5
+
+
+def signup_throttled(ip: str) -> bool:
+    from . import config
+
+    cutoff = time.time() - config.SIGNUP_RATE_WINDOW_SEC
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, SIGNUP_BUCKET, cutoff),
+    )
+    return row["n"] >= config.SIGNUP_RATE_LIMIT
+
+
+def signup_record(ip: str) -> None:
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+        (ip, SIGNUP_BUCKET, time.time()),
+    )
 
 
 def check_admin_password(password: str) -> bool:

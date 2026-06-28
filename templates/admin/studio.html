@@ -164,7 +164,10 @@
     {% if not google_configured %}
     <p class="muted small">Set <code>EOS_GOOGLE_CLIENT_ID</code>, <code>EOS_GOOGLE_CLIENT_SECRET</code>, and <code>EOS_GOOGLE_REDIRECT_URI</code> on the server.</p>
     {% elif google_connected %}
-    <p>Connected — appointments sync both ways every {{ 120 }}s; booking slots respect Google busy times.</p>
+    <p>Connected — appointments sync both ways; booking slots respect Google busy times.
+      {% if profile.google_last_sync_at %}Last sync {{ profile.google_last_sync_at[:16] }}.{% endif %}
+      {% if profile.google_last_sync_error %}<span class="error">{{ profile.google_last_sync_error }}</span>{% endif %}
+    </p>
     <form method="post" action="/admin/integrations/google/settings" class="inline-form">
       <label>Calendar ID <input name="google_calendar_id" value="{{ profile.google_calendar_id or 'primary' }}"></label>
       <button type="submit">Save calendar</button>
@@ -196,9 +199,36 @@
     <form method="post" action="/admin/integrations/dropbox/disconnect" class="inline-form">
       <button type="submit" class="link">Disconnect Dropbox</button>
     </form>
+    {% if dropbox_log %}
+    <table class="list compact">
+      <tr><th>When</th><th>Path</th><th>Status</th></tr>
+      {% for row in dropbox_log %}
+      <tr>
+        <td>{{ row.created_at[:16] }}</td>
+        <td class="muted">{{ row.dropbox_path }}</td>
+        <td>{{ row.status }}{% if row.error %} — {{ row.error }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
     {% else %}
     <p class="muted small">Watch a Dropbox folder — drop RAWs/JPEGs and they appear in the matching listing gallery.</p>
     <a href="/admin/integrations/dropbox/connect" class="btn">Connect Dropbox</a>
+    {% endif %}
+
+    {% if integration_events %}
+    <h3>Integration log</h3>
+    <table class="list compact">
+      <tr><th>When</th><th>Provider</th><th>Event</th><th>OK</th></tr>
+      {% for ev in integration_events %}
+      <tr>
+        <td>{{ ev.created_at[:16] }}</td>
+        <td>{{ ev.provider }}</td>
+        <td>{{ ev.event }}{% if ev.detail %} — {{ ev.detail }}{% endif %}</td>
+        <td>{{ 'yes' if ev.ok else 'no' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
     {% endif %}
 
     {% if billing_configured %}

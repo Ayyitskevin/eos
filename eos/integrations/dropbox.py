@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from .. import config, db, jobs, oauth_store, studio
+from .. import config, db, integration_events, jobs, oauth_store, studio
 from ..imaging import PHOTO_EXTS
 from ..vocab import STUDIO_ID
 
@@ -208,8 +208,13 @@ def scan_folder() -> int:
                     "INSERT INTO dropbox_sync_state (studio_id, cursor, last_scan_at) VALUES (?,?,datetime('now'))",
                     (STUDIO_ID, new_cursor),
                 )
-    except Exception:
+        integration_events.set_sync_status("dropbox", ok=True)
+        if queued:
+            integration_events.log_event("dropbox", "scan.queued", detail=f"{queued} files")
+    except Exception as e:
         log.exception("dropbox scan failed studio=%s", STUDIO_ID)
+        integration_events.set_sync_status("dropbox", ok=False, error=str(e))
+        integration_events.log_event("dropbox", "scan.failed", detail=str(e), ok=False)
     return queued
 
 

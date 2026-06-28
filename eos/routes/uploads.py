@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
-from .. import config, db, jobs, security
+from .. import config, db, galleries, jobs, security
 from ..imaging import PHOTO_EXTS
 
 log = logging.getLogger("eos.routes.uploads")
@@ -21,9 +21,7 @@ def _free_gb() -> float:
 
 @router.post("/galleries/{gallery_id}/upload")
 async def upload(gallery_id: int, files: list[UploadFile], section_id: int | None = None):
-    g = db.one("SELECT id FROM galleries WHERE id=?", (gallery_id,))
-    if not g:
-        raise HTTPException(status_code=404)
+    galleries.get_gallery(gallery_id)
     if section_id is None:
         first = db.one(
             "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",

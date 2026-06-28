@@ -9,9 +9,10 @@ from . import config
 
 
 def _fernet() -> Fernet | None:
-    if not config.SECRET_KEY:
+    material = config.TOKEN_ENCRYPTION_KEY
+    if not material:
         return None
-    key = base64.urlsafe_b64encode(hashlib.sha256(config.SECRET_KEY.encode()).digest())
+    key = base64.urlsafe_b64encode(hashlib.sha256(material.encode()).digest())
     return Fernet(key)
 
 

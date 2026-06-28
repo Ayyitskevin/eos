@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, onboarding
+from .. import config, onboarding, security
 from ..render import templates
 
 router = APIRouter()
@@ -31,6 +31,13 @@ async def signup_submit(
 ):
     if not config.SIGNUP_ENABLED:
         raise HTTPException(status_code=404)
+    ip = security.client_ip(request)
+    if security.signup_throttled(ip):
+        return templates.TemplateResponse(
+            request, "site/signup.html",
+            {"error": "Too many signups from this network. Try again later.", "base_domain": config.BASE_DOMAIN},
+            status_code=429,
+        )
     try:
         result = onboarding.create_studio(
             name=studio_name,
@@ -46,4 +53,5 @@ async def signup_submit(
             {"error": detail, "base_domain": config.BASE_DOMAIN},
             status_code=e.status_code,
         )
+    security.signup_record(ip)
     return RedirectResponse(result["login_url"], status_code=303)

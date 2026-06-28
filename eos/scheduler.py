@@ -14,14 +14,6 @@ _thread: threading.Thread | None = None
 _tick = 0
 
 
-def _integration_sweep() -> None:
-    from .integrations import dropbox, google_calendar
-    g = google_calendar.sweep_all()
-    d = dropbox.sweep_all()
-    if g or d:
-        log.info("integration sweep: google=%d dropbox=%d queued", g, d)
-
-
 def _loop() -> None:
     global _tick
     while not _stop.wait(config.SEQUENCE_TICK_SECONDS):
@@ -35,9 +27,10 @@ def _loop() -> None:
         if _tick * config.SEQUENCE_TICK_SECONDS >= config.INTEGRATION_TICK_SECONDS:
             _tick = 0
             try:
-                _integration_sweep()
+                from . import jobs
+                jobs.enqueue("integration_sweep", {})
             except Exception:
-                log.exception("integration sweep failed")
+                log.exception("integration sweep enqueue failed")
 
 
 def start() -> None:

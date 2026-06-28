@@ -42,26 +42,26 @@ async def login(
     user = None
     if email:
         user = users.authenticate(email, password, studio_id=tenant.get_studio_id())
-    elif not config.SAAS_MODE:
-        if security.check_admin_password(password):
-            user = None  # legacy admin
-        else:
-            user = False
+        if not user:
+            security.pin_fail(ip, security.ADMIN_BUCKET)
+            return templates.TemplateResponse(
+                request, "admin/login.html",
+                {"error": "Wrong email or password.", "saas_mode": saas_mode},
+                status_code=401,
+            )
+    elif security.legacy_admin_allowed():
+        if not security.check_admin_password(password):
+            security.pin_fail(ip, security.ADMIN_BUCKET)
+            return templates.TemplateResponse(
+                request, "admin/login.html",
+                {"error": "Wrong password.", "saas_mode": saas_mode},
+                status_code=401,
+            )
     else:
-        user = False
-
-    if user is False or (email and not user):
         security.pin_fail(ip, security.ADMIN_BUCKET)
         return templates.TemplateResponse(
             request, "admin/login.html",
-            {"error": "Wrong email or password.", "saas_mode": saas_mode},
-            status_code=401,
-        )
-    if not email and not security.check_admin_password(password):
-        security.pin_fail(ip, security.ADMIN_BUCKET)
-        return templates.TemplateResponse(
-            request, "admin/login.html",
-            {"error": "Wrong password.", "saas_mode": saas_mode},
+            {"error": "Email is required.", "saas_mode": saas_mode},
             status_code=401,
         )
 
@@ -75,6 +75,7 @@ async def login(
         max_age=config.SESSION_MAX_AGE, httponly=True,
         secure=config.COOKIE_SECURE, samesite="lax", path="/",
     )
+    security.set_csrf_cookie(resp)
     log.info("admin login from %s (%s)", ip, email or "legacy")
     return resp
 
