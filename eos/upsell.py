@@ -5,7 +5,7 @@ import logging
 
 from fastapi import HTTPException
 
-from . import db, invoices, security, stripe_checkout, tenant
+from . import clients, db, invoices, security, stripe_checkout, tenant
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.upsell")
@@ -30,6 +30,16 @@ def _addon_rows(addon_ids: list[int]) -> list:
     )
 
 
+def _order_by_token(order_token: str):
+    row = db.one(
+        "SELECT * FROM listing_upsell_orders WHERE token=? AND studio_id=?",
+        (order_token, STUDIO_ID),
+    )
+    if not row or row["status"] != "pending":
+        raise HTTPException(status_code=404)
+    return row
+
+
 def create_order(
     *,
     listing_id: int,
@@ -39,6 +49,9 @@ def create_order(
     from . import listings
 
     listing = listings.get_listing(listing_id)
+    order_client_id = client_id or listing["client_id"]
+    if order_client_id is not None:
+        clients.get_client(order_client_id)
     addons = _addon_rows(addon_ids)
     if not addons:
         raise HTTPException(status_code=400, detail="Select at least one add-on.")
@@ -52,7 +65,7 @@ def create_order(
         (
             STUDIO_ID,
             listing_id,
-            client_id or listing["client_id"],
+            order_client_id,
             json.dumps(addon_ids),
             total,
             token,
@@ -63,27 +76,22 @@ def create_order(
         listing_id,
         title=title,
         amount_cents=total,
-        client_id=client_id or listing["client_id"],
+        client_id=order_client_id,
         line_items=items,
         notes="Delivery upsell",
         invoice_kind="balance",
     )
     inv = invoices.get_invoice(iid)
     db.run(
-        "UPDATE listing_upsell_orders SET invoice_id=? WHERE id=?",
-        (iid, oid),
+        "UPDATE listing_upsell_orders SET invoice_id=? WHERE id=? AND studio_id=?",
+        (iid, oid, STUDIO_ID),
     )
     db.audit("upsell", "order.create", f"listing={listing_id} total={total}")
     return {"order_id": oid, "token": token, "invoice": inv, "total_cents": total}
 
 
 def checkout_url(order_token: str) -> str:
-    row = db.one(
-        "SELECT * FROM listing_upsell_orders WHERE token=? AND studio_id=?",
-        (order_token, STUDIO_ID),
-    )
-    if not row or row["status"] != "pending":
-        raise HTTPException(status_code=404)
+    row = _order_by_token(order_token)
     if not row["invoice_id"]:
         raise HTTPException(status_code=400, detail="invoice missing")
     inv = invoices.get_invoice(row["invoice_id"])
@@ -94,7 +102,10 @@ def checkout_url(order_token: str) -> str:
         return f"{base}/i/{inv['slug']}"
     client = None
     if inv["client_id"]:
-        client = db.one("SELECT email FROM clients WHERE id=?", (inv["client_id"],))
+        client = db.one(
+            "SELECT email FROM clients WHERE id=? AND studio_id=?",
+            (inv["client_id"], STUDIO_ID),
+        )
     session = stripe_checkout.create_payment_session(
         amount_cents=inv["amount_cents"],
         title=inv["title"],
@@ -104,10 +115,13 @@ def checkout_url(order_token: str) -> str:
         cancel_url=f"{base}/upsell/{order_token}",
         existing_session_id=inv.get("stripe_session_id"),
     )
-    db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, inv["id"]))
     db.run(
-        "UPDATE listing_upsell_orders SET stripe_session_id=? WHERE id=?",
-        (session.id, row["id"]),
+        "UPDATE invoices SET stripe_session_id=? WHERE id=? AND studio_id=?",
+        (session.id, inv["id"], STUDIO_ID),
+    )
+    db.run(
+        "UPDATE listing_upsell_orders SET stripe_session_id=? WHERE id=? AND studio_id=?",
+        (session.id, row["id"], STUDIO_ID),
     )
     return session.url
 
@@ -119,6 +133,6 @@ def mark_paid(invoice_id: int) -> None:
     )
     if row:
         db.run(
-            "UPDATE listing_upsell_orders SET status='paid' WHERE id=?",
-            (row["id"],),
+            "UPDATE listing_upsell_orders SET status='paid' WHERE id=? AND studio_id=?",
+            (row["id"], STUDIO_ID),
         )

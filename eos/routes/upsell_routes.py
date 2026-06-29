@@ -14,7 +14,7 @@ router = APIRouter()
 async def upsell_confirm(request: Request, token: str):
     row = db.one(
         """SELECT o.*, l.title AS listing_title FROM listing_upsell_orders o
-           JOIN listings l ON l.id=o.listing_id
+           JOIN listings l ON l.id=o.listing_id AND l.studio_id=o.studio_id
            WHERE o.token=? AND o.studio_id=?""",
         (token, str(STUDIO_ID)),
     )
