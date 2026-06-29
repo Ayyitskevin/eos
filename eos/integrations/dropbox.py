@@ -139,7 +139,11 @@ def _gallery_for_listing(listing_id: int) -> int:
         return row["id"]
     from .. import galleries
 
-    listing = db.one("SELECT title FROM listings WHERE id=?", (listing_id,))
+    listing = db.one(
+        "SELECT title FROM listings WHERE id=? AND studio_id=?", (listing_id, STUDIO_ID)
+    )
+    if not listing:
+        raise RuntimeError("listing not found for this studio")
     return galleries.create_gallery(listing["title"], listing_id=listing_id)
 
 
@@ -228,6 +232,13 @@ def scan_folder() -> int:
 
 
 def ingest_file(*, log_id: int, dropbox_path: str, listing_id: int) -> None:
+    log_row = db.one(
+        """SELECT * FROM dropbox_ingest_log
+           WHERE id=? AND studio_id=? AND dropbox_path=? AND listing_id=?""",
+        (log_id, STUDIO_ID, dropbox_path, listing_id),
+    )
+    if not log_row:
+        raise RuntimeError("dropbox ingest log not found for this studio")
     token = _token()
     if not token:
         raise RuntimeError("dropbox not connected")
@@ -264,10 +275,15 @@ def ingest_file(*, log_id: int, dropbox_path: str, listing_id: int) -> None:
         (gallery_id, section["id"] if section else None, "photo", filename, stored, size),
     )
     jobs.enqueue("image_derivatives", {"asset_id": asset_id})
-    db.run("UPDATE galleries SET content_rev=content_rev+1 WHERE id=?", (gallery_id,))
     db.run(
-        """UPDATE dropbox_ingest_log SET status='done', asset_id=?, error=NULL WHERE id=?""",
-        (asset_id, log_id),
+        "UPDATE galleries SET content_rev=content_rev+1 WHERE id=? AND studio_id=?",
+        (gallery_id, STUDIO_ID),
+    )
+    db.run(
+        """UPDATE dropbox_ingest_log
+           SET status='done', asset_id=?, error=NULL
+           WHERE id=? AND studio_id=?""",
+        (asset_id, log_id, STUDIO_ID),
     )
     db.audit("integration", "dropbox.ingest", f"path={dropbox_path} asset={asset_id}")
 
@@ -279,7 +295,10 @@ def retry_failed(log_id: int) -> None:
     )
     if not row:
         raise ValueError("log entry not found or not failed")
-    db.run("UPDATE dropbox_ingest_log SET status='queued', error=NULL WHERE id=?", (log_id,))
+    db.run(
+        "UPDATE dropbox_ingest_log SET status='queued', error=NULL WHERE id=? AND studio_id=?",
+        (log_id, STUDIO_ID),
+    )
     jobs.enqueue(
         "dropbox_ingest",
         {
