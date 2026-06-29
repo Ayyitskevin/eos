@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format run dogfood migrate check-env check-stripe coverage stripe-listen
+.PHONY: install dev test smoke lint format run dogfood migrate check-env check-stripe coverage stripe-listen
 
 install:
 	python3 -m venv .venv
@@ -9,6 +9,9 @@ dev: install
 
 test:
 	.venv/bin/pytest tests/ -q
+
+smoke:
+	.venv/bin/pytest tests/test_foundation.py tests/test_sql_guardrails.py -q
 
 coverage:
 	.venv/bin/pytest tests/ -q --cov=eos --cov-report=term-missing

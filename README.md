@@ -29,6 +29,7 @@ git clone https://github.com/Ayyitskevin/eos.git && cd eos
 make install
 cp .env.example .env          # EOS_SECRET_KEY + EOS_ADMIN_PASSWORD
 make run                      # http://127.0.0.1:8410
+make smoke                    # fast boot/migration/core-route smoke
 make test
 ```
 
@@ -54,6 +55,7 @@ sudo systemctl restart eos
 | TLS | `deploy/Caddyfile` (wildcard) |
 | Stripe | Platform billing + Connect; webhook → `/stripe/platform/webhook` |
 | Media | `EOS_S3_*` for scale (recommended) |
+| Readiness | `/healthz` for liveness, `/readyz` for load balancers |
 
 Guides: [docs/DEPLOY.md](docs/DEPLOY.md) · [docs/SCALE.md](docs/SCALE.md)
 
@@ -99,7 +101,8 @@ Suspend tenants, override plans, view usage, impersonate (audit logged).
 
 ```bash
 make lint          # ruff
-make test          # 81 tests
+make smoke         # fast boot/migration/core-route smoke
+make test          # full pytest suite
 make check-stripe  # verify test keys in .env
 make dogfood       # seed 1420 Maple Dr
 make check-env     # validate .env
