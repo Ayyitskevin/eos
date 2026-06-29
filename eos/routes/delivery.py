@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, galleries, listing_media, paywall, security, stripe_checkout, studio
 from ..render import templates
+from ..vocab import STUDIO_ID
 
 router = APIRouter()
 
@@ -75,7 +76,10 @@ async def gallery_view(request: Request, slug: str):
     upsell_banner = None
     upsell_addons = []
     if g["listing_id"]:
-        row = db.one("SELECT status FROM listings WHERE id=?", (g["listing_id"],))
+        row = db.one(
+            "SELECT status FROM listings WHERE id=? AND studio_id=?",
+            (g["listing_id"], STUDIO_ID),
+        )
         if row and row["status"] == "delivered":
             upsell_banner = studio.delivery_upsell()
             upsell_addons = upsell_mod.list_delivery_addons()

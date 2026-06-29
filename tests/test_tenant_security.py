@@ -5,14 +5,18 @@ from unittest.mock import patch
 
 import eos.config as config
 import eos.db as db
+import eos.drive_time as drive_time
 import eos.jobs as jobs
 import eos.mailer as mailer
 import eos.main as main
 import eos.onboarding as onboarding
+import eos.portal as portal
+import eos.reschedule as reschedule
 import eos.security as security
 import eos.sequences as sequences
 import eos.tenant as tenant
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 
@@ -24,7 +28,20 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EOS_SIGNUP_ENABLED", "true")
     monkeypatch.setenv("EOS_BASE_DOMAIN", "eos.test")
     monkeypatch.setenv("EOS_SAAS_MODE", "true")
-    for mod in (config, db, jobs, security, tenant, mailer, sequences, onboarding, main):
+    for mod in (
+        config,
+        db,
+        drive_time,
+        jobs,
+        security,
+        tenant,
+        mailer,
+        sequences,
+        onboarding,
+        portal,
+        reschedule,
+        main,
+    ):
         importlib.reload(mod)
     config.ensure_dirs()
     db.migrate()
@@ -488,3 +505,71 @@ def test_asset_job_binds_asset_studio(app_env):
     row = db.one("SELECT status FROM assets WHERE id=?", (asset_id,))
     assert row["status"] == "ready"
     assert tenant.get_studio_id() == "beta"
+
+
+def test_portal_token_requires_current_studio_client(app_env):
+    tenant.set_studio("alpha")
+    alpha_client = db.run(
+        "INSERT INTO clients (studio_id, name, email) VALUES ('alpha', 'Alpha Agent', 'agent@alpha.test')"
+    )
+
+    tenant.set_studio("beta")
+    with pytest.raises(HTTPException) as exc:
+        portal.ensure_token(alpha_client)
+
+    assert exc.value.status_code == 404
+    row = db.one("SELECT portal_token FROM clients WHERE id=?", (alpha_client,))
+    assert row["portal_token"] is None
+
+
+def test_drive_time_listing_update_stops_after_tenant_context_switch(app_env):
+    tenant.set_studio("alpha")
+    listing_id = db.run(
+        """INSERT INTO listings (studio_id, title, address_line1, city, state, zip)
+           VALUES ('alpha', 'Alpha Drive', '1 Main St', 'Austin', 'TX', '78701')"""
+    )
+
+    def switch_tenant_geocode(**_kwargs):
+        tenant.set_studio("beta")
+        return (30.2672, -97.7431)
+
+    with patch("eos.drive_time.geocode_address", side_effect=switch_tenant_geocode):
+        drive_time.geocode_listing(listing_id)
+
+    row = db.one("SELECT latitude, longitude FROM listings WHERE id=?", (listing_id,))
+    assert row["latitude"] is None
+    assert row["longitude"] is None
+
+
+def test_reschedule_confirm_cleanup_stops_after_tenant_context_switch(app_env):
+    tenant.set_studio("alpha")
+    client_id = db.run(
+        "INSERT INTO clients (studio_id, name, email) VALUES ('alpha', 'Alpha Agent', 'agent@alpha.test')"
+    )
+    appointment_id = db.run(
+        """INSERT INTO appointments (studio_id, client_id, title, kind, status, starts_at, token)
+           VALUES ('alpha', ?, 'Alpha Shoot', 'shoot', 'proposed', datetime('now', '+1 day'), 'appt-alpha')""",
+        (client_id,),
+    )
+    hold_id = db.run(
+        """INSERT INTO appointment_holds
+           (studio_id, appointment_id, client_id, starts_at, token, expires_at)
+           VALUES ('alpha', ?, ?, datetime('now', '+2 days'), 'hold-alpha', datetime('now', '+15 minutes'))""",
+        (appointment_id, client_id),
+    )
+
+    def switch_tenant_reschedule(_appointment_id, *, starts_at):
+        assert _appointment_id == appointment_id
+        assert starts_at
+        tenant.set_studio("beta")
+
+    with patch(
+        "eos.reschedule.appointments.reschedule_appointment",
+        side_effect=switch_tenant_reschedule,
+    ):
+        assert reschedule.confirm_hold("hold-alpha", client_id=client_id) == appointment_id
+
+    appt = db.one("SELECT status FROM appointments WHERE id=?", (appointment_id,))
+    hold = db.one("SELECT id FROM appointment_holds WHERE id=?", (hold_id,))
+    assert appt["status"] == "proposed"
+    assert hold is not None

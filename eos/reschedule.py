@@ -36,7 +36,10 @@ def create_hold(*, appointment_id: int, client_id: int, starts_at: str) -> str:
     expires = (dt.datetime.now() + dt.timedelta(minutes=_HOLD_MINUTES)).strftime(
         "%Y-%m-%d %H:%M:%S"
     )
-    db.run("DELETE FROM appointment_holds WHERE appointment_id=?", (appointment_id,))
+    db.run(
+        "DELETE FROM appointment_holds WHERE appointment_id=? AND studio_id=?",
+        (appointment_id, STUDIO_ID),
+    )
     db.run(
         """INSERT INTO appointment_holds
            (studio_id, appointment_id, client_id, starts_at, token, expires_at)
@@ -57,7 +60,10 @@ def confirm_hold(token: str, *, client_id: int) -> int:
     if row["expires_at"] < dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
         raise HTTPException(status_code=410, detail="Hold expired — pick a slot again.")
     appointments.reschedule_appointment(row["appointment_id"], starts_at=row["starts_at"])
-    db.run("UPDATE appointments SET status='confirmed' WHERE id=?", (row["appointment_id"],))
-    db.run("DELETE FROM appointment_holds WHERE id=?", (row["id"],))
+    db.run(
+        "UPDATE appointments SET status='confirmed' WHERE id=? AND studio_id=?",
+        (row["appointment_id"], STUDIO_ID),
+    )
+    db.run("DELETE FROM appointment_holds WHERE id=? AND studio_id=?", (row["id"], STUDIO_ID))
     db.audit("portal", "appointment.reschedule", f"id={row['appointment_id']}")
     return row["appointment_id"]
