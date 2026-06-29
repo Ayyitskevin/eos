@@ -23,9 +23,11 @@ def get_by_token(token: str):
 
 
 def list_for_listing(listing_id: int):
+    listings.get_listing(listing_id)
     return db.all_(
-        "SELECT * FROM questionnaires WHERE listing_id=? ORDER BY created_at DESC",
-        (listing_id,),
+        """SELECT * FROM questionnaires
+           WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC""",
+        (listing_id, STUDIO_ID),
     )
 
 
@@ -47,8 +49,8 @@ def save_answers(token: str, answers: dict) -> None:
     clean = {k: str(v).strip() for k, v in answers.items() if k in QUESTIONNAIRE_FIELDS}
     db.run(
         """UPDATE questionnaires SET status='completed', answers=?,
-           completed_at=datetime('now') WHERE id=?""",
-        (json.dumps(clean), row["id"]),
+           completed_at=datetime('now') WHERE id=? AND studio_id=?""",
+        (json.dumps(clean), row["id"], STUDIO_ID),
     )
     _apply_to_listing(row["listing_id"], clean)
     db.audit("client", "questionnaire.completed", f"listing_id={row['listing_id']}")

@@ -18,7 +18,11 @@ def _file_path(listing_id: int, kind: str) -> Path:
 
 
 def get_status(listing_id: int) -> dict:
-    row = db.one("SELECT * FROM listing_marketing_kit WHERE listing_id=?", (listing_id,))
+    listings.get_listing(listing_id)
+    row = db.one(
+        "SELECT * FROM listing_marketing_kit WHERE listing_id=? AND studio_id=?",
+        (listing_id, STUDIO_ID),
+    )
     if not row:
         return {"status": "pending", "ig_square": "", "ig_story": "", "flyer": ""}
     return dict(row)
