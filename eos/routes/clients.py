@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import brand_kits, clients, portal, security
 from ..render import templates
-from ..vocab import CLIENT_TYPE_LABELS, CLIENT_TYPES
+from ..vocab import CLIENT_TYPE_LABELS, CLIENT_TYPES, STUDIO_ID
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
 
@@ -45,10 +45,13 @@ async def client_detail(request: Request, client_id: int):
     c = clients.get_client(client_id)
     from .. import db
 
-    kids = db.all_("SELECT * FROM clients WHERE parent_id=? ORDER BY name", (client_id,))
+    kids = db.all_(
+        "SELECT * FROM clients WHERE parent_id=? AND studio_id=? ORDER BY name",
+        (client_id, STUDIO_ID),
+    )
     listings_rows = db.all_(
-        "SELECT * FROM listings WHERE client_id=? ORDER BY created_at DESC",
-        (client_id,),
+        "SELECT * FROM listings WHERE client_id=? AND studio_id=? ORDER BY created_at DESC",
+        (client_id, STUDIO_ID),
     )
     portal_link = portal.portal_url(client_id) if c["email"] else None
     brokerage_link = None

@@ -167,13 +167,13 @@ async def listing_update(
 
 @router.post("/listings/{listing_id}/shots/{shot_id}/toggle")
 async def shot_toggle(listing_id: int, shot_id: int, done: bool = Form(False)):
-    listings.toggle_shot(shot_id, done)
+    listings.toggle_shot(listing_id, shot_id, done)
     return RedirectResponse(f"/admin/listings/{listing_id}#shots", status_code=303)
 
 
 @router.post("/listings/{listing_id}/tasks/{task_id}/toggle")
 async def task_toggle(listing_id: int, task_id: int, done: bool = Form(False)):
-    listings.toggle_task(task_id, done)
+    listings.toggle_task(listing_id, task_id, done)
     return RedirectResponse(f"/admin/listings/{listing_id}#tasks", status_code=303)
 
 

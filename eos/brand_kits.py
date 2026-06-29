@@ -1,6 +1,7 @@
 """Agent watermark kits — hierarchy-aware overlay resolution."""
 
 from . import clients, config, db
+from .vocab import STUDIO_ID
 
 
 def _kit_spec(owner_id: int, kit) -> dict | None:
@@ -21,8 +22,10 @@ def overlay_for_client(client_id: int | None) -> dict | None:
         return None
     for owner_id in (client_id, *clients.ancestor_ids(client_id)):
         kit = db.one(
-            "SELECT * FROM brand_kits WHERE client_id=? AND active=1 ORDER BY id DESC LIMIT 1",
-            (owner_id,),
+            """SELECT * FROM brand_kits
+               WHERE client_id=? AND studio_id=? AND active=1
+               ORDER BY id DESC LIMIT 1""",
+            (owner_id, STUDIO_ID),
         )
         if kit:
             spec = _kit_spec(owner_id, kit)
@@ -34,12 +37,16 @@ def overlay_for_client(client_id: int | None) -> dict | None:
 def overlay_for_listing(listing_id: int | None) -> dict | None:
     if not listing_id:
         return None
-    row = db.one("SELECT client_id FROM listings WHERE id=?", (listing_id,))
+    row = db.one(
+        "SELECT client_id FROM listings WHERE id=? AND studio_id=?", (listing_id, STUDIO_ID)
+    )
     return overlay_for_client(row["client_id"] if row else None)
 
 
 def get_kit(client_id: int):
     return db.one(
-        "SELECT * FROM brand_kits WHERE client_id=? ORDER BY id DESC LIMIT 1",
-        (client_id,),
+        """SELECT * FROM brand_kits
+           WHERE client_id=? AND studio_id=?
+           ORDER BY id DESC LIMIT 1""",
+        (client_id, STUDIO_ID),
     )
