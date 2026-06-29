@@ -365,3 +365,27 @@ async def test_cross_tenant_invoice_public_view_rejects_foreign_client(app_env):
             follow_redirects=False,
         )
         assert blocked.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_upsell_public_confirm_rejects_foreign_listing(app_env):
+    tenant.set_studio("alpha")
+    alpha_listing = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('alpha', 'Alpha Upsell', 'delivered')"
+    )
+    tenant.set_studio("beta")
+    db.run(
+        """INSERT INTO listing_upsell_orders
+           (studio_id, listing_id, addon_ids, amount_cents, token)
+           VALUES ('beta', ?, '[]', 5000, 'bad-beta-upsell')""",
+        (alpha_listing,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        blocked = await client.get(
+            "/upsell/bad-beta-upsell",
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
