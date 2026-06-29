@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import eos.config as config
 import eos.db as db
+import eos.delivery_notify as delivery_notify
 import eos.drive_time as drive_time
 import eos.jobs as jobs
 import eos.mailer as mailer
@@ -15,6 +16,7 @@ import eos.reschedule as reschedule
 import eos.security as security
 import eos.sequences as sequences
 import eos.tenant as tenant
+import eos.webhooks as webhooks
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
@@ -31,6 +33,7 @@ def app_env(tmp_path, monkeypatch):
     for mod in (
         config,
         db,
+        delivery_notify,
         drive_time,
         jobs,
         security,
@@ -40,6 +43,7 @@ def app_env(tmp_path, monkeypatch):
         onboarding,
         portal,
         reschedule,
+        webhooks,
         main,
     ):
         importlib.reload(mod)
@@ -573,3 +577,70 @@ def test_reschedule_confirm_cleanup_stops_after_tenant_context_switch(app_env):
     hold = db.one("SELECT id FROM appointment_holds WHERE id=?", (hold_id,))
     assert appt["status"] == "proposed"
     assert hold is not None
+
+
+def test_delivery_notify_binds_gallery_owner_studio(app_env):
+    tenant.set_studio("beta")
+    db.run("UPDATE studio_profiles SET auto_deliver_email=1 WHERE studio_id='beta'")
+    client_id = db.run(
+        "INSERT INTO clients (studio_id, name, email) VALUES ('beta', 'Beta Agent', 'agent@beta.test')"
+    )
+    listing_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status)
+           VALUES ('beta', ?, 'Beta Delivered', 'delivered')""",
+        (client_id,),
+    )
+    gallery_id = db.run(
+        """INSERT INTO galleries
+           (studio_id, listing_id, slug, title, pin, delivery_token, published)
+           VALUES ('beta', ?, 'beta-delivery', 'Beta Gallery', '1234', 'tok-beta-delivery', 1)""",
+        (listing_id,),
+    )
+    tenant.set_studio("default")
+
+    with (
+        patch("eos.delivery_notify.mailer.configured", return_value=True),
+        patch("eos.delivery_notify.mailer.send_for_studio") as send,
+    ):
+        assert delivery_notify.maybe_send_gallery_email(gallery_id) is True
+
+    send.assert_called_once()
+    assert send.call_args.args[0] == "agent@beta.test"
+    assert "beta.eos.test" in send.call_args.args[2]
+    row = db.one(
+        "SELECT studio_id, listing_id FROM emails_log WHERE doc_kind='gallery' AND doc_id=?",
+        (gallery_id,),
+    )
+    assert row["studio_id"] == "beta"
+    assert row["listing_id"] == listing_id
+    assert tenant.get_studio_id() == "default"
+
+
+def test_webhook_post_binds_and_restores_dispatch_studio(app_env):
+    tenant.set_studio("default")
+    seen_studios: list[str] = []
+
+    class Response:
+        status_code = 204
+
+    def capture_post(*_args, **_kwargs):
+        seen_studios.append(tenant.get_studio_id())
+        return Response()
+
+    with patch("eos.webhooks.httpx.post", side_effect=capture_post):
+        webhooks._post(
+            42,
+            "beta",
+            "https://hooks.example.test/eos",
+            "secret",
+            {"event": "listing.delivered", "data": {"listing_id": 1}},
+        )
+
+    assert seen_studios == ["beta"]
+    row = db.one(
+        "SELECT studio_id, status FROM webhook_deliveries WHERE subscription_id=?",
+        (42,),
+    )
+    assert row["studio_id"] == "beta"
+    assert row["status"] == "ok"
+    assert tenant.get_studio_id() == "default"

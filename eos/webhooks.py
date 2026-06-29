@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
-from . import db, security
+from . import db, security, tenant
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.webhooks")
@@ -54,35 +54,42 @@ def _sign(secret: str, body: bytes) -> str:
 
 
 def _post(sub_id: int, studio_id: str, url: str, secret: str, payload: dict) -> None:
-    body = json.dumps(payload).encode()
-    delivery_id = db.run(
-        """INSERT INTO webhook_deliveries (subscription_id, studio_id, event, status)
-           VALUES (?,?,?,'pending')""",
-        (sub_id, studio_id, payload.get("event", "")),
-    )
+    previous_studio = tenant.get_studio_id()
+    tenant.set_studio(studio_id)
     try:
-        resp = httpx.post(
-            url,
-            content=body,
-            headers={
-                "Content-Type": "application/json",
-                "X-Eos-Event": payload.get("event", ""),
-                "X-Eos-Signature": _sign(secret, body),
-            },
-            timeout=_TIMEOUT,
+        body = json.dumps(payload).encode()
+        delivery_id = db.run(
+            """INSERT INTO webhook_deliveries (subscription_id, studio_id, event, status)
+               VALUES (?,?,?,'pending')""",
+            (sub_id, studio_id, payload.get("event", "")),
         )
-        if resp.status_code >= 400:
-            raise RuntimeError(f"HTTP {resp.status_code}")
-        db.run(
-            "UPDATE webhook_deliveries SET status='ok' WHERE id=?",
-            (delivery_id,),
-        )
-    except Exception as e:
-        db.run(
-            "UPDATE webhook_deliveries SET status='failed', error=? WHERE id=?",
-            (str(e)[:500], delivery_id),
-        )
-        log.error("webhook %s failed: %s", url, e)
+        try:
+            resp = httpx.post(
+                url,
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Eos-Event": payload.get("event", ""),
+                    "X-Eos-Signature": _sign(secret, body),
+                },
+                timeout=_TIMEOUT,
+            )
+            if resp.status_code >= 400:
+                raise RuntimeError(f"HTTP {resp.status_code}")
+            db.run(
+                """UPDATE webhook_deliveries SET status='ok'
+                   WHERE id=? AND subscription_id=? AND studio_id=?""",
+                (delivery_id, sub_id, studio_id),
+            )
+        except Exception as e:
+            db.run(
+                """UPDATE webhook_deliveries SET status='failed', error=?
+                   WHERE id=? AND subscription_id=? AND studio_id=?""",
+                (str(e)[:500], delivery_id, sub_id, studio_id),
+            )
+            log.error("webhook %s failed: %s", url, e)
+    finally:
+        tenant.set_studio(previous_studio)
 
 
 def dispatch(event: str, payload: dict, *, studio_id: str | None = None) -> None:
