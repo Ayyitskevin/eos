@@ -69,8 +69,8 @@ def geocode_listing(listing_id: int) -> None:
     )
     if coords:
         db.run(
-            "UPDATE listings SET latitude=?, longitude=? WHERE id=?",
-            (coords[0], coords[1], listing_id),
+            "UPDATE listings SET latitude=?, longitude=? WHERE id=? AND studio_id=?",
+            (coords[0], coords[1], listing_id, STUDIO_ID),
         )
 
 

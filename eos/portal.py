@@ -10,10 +10,15 @@ def ensure_token(client_id: int) -> str:
     row = db.one(
         "SELECT portal_token FROM clients WHERE id=? AND studio_id=?", (client_id, STUDIO_ID)
     )
-    if row and row["portal_token"]:
+    if not row:
+        raise HTTPException(status_code=404)
+    if row["portal_token"]:
         return row["portal_token"]
     token = security.new_token()
-    db.run("UPDATE clients SET portal_token=? WHERE id=?", (token, client_id))
+    db.run(
+        "UPDATE clients SET portal_token=? WHERE id=? AND studio_id=?",
+        (token, client_id, STUDIO_ID),
+    )
     return token
 
 
