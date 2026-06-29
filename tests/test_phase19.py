@@ -1,6 +1,7 @@
 """Phase 19 — Stripe test-mode dogfood (Connect client payments + platform billing webhooks)."""
 
 import importlib
+from unittest.mock import patch
 
 import eos.config as config
 import eos.db as db
@@ -76,19 +77,46 @@ def test_connect_client_payment_webhook_marks_invoice_paid(saas_env):
         "metadata": {"invoice_id": str(iid)},
     }
     event = {"type": "checkout.session.completed", "data": {"object": session}}
+
+    tenant.set_studio("default")
     platform_billing.handle_webhook_event(event)
+
     row = db.one("SELECT status FROM invoices WHERE id=?", (iid,))
     assert row["status"] == "paid"
+    assert tenant.get_studio_id() == "default"
+
+
+def test_connect_client_payment_binds_invoice_studio_for_automations(saas_env):
+    _seed_studio("pay-bind")
+    iid = _seed_invoice("pay-bind")
+    listing_id = db.one("SELECT listing_id FROM invoices WHERE id=?", (iid,))["listing_id"]
+    session = {"id": "cs_test_bind", "mode": "payment", "metadata": {"invoice_id": str(iid)}}
+    seen_studios: list[str] = []
+
+    def capture_invoice_paid(_listing_id: int) -> None:
+        assert _listing_id == listing_id
+        seen_studios.append(tenant.get_studio_id())
+
+    tenant.set_studio("default")
+    with patch("eos.stripe_webhooks.automations.on_invoice_paid", side_effect=capture_invoice_paid):
+        assert stripe_webhooks.handle_invoice_checkout_completed(session) is True
+
+    row = db.one("SELECT status FROM invoices WHERE id=?", (iid,))
+    assert row["status"] == "paid"
+    assert seen_studios == ["pay-bind"]
+    assert tenant.get_studio_id() == "default"
 
 
 def test_connect_client_payment_idempotent(saas_env):
     _seed_studio("pay-idem")
     iid = _seed_invoice("pay-idem")
     session = {"id": "cs_test_2", "mode": "payment", "metadata": {"invoice_id": str(iid)}}
+    tenant.set_studio("default")
     stripe_webhooks.handle_invoice_checkout_completed(session)
     stripe_webhooks.handle_invoice_checkout_completed(session)
     row = db.one("SELECT status FROM invoices WHERE id=?", (iid,))
     assert row["status"] == "paid"
+    assert tenant.get_studio_id() == "default"
 
 
 def test_subscription_webhook_still_works(saas_env):
@@ -104,6 +132,7 @@ def test_subscription_webhook_still_works(saas_env):
             }
         },
     }
+    tenant.set_studio("default")
     platform_billing.handle_webhook_event(event)
     row = db.one(
         "SELECT billing_status, plan_tier, stripe_subscription_id FROM studio WHERE id=?",
@@ -112,3 +141,4 @@ def test_subscription_webhook_still_works(saas_env):
     assert row["billing_status"] == "active"
     assert row["plan_tier"] == "starter"
     assert row["stripe_subscription_id"] == "sub_123"
+    assert tenant.get_studio_id() == "default"
