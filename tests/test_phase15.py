@@ -1,6 +1,7 @@
 """Phase 15 — low priority + ops polish."""
 
 import importlib
+import json
 
 import eos.commerce as commerce
 import eos.config as config
@@ -69,8 +70,11 @@ def test_ai_cull_job(app_env):
             "INSERT INTO assets (gallery_id, section_id, kind, filename, stored, status) VALUES (?,?,?,?,?,?)",
             (gid, sid, "photo", f"p{i}.jpg", f"p{i}.jpg", "ready"),
         )
-    jobs.enqueue("ai_cull", {"gallery_id": gid})
-    jobs._execute(db.one("SELECT id FROM jobs ORDER BY id DESC")["id"])
+    job_id = db.run(
+        "INSERT INTO jobs (kind, payload) VALUES (?,?)",
+        ("ai_cull", json.dumps({"gallery_id": gid})),
+    )
+    jobs._execute(job_id)
     fav = db.one("SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND agent_favorite=1", (gid,))
     assert fav["n"] == 1
 
