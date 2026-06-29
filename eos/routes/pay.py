@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db, invoices, stripe_checkout, stripe_webhooks
 from ..render import templates
+from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.routes.pay")
 router = APIRouter()
@@ -19,11 +20,15 @@ async def view_invoice(request: Request, slug: str):
     inv = invoices.get_invoice_by_slug(slug)
     client = None
     if inv["client_id"]:
-        client = db.one("SELECT name, email, company FROM clients WHERE id=?", (inv["client_id"],))
+        client = db.one(
+            "SELECT name, email, company FROM clients WHERE id=? AND studio_id=?",
+            (inv["client_id"], STUDIO_ID),
+        )
     listing = None
     if inv["listing_id"]:
         listing = db.one(
-            "SELECT title, address_line1, city FROM listings WHERE id=?", (inv["listing_id"],)
+            "SELECT title, address_line1, city FROM listings WHERE id=? AND studio_id=?",
+            (inv["listing_id"], STUDIO_ID),
         )
     return templates.TemplateResponse(
         request,
@@ -47,14 +52,19 @@ async def pay_invoice(slug: str):
     from .. import tenant
 
     client = (
-        db.one("SELECT email FROM clients WHERE id=?", (inv["client_id"],))
+        db.one(
+            "SELECT email FROM clients WHERE id=? AND studio_id=?", (inv["client_id"], STUDIO_ID)
+        )
         if inv["client_id"]
         else None
     )
     base = tenant.get_base_url()
     success = f"{base}/i/{slug}?thanks=1"
     if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
-        inq = db.one("SELECT order_token FROM inquiries WHERE id=?", (inv["inquiry_id"],))
+        inq = db.one(
+            "SELECT order_token FROM inquiries WHERE id=? AND studio_id=?",
+            (inv["inquiry_id"], STUDIO_ID),
+        )
         if inq and inq.get("order_token"):
             success = f"{base}/booking/{inq['order_token']}?thanks=1"
     session = stripe_checkout.create_payment_session(
@@ -66,7 +76,10 @@ async def pay_invoice(slug: str):
         cancel_url=f"{base}/i/{slug}",
         existing_session_id=inv.get("stripe_session_id"),
     )
-    db.run("UPDATE invoices SET stripe_session_id=? WHERE id=?", (session.id, inv["id"]))
+    db.run(
+        "UPDATE invoices SET stripe_session_id=? WHERE id=? AND studio_id=?",
+        (session.id, inv["id"], STUDIO_ID),
+    )
     log.info("invoice %s checkout %s", inv["id"], session.id)
     return RedirectResponse(session.url, status_code=303)
 

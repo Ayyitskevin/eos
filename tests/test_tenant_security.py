@@ -308,3 +308,60 @@ async def test_cross_tenant_contract_public_view_rejects_foreign_listing(app_env
             follow_redirects=False,
         )
         assert blocked.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_invoice_send_rejects_foreign_listing(app_env):
+    tenant.set_studio("alpha")
+    alpha_listing = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('alpha', 'Alpha Invoice', 'lead')"
+    )
+    beta_invoice = db.run(
+        """INSERT INTO invoices (studio_id, listing_id, slug, title, amount_cents, status)
+           VALUES ('beta', ?, 'bad-beta-invoice-admin', 'Bad Invoice', 1000, 'draft')""",
+        (alpha_listing,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "b@beta.test", "password": "beta-pass-1"},
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        blocked = await client.post(
+            f"/admin/invoices/{beta_invoice}/send",
+            data={security.CSRF_FORM: csrf},
+            headers={"host": "beta.eos.test", "sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
+        row = db.one("SELECT status FROM invoices WHERE id=?", (beta_invoice,))
+        assert row["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_invoice_public_view_rejects_foreign_client(app_env):
+    tenant.set_studio("alpha")
+    alpha_client = db.run(
+        "INSERT INTO clients (studio_id, name, email) VALUES ('alpha', 'Alpha Buyer', 'buyer@alpha.test')"
+    )
+    db.run(
+        """INSERT INTO invoices (studio_id, client_id, slug, title, amount_cents, status)
+           VALUES ('beta', ?, 'bad-beta-invoice-public', 'Bad Invoice', 1000, 'sent')""",
+        (alpha_client,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        blocked = await client.get(
+            "/i/bad-beta-invoice-public",
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
