@@ -26,9 +26,9 @@ def statement_rows(brokerage_id: int) -> list:
                   agent.name AS agent_name,
                   bill.name AS bill_to_name
            FROM invoices i
-           LEFT JOIN listings l ON l.id=i.listing_id
-           LEFT JOIN clients agent ON agent.id=i.agent_client_id
-           LEFT JOIN clients bill ON bill.id=i.bill_to_client_id
+           LEFT JOIN listings l ON l.id=i.listing_id AND l.studio_id=i.studio_id
+           LEFT JOIN clients agent ON agent.id=i.agent_client_id AND agent.studio_id=i.studio_id
+           LEFT JOIN clients bill ON bill.id=i.bill_to_client_id AND bill.studio_id=i.studio_id
            WHERE i.studio_id=? AND i.bill_to_client_id=?
              AND i.status IN ('sent','paid')
            ORDER BY i.created_at DESC""",

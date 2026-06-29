@@ -3,6 +3,7 @@
 import logging
 
 from . import db
+from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.automations")
 
@@ -17,11 +18,12 @@ def _trigger(event: str, listing_id: int) -> None:
 
 
 def on_questionnaire_completed(listing_id: int) -> None:
-    row = db.one("SELECT status FROM listings WHERE id=?", (listing_id,))
+    row = db.one("SELECT status FROM listings WHERE id=? AND studio_id=?", (listing_id, STUDIO_ID))
     if row and row["status"] == "booked":
         db.run(
-            "UPDATE listings SET status='shooting', updated_at=datetime('now') WHERE id=?",
-            (listing_id,),
+            """UPDATE listings SET status='shooting', updated_at=datetime('now')
+               WHERE id=? AND studio_id=?""",
+            (listing_id, STUDIO_ID),
         )
         log.info("listing %s auto-advanced booked → shooting (questionnaire)", listing_id)
 
@@ -34,11 +36,12 @@ def on_listing_booked(listing_id: int) -> None:
 def on_gallery_published(listing_id: int | None, n_assets: int) -> None:
     if not listing_id or n_assets == 0:
         return
-    row = db.one("SELECT status FROM listings WHERE id=?", (listing_id,))
+    row = db.one("SELECT status FROM listings WHERE id=? AND studio_id=?", (listing_id, STUDIO_ID))
     if row and row["status"] in ("shooting", "editing"):
         db.run(
-            "UPDATE listings SET status='delivered', updated_at=datetime('now') WHERE id=?",
-            (listing_id,),
+            """UPDATE listings SET status='delivered', updated_at=datetime('now')
+               WHERE id=? AND studio_id=?""",
+            (listing_id, STUDIO_ID),
         )
         log.info("listing %s auto-advanced → delivered (gallery published)", listing_id)
         _trigger("listing.delivered", listing_id)
@@ -62,8 +65,9 @@ def on_invoice_paid(listing_id: int | None) -> None:
     if not listing_id:
         return
     db.run(
-        "UPDATE listing_tasks SET done=1 WHERE listing_id=? AND label LIKE '%invoice%'",
-        (listing_id,),
+        """UPDATE listing_tasks SET done=1
+           WHERE listing_id=? AND studio_id=? AND label LIKE '%invoice%'""",
+        (listing_id, STUDIO_ID),
     )
     _webhook("invoice.paid", listing_id)
 
@@ -82,24 +86,31 @@ def _webhook(event: str, listing_id: int, *, extra: dict | None = None) -> None:
 
 def on_deposit_paid(inquiry_id: int, listing_id: int | None) -> None:
     db.run(
-        "UPDATE inquiries SET status='confirmed' WHERE id=? AND status='pending_payment'",
-        (inquiry_id,),
+        """UPDATE inquiries SET status='confirmed'
+           WHERE id=? AND studio_id=? AND status='pending_payment'""",
+        (inquiry_id, STUDIO_ID),
     )
     if not listing_id:
         return
-    inq = db.one("SELECT appointment_id FROM inquiries WHERE id=?", (inquiry_id,))
+    inq = db.one(
+        "SELECT appointment_id FROM inquiries WHERE id=? AND studio_id=?",
+        (inquiry_id, STUDIO_ID),
+    )
     if inq and inq.get("appointment_id"):
         db.run(
-            "UPDATE appointments SET status='confirmed' WHERE id=?",
-            (inq["appointment_id"],),
+            "UPDATE appointments SET status='confirmed' WHERE id=? AND studio_id=?",
+            (inq["appointment_id"], STUDIO_ID),
         )
     db.run(
-        "UPDATE listings SET status='booked', updated_at=datetime('now') WHERE id=?",
-        (listing_id,),
+        """UPDATE listings SET status='booked', updated_at=datetime('now')
+           WHERE id=? AND studio_id=?""",
+        (listing_id, STUDIO_ID),
     )
     prop = db.one(
-        "SELECT id FROM proposals WHERE listing_id=? AND status='draft' ORDER BY id DESC LIMIT 1",
-        (listing_id,),
+        """SELECT id FROM proposals
+           WHERE listing_id=? AND studio_id=? AND status='draft'
+           ORDER BY id DESC LIMIT 1""",
+        (listing_id, STUDIO_ID),
     )
     if prop:
         from . import proposals

@@ -4,14 +4,44 @@ import json
 
 from fastapi import HTTPException
 
-from . import db, security
+from . import clients, db, listings, security
 from .vocab import STUDIO_ID
+
+
+def _ensure_refs(
+    *,
+    listing_id: int | None = None,
+    client_id: int | None = None,
+    bill_to_client_id: int | None = None,
+    agent_client_id: int | None = None,
+    inquiry_id: int | None = None,
+) -> None:
+    if listing_id is not None:
+        listings.get_listing(listing_id)
+    for cid in (client_id, bill_to_client_id, agent_client_id):
+        if cid is not None:
+            clients.get_client(cid)
+    if inquiry_id is not None:
+        row = db.one("SELECT id FROM inquiries WHERE id=? AND studio_id=?", (inquiry_id, STUDIO_ID))
+        if not row:
+            raise HTTPException(status_code=404)
+
+
+def _ensure_invoice_refs(row) -> None:
+    _ensure_refs(
+        listing_id=row["listing_id"],
+        client_id=row["client_id"],
+        bill_to_client_id=row["bill_to_client_id"],
+        agent_client_id=row["agent_client_id"],
+        inquiry_id=row["inquiry_id"],
+    )
 
 
 def get_invoice(invoice_id: int):
     row = db.one("SELECT * FROM invoices WHERE id=? AND studio_id=?", (invoice_id, STUDIO_ID))
     if not row:
         raise HTTPException(status_code=404)
+    _ensure_invoice_refs(row)
     return row
 
 
@@ -19,10 +49,12 @@ def get_invoice_by_slug(slug: str):
     row = db.one("SELECT * FROM invoices WHERE slug=? AND studio_id=?", (slug, STUDIO_ID))
     if not row or row["status"] == "draft":
         raise HTTPException(status_code=404)
+    _ensure_invoice_refs(row)
     return row
 
 
 def list_for_listing(listing_id: int):
+    listings.get_listing(listing_id)
     return db.all_(
         "SELECT * FROM invoices WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC",
         (listing_id, STUDIO_ID),
@@ -44,10 +76,18 @@ def create_invoice(
 ) -> int:
     from . import brokerage
 
+    _ensure_refs(
+        listing_id=listing_id,
+        client_id=client_id,
+        bill_to_client_id=bill_to_client_id,
+        agent_client_id=agent_client_id,
+        inquiry_id=inquiry_id,
+    )
     if client_id and not bill_to_client_id:
         bill_to, agent = brokerage.resolve_billing(client_id)
         bill_to_client_id = bill_to
         agent_client_id = agent_client_id or agent
+    _ensure_refs(bill_to_client_id=bill_to_client_id, agent_client_id=agent_client_id)
     iid = db.run(
         """INSERT INTO invoices
            (studio_id, listing_id, client_id, bill_to_client_id, agent_client_id,
@@ -112,12 +152,19 @@ def update_invoice(invoice_id: int, **fields) -> None:
         params.append(v)
     if not parts:
         return
+    get_invoice(invoice_id)
+    _ensure_refs(
+        client_id=fields.get("client_id"),
+        bill_to_client_id=fields.get("bill_to_client_id"),
+        agent_client_id=fields.get("agent_client_id"),
+    )
     params.extend([invoice_id, STUDIO_ID])
     db.run(f"UPDATE invoices SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "invoice.update", f"id={invoice_id}")
 
 
 def mark_sent(invoice_id: int) -> None:
+    get_invoice(invoice_id)
     db.run(
         "UPDATE invoices SET status='sent' WHERE id=? AND studio_id=? AND status='draft'",
         (invoice_id, STUDIO_ID),
@@ -125,6 +172,7 @@ def mark_sent(invoice_id: int) -> None:
 
 
 def mark_paid(invoice_id: int) -> None:
+    get_invoice(invoice_id)
     db.run(
         "UPDATE invoices SET status='paid', paid_at=datetime('now') WHERE id=? AND studio_id=?",
         (invoice_id, STUDIO_ID),

@@ -102,15 +102,19 @@ def create_booking(
         ph = ",".join("?" * len(addon_ids))
         twilight = bool(
             db.one(
-                f"SELECT 1 AS x FROM service_addons WHERE id IN ({ph}) AND slug='twilight' LIMIT 1",
-                tuple(addon_ids),
+                f"""SELECT 1 AS x FROM service_addons
+                   WHERE id IN ({ph}) AND studio_id=? AND slug='twilight' LIMIT 1""",
+                (*addon_ids, STUDIO_ID),
             )
         )
     if not scheduling.slot_is_open(scheduled_at, twilight=twilight):
         raise HTTPException(status_code=400, detail="slot no longer available")
     if not signer_name.strip():
         raise HTTPException(status_code=400, detail="signature required")
-    pkg = db.one("SELECT name, turnaround_hours FROM service_packages WHERE id=?", (package_id,))
+    pkg = db.one(
+        "SELECT name, turnaround_hours FROM service_packages WHERE id=? AND studio_id=?",
+        (package_id, STUDIO_ID),
+    )
 
     client_id = _find_or_create_client(name, email, phone, client_type=client_type)
     total_cents, deposit_cents, line_items, referral_id = calc_total(
@@ -143,22 +147,28 @@ def create_booking(
     )
     appt_status = "confirmed" if deposit_cents == 0 else "proposed"
     db.run(
-        "UPDATE appointments SET ends_at=?, status=? WHERE id=?",
-        (ends, appt_status, appt_id),
+        "UPDATE appointments SET ends_at=?, status=? WHERE id=? AND studio_id=?",
+        (ends, appt_status, appt_id, STUDIO_ID),
     )
 
     preset_key = pkg["name"].lower().replace(" ", "_")
     prop_id = proposals.create_proposal(listing_id, preset=preset_key)
     for a in addon_ids:
-        addon = db.one("SELECT name, price_cents FROM service_addons WHERE id=?", (a,))
+        addon = db.one(
+            "SELECT name, price_cents FROM service_addons WHERE id=? AND studio_id=?",
+            (a, STUDIO_ID),
+        )
         if addon:
-            prop = db.one("SELECT line_items, total_cents FROM proposals WHERE id=?", (prop_id,))
+            prop = db.one(
+                "SELECT line_items, total_cents FROM proposals WHERE id=? AND studio_id=?",
+                (prop_id, STUDIO_ID),
+            )
             items = json.loads(prop["line_items"] or "[]")
             items.append({"label": addon["name"], "qty": 1, "unit_cents": addon["price_cents"]})
             new_total = sum(i["qty"] * i["unit_cents"] for i in items)
             db.run(
-                "UPDATE proposals SET line_items=?, total_cents=? WHERE id=?",
-                (json.dumps(items), new_total, prop_id),
+                "UPDATE proposals SET line_items=?, total_cents=? WHERE id=? AND studio_id=?",
+                (json.dumps(items), new_total, prop_id, STUDIO_ID),
             )
     if deposit_cents == 0:
         listings.update_listing(listing_id, status="booked")
@@ -193,7 +203,10 @@ def create_booking(
             deposit_cents,
         ),
     )
-    db.run("UPDATE appointments SET inquiry_id=? WHERE id=?", (inquiry_id, appt_id))
+    db.run(
+        "UPDATE appointments SET inquiry_id=? WHERE id=? AND studio_id=?",
+        (inquiry_id, appt_id, STUDIO_ID),
+    )
 
     invoice_id = None
     pay_slug = None
@@ -207,8 +220,13 @@ def create_booking(
             title=f"Booking deposit — {title}",
         )
         invoices.mark_sent(invoice_id)
-        db.run("UPDATE inquiries SET invoice_id=? WHERE id=?", (invoice_id, inquiry_id))
-        pay_slug = db.one("SELECT slug FROM invoices WHERE id=?", (invoice_id,))["slug"]
+        db.run(
+            "UPDATE inquiries SET invoice_id=? WHERE id=? AND studio_id=?",
+            (invoice_id, inquiry_id, STUDIO_ID),
+        )
+        pay_slug = db.one(
+            "SELECT slug FROM invoices WHERE id=? AND studio_id=?", (invoice_id, STUDIO_ID)
+        )["slug"]
 
     if referral_id:
         from . import referrals
