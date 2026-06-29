@@ -121,16 +121,21 @@ def apply_subscription(
     status: str,
     plan_tier: str | None = None,
 ) -> None:
-    billing_status = _STATUS_MAP.get(status, "none")
-    tier = plan_tier or "starter"
-    if billing_status == "canceled":
-        tier = "solo"
-    db.run(
-        """UPDATE studio SET stripe_subscription_id=?, billing_status=?, plan_tier=?
-           WHERE id=?""",
-        (subscription_id, billing_status, tier, studio_id),
-    )
-    log.info("studio %s billing %s tier %s", studio_id, billing_status, tier)
+    previous_studio = tenant.get_studio_id()
+    tenant.set_studio(studio_id)
+    try:
+        billing_status = _STATUS_MAP.get(status, "none")
+        tier = plan_tier or "starter"
+        if billing_status == "canceled":
+            tier = "solo"
+        db.run(
+            """UPDATE studio SET stripe_subscription_id=?, billing_status=?, plan_tier=?
+               WHERE id=?""",
+            (subscription_id, billing_status, tier, studio_id),
+        )
+        log.info("studio %s billing %s tier %s", studio_id, billing_status, tier)
+    finally:
+        tenant.set_studio(previous_studio)
 
 
 def handle_webhook_event(event: dict) -> None:
