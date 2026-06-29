@@ -21,7 +21,7 @@ def _free_gb() -> float:
 
 @router.post("/galleries/{gallery_id}/upload")
 async def upload(gallery_id: int, files: list[UploadFile], section_id: int | None = None):
-    galleries.get_gallery(gallery_id)
+    gallery = galleries.get_gallery(gallery_id)
     if section_id is None:
         first = db.one(
             "SELECT id FROM sections WHERE gallery_id=? ORDER BY position, id LIMIT 1",
@@ -29,6 +29,10 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
         )
         if first:
             section_id = first["id"]
+    elif not db.one(
+        "SELECT 1 AS x FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id)
+    ):
+        raise HTTPException(status_code=404)
     if _free_gb() < config.MIN_FREE_GB:
         raise HTTPException(status_code=507, detail="low disk space — upload refused")
     from .. import usage
@@ -74,6 +78,9 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
         accepted.append(asset_id)
 
     if accepted:
-        db.run("UPDATE galleries SET content_rev=content_rev+1 WHERE id=?", (gallery_id,))
+        db.run(
+            "UPDATE galleries SET content_rev=content_rev+1 WHERE id=? AND studio_id=?",
+            (gallery_id, gallery["studio_id"]),
+        )
     log.info("gallery %s: %d accepted, %d rejected", gallery_id, len(accepted), len(rejected))
     return {"accepted": len(accepted), "rejected": rejected}

@@ -172,3 +172,79 @@ async def test_cross_tenant_client_mutation_blocked(app_env):
             (alpha_client,),
         )
         assert leaked is None
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_gallery_section_delete_blocked(app_env):
+    tenant.set_studio("alpha")
+    gallery_id = db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
+           VALUES ('alpha', 'alpha-gallery', 'Alpha Gallery', '0000', 'tok-alpha')"""
+    )
+    section_id = db.run(
+        "INSERT INTO sections (gallery_id, name, position) VALUES (?, 'Alpha Section', 0)",
+        (gallery_id,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "b@beta.test", "password": "beta-pass-1"},
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        blocked = await client.post(
+            f"/admin/galleries/{gallery_id}/sections/{section_id}/delete",
+            data={security.CSRF_FORM: csrf},
+            headers={"host": "beta.eos.test", "sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
+        assert db.one("SELECT id FROM sections WHERE id=?", (section_id,)) is not None
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_gallery_listing_link_blocked(app_env):
+    tenant.set_studio("alpha")
+    alpha_listing = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('alpha', 'Alpha Listing', 'lead')"
+    )
+    tenant.set_studio("beta")
+    beta_gallery = db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
+           VALUES ('beta', 'beta-gallery', 'Beta Gallery', '1111', 'tok-beta')"""
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "b@beta.test", "password": "beta-pass-1"},
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        blocked = await client.post(
+            f"/admin/galleries/{beta_gallery}/settings",
+            data={
+                "title": "Beta Gallery",
+                "pin": "1111",
+                "client_name": "",
+                "expires_at": "",
+                "listing_id": str(alpha_listing),
+                security.CSRF_FORM: csrf,
+            },
+            headers={"host": "beta.eos.test", "sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
+        row = db.one("SELECT listing_id FROM galleries WHERE id=?", (beta_gallery,))
+        assert row["listing_id"] is None

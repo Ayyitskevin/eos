@@ -111,13 +111,17 @@ async def set_cover(gallery_id: int, asset_id: int):
 
         raise HTTPException(status_code=404)
     new = None if g["cover_asset_id"] == asset_id else asset_id
-    db.run("UPDATE galleries SET cover_asset_id=? WHERE id=?", (new, gallery_id))
+    db.run(
+        "UPDATE galleries SET cover_asset_id=? WHERE id=? AND studio_id=?",
+        (new, gallery_id, g["studio_id"]),
+    )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 def _get_section(gallery_id: int, section_id: int):
     from fastapi import HTTPException
 
+    galleries.get_gallery(gallery_id)
     s = db.one("SELECT * FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
     if not s:
         raise HTTPException(status_code=404)
@@ -145,7 +149,10 @@ async def rename_section(gallery_id: int, section_id: int, name: str = Form(...)
     _get_section(gallery_id, section_id)
     if not name.strip():
         raise HTTPException(status_code=400, detail="name required")
-    db.run("UPDATE sections SET name=? WHERE id=?", (name.strip(), section_id))
+    db.run(
+        "UPDATE sections SET name=? WHERE id=? AND gallery_id=?",
+        (name.strip(), section_id, gallery_id),
+    )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
@@ -168,19 +175,26 @@ async def reorder_section(gallery_id: int, section_id: int, dir: str = Form(...)
     if 0 <= j < len(ids):
         ids[i], ids[j] = ids[j], ids[i]
         for pos, sid in enumerate(ids):
-            db.run("UPDATE sections SET position=? WHERE id=?", (pos, sid))
+            db.run(
+                "UPDATE sections SET position=? WHERE id=? AND gallery_id=?",
+                (pos, sid, gallery_id),
+            )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/sections/{section_id}/delete")
 async def delete_section(gallery_id: int, section_id: int):
+    galleries.get_gallery(gallery_id)
     db.run("DELETE FROM sections WHERE id=? AND gallery_id=?", (section_id, gallery_id))
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/assets/{asset_id}/section")
 async def move_asset(gallery_id: int, asset_id: int, section_id: str = Form("")):
+    galleries.get_gallery(gallery_id)
     sid = int(section_id) if section_id.strip().isdigit() else None
+    if sid is not None:
+        _get_section(gallery_id, sid)
     db.run(
         "UPDATE assets SET section_id=? WHERE id=? AND gallery_id=?",
         (sid, asset_id, gallery_id),
@@ -194,6 +208,7 @@ async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
 
     if dir not in ("left", "right"):
         raise HTTPException(status_code=400, detail="dir must be left or right")
+    galleries.get_gallery(gallery_id)
     a = db.one("SELECT section_id FROM assets WHERE id=? AND gallery_id=?", (asset_id, gallery_id))
     if not a:
         raise HTTPException(status_code=404)
@@ -208,5 +223,8 @@ async def reorder_asset(gallery_id: int, asset_id: int, dir: str = Form(...)):
     if 0 <= j < len(ids):
         ids[i], ids[j] = ids[j], ids[i]
         for pos, aid in enumerate(ids):
-            db.run("UPDATE assets SET position=? WHERE id=?", (pos, aid))
+            db.run(
+                "UPDATE assets SET position=? WHERE id=? AND gallery_id=?",
+                (pos, aid, gallery_id),
+            )
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
