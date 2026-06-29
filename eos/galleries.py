@@ -2,8 +2,13 @@
 
 from fastapi import HTTPException
 
-from . import db, security
+from . import db, listings, security
 from .vocab import DEFAULT_SECTIONS, STUDIO_ID
+
+
+def _ensure_listing(listing_id: int | None) -> None:
+    if listing_id is not None:
+        listings.get_listing(listing_id)
 
 
 def get_gallery(gallery_id: int):
@@ -27,7 +32,7 @@ def list_galleries():
                   l.title AS listing_title,
                   l.address_line1 AS listing_address
            FROM galleries g
-           LEFT JOIN listings l ON l.id=g.listing_id
+           LEFT JOIN listings l ON l.id=g.listing_id AND l.studio_id=g.studio_id
            WHERE g.studio_id=?
            ORDER BY g.created_at DESC""",
         (STUDIO_ID,),
@@ -40,6 +45,7 @@ def create_gallery(
     listing_id: int | None = None,
     client_name: str | None = None,
 ) -> int:
+    _ensure_listing(listing_id)
     slug = security.new_slug()
     pin = security.new_pin()
     token = security.new_token()
@@ -59,6 +65,7 @@ def create_gallery(
 
 
 def gallery_sections(gallery_id: int):
+    get_gallery(gallery_id)
     return db.all_(
         "SELECT * FROM sections WHERE gallery_id=? ORDER BY position",
         (gallery_id,),
@@ -66,6 +73,7 @@ def gallery_sections(gallery_id: int):
 
 
 def gallery_assets(gallery_id: int):
+    get_gallery(gallery_id)
     return db.all_(
         """SELECT * FROM assets WHERE gallery_id=?
            ORDER BY section_id, position, id""",
@@ -83,11 +91,14 @@ def update_gallery_settings(
     published: bool,
     listing_id: int | None,
 ) -> None:
+    get_gallery(gallery_id)
+    _ensure_listing(listing_id)
     if not (pin.isdigit() and len(pin) == 4):
         raise HTTPException(status_code=400, detail="PIN must be 4 digits")
     db.run(
         """UPDATE galleries SET title=?, client_name=?, pin=?, expires_at=?,
-           published=?, listing_id=?, content_rev=content_rev+1 WHERE id=?""",
+           published=?, listing_id=?, content_rev=content_rev+1
+           WHERE id=? AND studio_id=?""",
         (
             title.strip(),
             client_name,
@@ -96,12 +107,14 @@ def update_gallery_settings(
             1 if published else 0,
             listing_id,
             gallery_id,
+            STUDIO_ID,
         ),
     )
     db.audit("admin", "gallery.update", f"id={gallery_id}")
 
 
 def toggle_agent_favorite(asset_id: int, *, gallery_id: int) -> bool:
+    get_gallery(gallery_id)
     row = db.one(
         "SELECT agent_favorite FROM assets WHERE id=? AND gallery_id=?",
         (asset_id, gallery_id),
@@ -109,11 +122,15 @@ def toggle_agent_favorite(asset_id: int, *, gallery_id: int) -> bool:
     if not row:
         raise HTTPException(status_code=404)
     new_val = 0 if row["agent_favorite"] else 1
-    db.run("UPDATE assets SET agent_favorite=? WHERE id=?", (new_val, asset_id))
+    db.run(
+        "UPDATE assets SET agent_favorite=? WHERE id=? AND gallery_id=?",
+        (new_val, asset_id, gallery_id),
+    )
     return bool(new_val)
 
 
 def agent_favorites(gallery_id: int) -> list:
+    get_gallery(gallery_id)
     return db.all_(
         """SELECT * FROM assets WHERE gallery_id=? AND agent_favorite=1
            ORDER BY section_id, position, id""",

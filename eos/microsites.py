@@ -11,7 +11,9 @@ def ensure_site_slug(listing_id: int) -> str:
     if row["site_slug"]:
         return row["site_slug"]
     slug = security.new_slug(12)
-    db.run("UPDATE listings SET site_slug=? WHERE id=?", (slug, listing_id))
+    db.run(
+        "UPDATE listings SET site_slug=? WHERE id=? AND studio_id=?", (slug, listing_id, STUDIO_ID)
+    )
     return slug
 
 
@@ -53,8 +55,8 @@ def update_site(
         params.append(1 if lead_capture else 0)
     if len(parts) == 1:
         return
-    params.append(listing_id)
-    db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=?", tuple(params))
+    params.extend([listing_id, STUDIO_ID])
+    db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "listing.site", f"id={listing_id}")
 
 
@@ -64,8 +66,9 @@ def maybe_auto_publish(listing_id: int) -> None:
         return
     ensure_site_slug(listing_id)
     db.run(
-        "UPDATE listings SET site_published=1, updated_at=datetime('now') WHERE id=?",
-        (listing_id,),
+        """UPDATE listings SET site_published=1, updated_at=datetime('now')
+           WHERE id=? AND studio_id=?""",
+        (listing_id, STUDIO_ID),
     )
 
 
