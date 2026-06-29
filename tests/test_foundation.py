@@ -1,5 +1,7 @@
 """Foundation smoke tests — migrate, listing spine, RE gallery sections."""
 
+from unittest.mock import patch
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -11,6 +13,27 @@ async def test_healthz(app_env_http):
         r = await client.get("/healthz")
     assert r.status_code == 200
     assert r.json()["ok"] is True
+    assert r.json()["service"] == "eos"
+
+
+@pytest.mark.asyncio
+async def test_readyz_returns_200_when_ready(app_env_http):
+    transport = ASGITransport(app=app_env_http)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        r = await client.get("/readyz")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["service"] == "eos"
+
+
+@pytest.mark.asyncio
+async def test_readyz_returns_503_when_not_ready(app_env_http):
+    with patch("eos.main.monitoring.health_details", return_value={"ok": False, "db": "error"}):
+        transport = ASGITransport(app=app_env_http)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            r = await client.get("/readyz")
+    assert r.status_code == 503
+    assert r.json()["ok"] is False
     assert r.json()["service"] == "eos"
 
 

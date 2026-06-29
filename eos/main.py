@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -188,6 +189,12 @@ async def branded_errors(request: Request, exc: StarletteHTTPException):
 async def healthz():
     details = monitoring.health_details()
     return {"service": "eos", **details}
+
+
+@app.get("/readyz")
+async def readyz():
+    details = {"service": "eos", **monitoring.health_details()}
+    return JSONResponse(details, status_code=200 if details["ok"] else 503)
 
 
 for r in (

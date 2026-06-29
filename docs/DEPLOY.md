@@ -36,10 +36,13 @@ Edit `/opt/eos/.env` from `deploy/env.production.example`:
 | `EOS_S3_*` | Object storage for gallery media |
 | `EOS_PLATFORM_ADMIN_EMAILS` | Super-admin for `/admin/platform/studios` |
 
-Validate:
+Validate before restart:
 
 ```bash
-cd /opt/eos && EOS_CHECK_MODE=production set -a && source .env && set +a && .venv/bin/python scripts/check-env.py
+cd /opt/eos
+set -a && source .env && set +a
+EOS_CHECK_MODE=production .venv/bin/python scripts/check-env.py
+.venv/bin/pytest tests/test_foundation.py tests/test_sql_guardrails.py -q
 sudo systemctl restart eos
 ```
 
@@ -77,10 +80,33 @@ Create Starter/Pro products in Stripe Dashboard; set `EOS_STRIPE_PRICE_STARTER` 
 
 Backs up SQLite DB + local media tarball. With S3 enabled, media is also in object storage.
 
-## Health
+## Health and readiness
+
+Use `/healthz` as a liveness endpoint and `/readyz` for load balancers or deployment gates.
+`/readyz` returns HTTP 503 when core dependencies such as SQLite or disk capacity are not ready.
 
 ```bash
-curl -s https://eos.yourdomain.com/healthz | jq .
+curl -fsS https://eos.yourdomain.com/healthz | jq .
+curl -fsS https://eos.yourdomain.com/readyz | jq .
 systemctl status eos
 journalctl -u eos -f
+```
+
+## Post-deploy smoke
+
+After restart, verify public and tenant paths from outside the server:
+
+```bash
+curl -fsS https://eos.yourdomain.com/readyz | jq .
+curl -fsSI https://eos.yourdomain.com/signup
+curl -fsSI https://demo.eos.yourdomain.com/
+```
+
+For a local checkout or CI runner, use:
+
+```bash
+make smoke
+make test
+make lint
+make security
 ```
