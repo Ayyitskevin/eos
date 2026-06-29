@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, contracts, listings, security
+from .. import clients, config, contracts, listings, security
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -13,9 +13,7 @@ async def contract_detail(request: Request, contract_id: int):
     listing = listings.get_listing(d["listing_id"])
     client = None
     if listing["client_id"]:
-        from .. import db
-
-        client = db.one("SELECT * FROM clients WHERE id=?", (listing["client_id"],))
+        client = clients.get_client(listing["client_id"])
     return templates.TemplateResponse(
         request,
         "admin/contract.html",

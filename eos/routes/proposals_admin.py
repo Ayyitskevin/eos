@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, listings, proposals, security
+from .. import clients, config, listings, proposals, security
 from ..render import templates
 
 log = logging.getLogger("eos.routes.proposals_admin")
@@ -17,9 +17,7 @@ async def proposal_detail(request: Request, proposal_id: int):
     listing = listings.get_listing(prop["listing_id"])
     client = None
     if listing["client_id"]:
-        from .. import db
-
-        client = db.one("SELECT * FROM clients WHERE id=?", (listing["client_id"],))
+        client = clients.get_client(listing["client_id"])
     return templates.TemplateResponse(
         request,
         "admin/proposal.html",

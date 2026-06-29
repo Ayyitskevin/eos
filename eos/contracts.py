@@ -33,6 +33,7 @@ def get_contract(contract_id: int):
     row = db.one("SELECT * FROM contracts WHERE id=? AND studio_id=?", (contract_id, STUDIO_ID))
     if not row:
         raise HTTPException(status_code=404)
+    listings.get_listing(row["listing_id"])
     return row
 
 
@@ -40,13 +41,16 @@ def get_contract_by_slug(slug: str):
     row = db.one("SELECT * FROM contracts WHERE slug=? AND studio_id=?", (slug, STUDIO_ID))
     if not row or row["status"] == "draft":
         raise HTTPException(status_code=404)
+    listings.get_listing(row["listing_id"])
     return row
 
 
 def list_for_listing(listing_id: int):
+    listings.get_listing(listing_id)
     return db.all_(
-        "SELECT * FROM contracts WHERE listing_id=? ORDER BY created_at DESC",
-        (listing_id,),
+        """SELECT * FROM contracts
+           WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC""",
+        (listing_id, STUDIO_ID),
     )
 
 
@@ -55,14 +59,18 @@ def render_template(listing_id: int) -> str:
     client_name = "Client"
     company_clause = ""
     if listing["client_id"]:
-        c = db.one("SELECT name, company FROM clients WHERE id=?", (listing["client_id"],))
+        c = db.one(
+            "SELECT name, company FROM clients WHERE id=? AND studio_id=?",
+            (listing["client_id"], STUDIO_ID),
+        )
         if c:
             client_name = c["name"]
             company_clause = f" of {c['company']}" if c["company"] else ""
     accepted = db.one(
         """SELECT total_cents FROM proposals
-           WHERE listing_id=? AND status='accepted' ORDER BY accepted_at DESC LIMIT 1""",
-        (listing_id,),
+           WHERE listing_id=? AND studio_id=? AND status='accepted'
+           ORDER BY accepted_at DESC LIMIT 1""",
+        (listing_id, STUDIO_ID),
     )
     total_clause = f" for a total of ${accepted['total_cents'] / 100:.2f}" if accepted else ""
     addr = listings.format_address(listing)
@@ -102,8 +110,8 @@ def update_contract(contract_id: int, *, title: str, body: str) -> None:
     if not body.strip():
         raise HTTPException(status_code=400, detail="body required")
     db.run(
-        "UPDATE contracts SET title=?, body=? WHERE id=?",
-        (title.strip() or d["title"], body, contract_id),
+        "UPDATE contracts SET title=?, body=? WHERE id=? AND studio_id=?",
+        (title.strip() or d["title"], body, contract_id, STUDIO_ID),
     )
 
 
@@ -114,15 +122,17 @@ def mark_sent(contract_id: int) -> None:
     sha = hashlib.sha256(d["body"].encode()).hexdigest()
     db.run(
         """UPDATE contracts SET status='sent', body_sha256=?, sent_at=datetime('now')
-           WHERE id=?""",
-        (sha, contract_id),
+           WHERE id=? AND studio_id=?""",
+        (sha, contract_id, STUDIO_ID),
     )
 
 
 def mark_viewed(contract_id: int) -> None:
+    get_contract(contract_id)
     db.run(
-        "UPDATE contracts SET status='viewed', viewed_at=datetime('now') WHERE id=? AND status='sent'",
-        (contract_id,),
+        """UPDATE contracts SET status='viewed', viewed_at=datetime('now')
+           WHERE id=? AND studio_id=? AND status='sent'""",
+        (contract_id, STUDIO_ID),
     )
 
 
@@ -136,6 +146,6 @@ def sign_by_slug(slug: str, signer_name: str, signer_ip: str) -> None:
         raise HTTPException(status_code=409, detail="contract integrity check failed")
     db.run(
         """UPDATE contracts SET status='signed', signer_name=?, signer_ip=?,
-           signed_at=datetime('now') WHERE id=?""",
-        (signer_name.strip(), signer_ip, d["id"]),
+           signed_at=datetime('now') WHERE id=? AND studio_id=?""",
+        (signer_name.strip(), signer_ip, d["id"], STUDIO_ID),
     )

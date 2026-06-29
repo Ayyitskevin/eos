@@ -248,3 +248,63 @@ async def test_cross_tenant_gallery_listing_link_blocked(app_env):
         assert blocked.status_code == 404
         row = db.one("SELECT listing_id FROM galleries WHERE id=?", (beta_gallery,))
         assert row["listing_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_proposal_send_rejects_foreign_listing(app_env):
+    tenant.set_studio("alpha")
+    alpha_listing = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('alpha', 'Alpha Proposal', 'lead')"
+    )
+    beta_proposal = db.run(
+        """INSERT INTO proposals (studio_id, listing_id, slug, title, status)
+           VALUES ('beta', ?, 'bad-beta-proposal', 'Bad Proposal', 'draft')""",
+        (alpha_listing,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "b@beta.test", "password": "beta-pass-1"},
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        blocked = await client.post(
+            f"/admin/proposals/{beta_proposal}/send",
+            data={security.CSRF_FORM: csrf},
+            headers={"host": "beta.eos.test", "sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
+        proposal = db.one("SELECT status FROM proposals WHERE id=?", (beta_proposal,))
+        listing = db.one("SELECT status FROM listings WHERE id=?", (alpha_listing,))
+        assert proposal["status"] == "draft"
+        assert listing["status"] == "lead"
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_contract_public_view_rejects_foreign_listing(app_env):
+    tenant.set_studio("alpha")
+    alpha_listing = db.run(
+        "INSERT INTO listings (studio_id, title, status) VALUES ('alpha', 'Alpha Contract', 'lead')"
+    )
+    db.run(
+        """INSERT INTO contracts
+           (studio_id, listing_id, slug, title, body, body_sha256, status)
+           VALUES ('beta', ?, 'bad-beta-contract', 'Bad Contract', 'body', '', 'sent')""",
+        (alpha_listing,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        blocked = await client.get(
+            "/c/bad-beta-contract",
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
