@@ -6,12 +6,45 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import brand_kits, config, db, imaging, presets
+from . import brand_kits, config, db, imaging, presets, tenant
 
 log = logging.getLogger("eos.jobs")
 
 _pool: ThreadPoolExecutor | None = None
 MAX_ATTEMPTS = 3
+
+
+def _set_studio_for_gallery(gallery_id: int) -> str | None:
+    row = db.one("SELECT studio_id FROM galleries WHERE id=?", (gallery_id,))
+    if not row:
+        return None
+    tenant.set_studio(row["studio_id"])
+    return row["studio_id"]
+
+
+def _set_studio_for_listing(listing_id: int) -> str | None:
+    row = db.one("SELECT studio_id FROM listings WHERE id=?", (listing_id,))
+    if not row:
+        return None
+    tenant.set_studio(row["studio_id"])
+    return row["studio_id"]
+
+
+def _asset(asset_id: int, *, kind: str | None = None, status: str | None = None):
+    sql = """SELECT a.*, g.studio_id AS studio_id
+             FROM assets a JOIN galleries g ON g.id=a.gallery_id
+             WHERE a.id=?"""
+    params: list = [asset_id]
+    if kind:
+        sql += " AND a.kind=?"
+        params.append(kind)
+    if status:
+        sql += " AND a.status=?"
+        params.append(status)
+    row = db.one(sql, tuple(params))
+    if row:
+        tenant.set_studio(row["studio_id"])
+    return row
 
 
 def _gallery_dirs(gallery_id: int) -> dict[str, Path]:
@@ -43,7 +76,7 @@ def _sync_derivatives(gallery_id: int, dirs: dict[str, Path], base: str) -> None
 
 
 def _h_image(p: dict) -> None:
-    asset = db.one("SELECT * FROM assets WHERE id=?", (p["asset_id"],))
+    asset = _asset(p["asset_id"])
     if not asset:
         return
     dirs = _gallery_dirs(asset["gallery_id"])
@@ -57,15 +90,15 @@ def _h_image(p: dict) -> None:
         config.THUMB_MAX_PX,
         config.JPEG_QUALITY,
     )
-    db.run("UPDATE assets SET status='ready', width=?, height=? WHERE id=?", (w, h, asset["id"]))
+    db.run(
+        "UPDATE assets SET status='ready', width=?, height=? WHERE id=? AND gallery_id=?",
+        (w, h, asset["id"], asset["gallery_id"]),
+    )
     _sync_derivatives(asset["gallery_id"], dirs, base)
 
 
 def _h_exports(p: dict) -> None:
-    asset = db.one(
-        "SELECT * FROM assets WHERE id=? AND kind='photo' AND status='ready'",
-        (p["asset_id"],),
-    )
+    asset = _asset(p["asset_id"], kind="photo", status="ready")
     if not asset:
         return
     out = crops_dir(asset["gallery_id"])
@@ -75,7 +108,10 @@ def _h_exports(p: dict) -> None:
         return
     out.mkdir(parents=True, exist_ok=True)
     src = _gallery_dirs(asset["gallery_id"])["original"] / asset["stored"]
-    gal = db.one("SELECT listing_id FROM galleries WHERE id=?", (asset["gallery_id"],))
+    gal = db.one(
+        "SELECT listing_id FROM galleries WHERE id=? AND studio_id=?",
+        (asset["gallery_id"], asset["studio_id"]),
+    )
     listing_id = gal["listing_id"] if gal else None
     overlay = brand_kits.overlay_for_listing(listing_id)
     metadata = None
@@ -84,8 +120,9 @@ def _h_exports(p: dict) -> None:
 
         listing = db.one(
             """SELECT l.*, c.name AS client_name FROM listings l
-               LEFT JOIN clients c ON c.id=l.client_id WHERE l.id=?""",
-            (listing_id,),
+               LEFT JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
+               WHERE l.id=? AND l.studio_id=?""",
+            (listing_id, asset["studio_id"]),
         )
         metadata = imaging.listing_export_metadata(listing, site_name=get_site_name())
     imaging.make_crops(
@@ -101,6 +138,8 @@ def _h_exports(p: dict) -> None:
 
 def _h_zip(p: dict) -> None:
     gid, rev = p["gallery_id"], p["rev"]
+    if not _set_studio_for_gallery(gid):
+        return
     final = zip_path(gid, rev)
     if final.exists():
         return
@@ -123,6 +162,8 @@ def _h_zip(p: dict) -> None:
 
 def _h_gallery_exports(p: dict) -> None:
     gid = p["gallery_id"]
+    if not _set_studio_for_gallery(gid):
+        return
     for row in db.all_(
         "SELECT id FROM assets WHERE gallery_id=? AND kind='photo' AND status='ready'",
         (gid,),
@@ -133,12 +174,16 @@ def _h_gallery_exports(p: dict) -> None:
 def _h_bundle(p: dict) -> None:
     from . import bundles
 
+    if not _set_studio_for_listing(p["listing_id"]):
+        return
     bundles.build_bundle(p["listing_id"], p["kind"])
 
 
 def _h_marketing_kit(p: dict) -> None:
     from . import marketing_kit
 
+    if not _set_studio_for_listing(p["listing_id"]):
+        return
     try:
         marketing_kit.build_kit(p["listing_id"])
     except Exception as e:
@@ -171,15 +216,20 @@ def _h_integration_sweep(p: dict) -> None:
 
 
 def _h_video_ready(p: dict) -> None:
-    asset = db.one("SELECT * FROM assets WHERE id=?", (p["asset_id"],))
+    asset = _asset(p["asset_id"])
     if not asset:
         return
-    db.run("UPDATE assets SET status='ready' WHERE id=?", (asset["id"],))
+    db.run(
+        "UPDATE assets SET status='ready' WHERE id=? AND gallery_id=?",
+        (asset["id"], asset["gallery_id"]),
+    )
 
 
 def _h_ai_cull(p: dict) -> None:
     """Stub AI cull — pick first photo per section as agent favorite."""
     gid = p["gallery_id"]
+    if not _set_studio_for_gallery(gid):
+        return
     sections = db.all_("SELECT id FROM sections WHERE gallery_id=? ORDER BY position", (gid,))
     for sec in sections:
         row = db.one(
@@ -188,7 +238,10 @@ def _h_ai_cull(p: dict) -> None:
             (gid, sec["id"]),
         )
         if row:
-            db.run("UPDATE assets SET agent_favorite=1 WHERE id=?", (row["id"],))
+            db.run(
+                "UPDATE assets SET agent_favorite=1 WHERE id=? AND gallery_id=?",
+                (row["id"], gid),
+            )
 
 
 def _h_dropbox_ingest(p: dict) -> None:
@@ -204,8 +257,8 @@ def _h_dropbox_ingest(p: dict) -> None:
         )
     except Exception as e:
         db.run(
-            "UPDATE dropbox_ingest_log SET status='failed', error=? WHERE id=?",
-            (str(e)[:500], p["log_id"]),
+            "UPDATE dropbox_ingest_log SET status='failed', error=? WHERE id=? AND studio_id=?",
+            (str(e)[:500], p["log_id"], p["studio_id"]),
         )
         raise
 
@@ -269,7 +322,12 @@ def _execute(job_id: int) -> None:
         )
         log.error("job %s %s attempt %s -> %s: %s", job_id, job["kind"], job["attempts"], status, e)
         if status == "failed" and "asset_id" in payload:
-            db.run("UPDATE assets SET status='failed' WHERE id=?", (payload["asset_id"],))
+            asset = db.one("SELECT gallery_id FROM assets WHERE id=?", (payload["asset_id"],))
+            if asset:
+                db.run(
+                    "UPDATE assets SET status='failed' WHERE id=? AND gallery_id=?",
+                    (payload["asset_id"], asset["gallery_id"]),
+                )
         if status == "queued" and _pool:
             _pool.submit(_execute, job_id)
 

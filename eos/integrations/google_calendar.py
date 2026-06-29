@@ -142,8 +142,9 @@ def push_appointment(appt_id: int) -> None:
                 timeout=30,
             )
             db.run(
-                "UPDATE appointments SET google_event_id=NULL, google_synced_at=datetime('now') WHERE id=?",
-                (appt_id,),
+                """UPDATE appointments SET google_event_id=NULL, google_synced_at=datetime('now')
+                   WHERE id=? AND studio_id=?""",
+                (appt_id, STUDIO_ID),
             )
             return
         body = _event_body(appt)
@@ -164,8 +165,9 @@ def push_appointment(appt_id: int) -> None:
         resp.raise_for_status()
         event_id = resp.json().get("id")
         db.run(
-            "UPDATE appointments SET google_event_id=?, google_synced_at=datetime('now') WHERE id=?",
-            (event_id, appt_id),
+            """UPDATE appointments SET google_event_id=?, google_synced_at=datetime('now')
+               WHERE id=? AND studio_id=?""",
+            (event_id, appt_id, STUDIO_ID),
         )
     except Exception as e:
         log.exception("google push failed appt=%s studio=%s", appt_id, STUDIO_ID)
@@ -210,8 +212,8 @@ def pull_changes() -> int:
             if ev.get("status") == "cancelled":
                 if existing:
                     db.run(
-                        "UPDATE appointments SET status='canceled' WHERE id=?",
-                        (existing["id"],),
+                        "UPDATE appointments SET status='canceled' WHERE id=? AND studio_id=?",
+                        (existing["id"], STUDIO_ID),
                     )
                 continue
             start = ev.get("start", {})
@@ -231,8 +233,15 @@ def pull_changes() -> int:
             if existing:
                 db.run(
                     """UPDATE appointments SET title=?, starts_at=?, ends_at=?, location=?, status='confirmed',
-                       google_synced_at=datetime('now') WHERE id=?""",
-                    (title, starts_at, ends_at, ev.get("location") or "", existing["id"]),
+                       google_synced_at=datetime('now') WHERE id=? AND studio_id=?""",
+                    (
+                        title,
+                        starts_at,
+                        ends_at,
+                        ev.get("location") or "",
+                        existing["id"],
+                        STUDIO_ID,
+                    ),
                 )
             else:
                 db.run(

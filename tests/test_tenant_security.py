@@ -468,3 +468,23 @@ def test_sequence_worker_binds_each_run_studio(app_env, monkeypatch):
     row = db.one("SELECT status FROM email_sequence_runs WHERE id=?", (run_id,))
     assert row["status"] == "sent"
     assert tenant.get_studio_id() == "default"
+
+
+def test_asset_job_binds_asset_studio(app_env):
+    tenant.set_studio("beta")
+    gallery_id = db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
+           VALUES ('beta', 'beta-job-gallery', 'Beta Job Gallery', '1111', 'tok-beta-job')"""
+    )
+    asset_id = db.run(
+        """INSERT INTO assets (gallery_id, kind, filename, stored, status)
+           VALUES (?, 'video', 'tour.mp4', 'tour.mp4', 'pending')""",
+        (gallery_id,),
+    )
+    tenant.set_studio("default")
+
+    jobs.HANDLERS["video_ready"]({"asset_id": asset_id})
+
+    row = db.one("SELECT status FROM assets WHERE id=?", (asset_id,))
+    assert row["status"] == "ready"
+    assert tenant.get_studio_id() == "beta"
