@@ -45,3 +45,23 @@ Configured `.env` for SaaS mode and ran end-to-end flow on `127.0.0.1:8410`:
 ### Next when ready
 
 Production deploy via `deploy/install.sh` with real domain, DNS (`eos.domain` + `*.eos.domain`), Caddy wildcard TLS, and production `.env` from `deploy/env.production.example`.
+
+## 2026-06-29 — Production install on mickey (user systemd)
+
+**Install path:** `~/opt/eos` · **Service:** `systemctl --user` · **Domain target:** `eos.kleephotography.com`
+
+### Done
+
+- `deploy/install-user.sh` + `deploy/eos-user.service` — no-root install pattern (like Odysseus CRM user unit)
+- Production `.env` at `~/opt/eos/.env` — SaaS mode, invite-only beta, `EOS_BILLING_ENFORCE=false` until Stripe live
+- Service **active** on `0.0.0.0:8410` (dev uvicorn on :8410 stopped)
+- Platform owner bootstrapped: `klee.developer@gmail.com` (password in `~/opt/eos/.env` → `EOS_ADMIN_PASSWORD`)
+- Invite code `BETA2026` seeded (10 uses)
+- `deploy/cloudflared-flow-merged.yml` — ready to merge into flow tunnel
+
+### Remaining (needs sudo on flow + Cloudflare DNS)
+
+1. On **flow:** `sudo cp deploy/cloudflared-flow-merged.yml /etc/cloudflared/config.yml && sudo systemctl restart cloudflared`
+2. In **Cloudflare** (kleephotography.com): CNAME `eos` and `*.eos` → `1d45e82b-7189-4401-8d91-f5ed1058d632.cfargotunnel.com`
+3. Stripe live/test keys + webhook → `/stripe/platform/webhook`
+4. Postmark or Gmail for transactional email

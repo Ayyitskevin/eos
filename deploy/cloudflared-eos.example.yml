@@ -1,0 +1,15 @@
+# Cloudflare Tunnel routes for Eos on mickey (via Tailscale).
+# Copy to flow:/etc/cloudflared/config.yml (merge with existing mise tunnel) or a new tunnel.
+#
+# DNS in Cloudflare (kleephotography.com zone):
+#   CNAME eos     → <tunnel-id>.cfargotunnel.com  (proxied)
+#   CNAME *.eos   → <tunnel-id>.cfargotunnel.com  (proxied)
+#
+# mickey Tailscale IP: 100.125.80.91 · Eos listens on :8410 (127.0.0.1, user systemd)
+
+ingress:
+  - hostname: eos.kleephotography.com
+    service: http://100.125.80.91:8410
+  - hostname: "*.eos.kleephotography.com"
+    service: http://100.125.80.91:8410
+  - service: http_status:404

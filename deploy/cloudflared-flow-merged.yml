@@ -1,0 +1,23 @@
+# Merged cloudflared config for flow — add Eos routes, then:
+#   sudo cp deploy/cloudflared-flow-merged.yml /etc/cloudflared/config.yml
+#   sudo systemctl restart cloudflared
+#
+# Cloudflare DNS (kleephotography.com zone):
+#   CNAME eos   → 1d45e82b-7189-4401-8d91-f5ed1058d632.cfargotunnel.com (proxied)
+#   CNAME *.eos → 1d45e82b-7189-4401-8d91-f5ed1058d632.cfargotunnel.com (proxied)
+
+tunnel: 1d45e82b-7189-4401-8d91-f5ed1058d632
+credentials-file: /home/kevin-lee/.cloudflared/1d45e82b-7189-4401-8d91-f5ed1058d632.json
+
+ingress:
+  - hostname: eos.kleephotography.com
+    service: http://strix-halo-a9-mega:8410
+  - hostname: "*.eos.kleephotography.com"
+    service: http://strix-halo-a9-mega:8410
+  - hostname: kleephotography.com
+    service: http://localhost:8400
+  - hostname: www.kleephotography.com
+    service: http://localhost:8400
+  - hostname: plutus.kleephotography.com
+    service: http://strix-halo-a9-mega:8031
+  - service: http_status:404

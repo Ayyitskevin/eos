@@ -1,0 +1,17 @@
+[Unit]
+Description=Eos — real estate photography SaaS (user service)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@INSTALL_DIR@
+EnvironmentFile=@INSTALL_DIR@/.env
+Environment=EOS_CHECK_MODE=production
+ExecStartPre=@INSTALL_DIR@/.venv/bin/python @INSTALL_DIR@/scripts/check-env.py
+ExecStart=@INSTALL_DIR@/.venv/bin/uvicorn eos.main:app --host 0.0.0.0 --port 8410 --workers 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
