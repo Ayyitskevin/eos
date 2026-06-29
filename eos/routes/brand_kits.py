@@ -39,7 +39,9 @@ async def upload_brand_kit(
     with dest.open("wb") as out:
         while chunk := await file.read(1 << 20):
             out.write(chunk)
-    db.run("UPDATE brand_kits SET active=0 WHERE client_id=?", (client_id,))
+    db.run(
+        "UPDATE brand_kits SET active=0 WHERE client_id=? AND studio_id=?", (client_id, STUDIO_ID)
+    )
     db.run(
         """INSERT INTO brand_kits
            (studio_id, client_id, label, stored, position, opacity, scale_pct, margin_pct)

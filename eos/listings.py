@@ -35,10 +35,10 @@ def get_listing(listing_id: int):
 
 def list_listings(*, status: str | None = None):
     sql = """SELECT l.*, c.name AS client_name, c.company AS client_company,
-                    (SELECT COUNT(*) FROM listing_shots s WHERE s.listing_id=l.id AND s.done=0) AS shots_open,
-                    (SELECT COUNT(*) FROM listing_tasks t WHERE t.listing_id=l.id AND t.done=0) AS tasks_open
+                    (SELECT COUNT(*) FROM listing_shots s WHERE s.listing_id=l.id AND s.studio_id=l.studio_id AND s.done=0) AS shots_open,
+                    (SELECT COUNT(*) FROM listing_tasks t WHERE t.listing_id=l.id AND t.studio_id=l.studio_id AND t.done=0) AS tasks_open
              FROM listings l
-             LEFT JOIN clients c ON c.id=l.client_id
+             LEFT JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
              WHERE l.studio_id=?"""
     params: list = [STUDIO_ID]
     if status:
@@ -66,6 +66,22 @@ def _default_due_at() -> str:
     return due.strftime("%Y-%m-%d %H:%M")
 
 
+def _validate_client_id(client_id: int | None) -> None:
+    if client_id is None:
+        return
+    from . import clients
+
+    clients.get_client(client_id)
+
+
+def _validate_user_id(user_id: int | None) -> None:
+    if user_id is None:
+        return
+    from . import users
+
+    users.get_user(user_id)
+
+
 def create_listing(
     title: str,
     *,
@@ -88,6 +104,7 @@ def create_listing(
 ) -> int:
     from . import plan_limits, usage
 
+    _validate_client_id(client_id)
     plan_limits.check_listing_create(current_month_count=usage.listings_created_this_month())
     lid = db.run(
         """INSERT INTO listings
@@ -142,6 +159,10 @@ def create_listing(
 
 def update_listing(listing_id: int, **fields) -> None:
     old = get_listing(listing_id)
+    if "client_id" in fields:
+        _validate_client_id(fields["client_id"])
+    if "assigned_user_id" in fields:
+        _validate_user_id(fields["assigned_user_id"])
     allowed = {
         "client_id",
         "title",
@@ -175,8 +196,8 @@ def update_listing(listing_id: int, **fields) -> None:
             params.append(v.strip())
         else:
             params.append(v)
-    params.append(listing_id)
-    db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=?", tuple(params))
+    params.extend([listing_id, STUDIO_ID])
+    db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "listing.update", f"id={listing_id}")
     new_status = fields.get("status")
     if new_status and new_status != old["status"]:
@@ -190,30 +211,38 @@ def update_listing(listing_id: int, **fields) -> None:
 
 def listing_shots(listing_id: int):
     return db.all_(
-        "SELECT * FROM listing_shots WHERE listing_id=? ORDER BY position, id",
-        (listing_id,),
+        "SELECT * FROM listing_shots WHERE listing_id=? AND studio_id=? ORDER BY position, id",
+        (listing_id, STUDIO_ID),
     )
 
 
 def listing_tasks(listing_id: int):
     return db.all_(
-        "SELECT * FROM listing_tasks WHERE listing_id=? ORDER BY id",
-        (listing_id,),
+        "SELECT * FROM listing_tasks WHERE listing_id=? AND studio_id=? ORDER BY id",
+        (listing_id, STUDIO_ID),
     )
 
 
-def toggle_shot(shot_id: int, done: bool) -> None:
-    db.run("UPDATE listing_shots SET done=? WHERE id=?", (1 if done else 0, shot_id))
+def toggle_shot(listing_id: int, shot_id: int, done: bool) -> None:
+    get_listing(listing_id)
+    db.run(
+        "UPDATE listing_shots SET done=? WHERE id=? AND listing_id=? AND studio_id=?",
+        (1 if done else 0, shot_id, listing_id, STUDIO_ID),
+    )
 
 
-def toggle_task(task_id: int, done: bool) -> None:
-    db.run("UPDATE listing_tasks SET done=? WHERE id=?", (1 if done else 0, task_id))
+def toggle_task(listing_id: int, task_id: int, done: bool) -> None:
+    get_listing(listing_id)
+    db.run(
+        "UPDATE listing_tasks SET done=? WHERE id=? AND listing_id=? AND studio_id=?",
+        (1 if done else 0, task_id, listing_id, STUDIO_ID),
+    )
 
 
 def listing_galleries(listing_id: int):
     return db.all_(
-        "SELECT * FROM galleries WHERE listing_id=? ORDER BY created_at DESC",
-        (listing_id,),
+        "SELECT * FROM galleries WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC",
+        (listing_id, STUDIO_ID),
     )
 
 
@@ -227,10 +256,10 @@ def kanban_board() -> dict[str, list]:
         board[status] = db.all_(
             """SELECT l.*, c.name AS client_name,
                       u.name AS photographer_name,
-                      (SELECT COUNT(*) FROM listing_tasks t WHERE t.listing_id=l.id AND t.done=0) AS tasks_open
+                      (SELECT COUNT(*) FROM listing_tasks t WHERE t.listing_id=l.id AND t.studio_id=l.studio_id AND t.done=0) AS tasks_open
                FROM listings l
-               LEFT JOIN clients c ON c.id=l.client_id
-               LEFT JOIN users u ON u.id=l.assigned_user_id
+               LEFT JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
+               LEFT JOIN users u ON u.id=l.assigned_user_id AND u.studio_id=l.studio_id
                WHERE l.studio_id=? AND l.status=?
                ORDER BY COALESCE(l.due_at, '9999'), l.created_at DESC""",
             (STUDIO_ID, status),

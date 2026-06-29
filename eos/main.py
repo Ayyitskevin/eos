@@ -152,14 +152,16 @@ async def tenant_context(request: Request, call_next):
             from fastapi.responses import JSONResponse
 
             return JSONResponse({"detail": "Demo studio is read-only"}, status_code=403)
-    security.validate_csrf(request)
+    csrf_blocked = await security.validate_csrf(request)
+    if csrf_blocked:
+        return csrf_blocked
     return await call_next(request)
 
 
 @app.middleware("http")
 async def common_headers(request: Request, call_next):
     resp = await call_next(request)
-    if request.url.path.startswith("/admin"):
+    if request.url.path.startswith("/admin") and not request.cookies.get(security.CSRF_COOKIE):
         security.set_csrf_cookie(resp)
     p = request.url.path
     if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/", "/api/", "/oauth/"))):

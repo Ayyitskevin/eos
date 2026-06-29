@@ -4,8 +4,10 @@ import logging
 import secrets
 import string
 import time
+from urllib.parse import parse_qs
 
 from fastapi import HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from . import config, db
@@ -163,31 +165,52 @@ def set_csrf_cookie(response, token: str | None = None) -> str:
     return tok
 
 
-def validate_csrf(request: Request) -> None:
+def _csrf_matches(cookie: str, submitted: str) -> bool:
+    if not submitted:
+        return False
+    if secrets.compare_digest(cookie, submitted):
+        return True
+    unsigned = unsign(cookie)
+    return bool(unsigned) and secrets.compare_digest(unsigned, submitted)
+
+
+async def _urlencoded_form_token(request: Request) -> str:
+    body = await request.body()
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request._receive = receive
+    parsed = parse_qs(body.decode("utf-8", errors="ignore"), keep_blank_values=True)
+    values = parsed.get(CSRF_FORM) or []
+    return values[0] if values else ""
+
+
+async def validate_csrf(request: Request) -> PlainTextResponse | None:
     if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
-        return
+        return None
     path = request.url.path
     if path in ("/admin/login", "/admin/logout") or path.startswith(
         ("/stripe/", "/oauth/", "/api/")
     ):
-        return
+        return None
     if not path.startswith("/admin"):
-        return
+        return None
     site = request.headers.get("sec-fetch-site", "")
     if site and site not in ("same-origin", "same-site", "none"):
-        raise HTTPException(status_code=403, detail="cross-site request blocked")
+        return PlainTextResponse("cross-site request blocked", status_code=403)
+    if not site:
+        return None
     cookie = request.cookies.get(CSRF_COOKIE)
     if not cookie:
-        return
-    body_tok = ""
-    if request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded"):
-        # validated in route layer for multipart; Sec-Fetch-Site is primary guard
-        pass
-    header_tok = request.headers.get("x-eos-csrf", "")
-    if header_tok and unsign(cookie) == header_tok:
-        return
-    if body_tok and unsign(cookie) == body_tok:
-        return
+        return PlainTextResponse("missing csrf token", status_code=403)
+    submitted = request.headers.get("x-eos-csrf", "")
+    content_type = request.headers.get("content-type", "")
+    if not submitted and content_type.startswith("application/x-www-form-urlencoded"):
+        submitted = await _urlencoded_form_token(request)
+    if not _csrf_matches(cookie, submitted):
+        return PlainTextResponse("invalid csrf token", status_code=403)
+    return None
 
 
 SIGNUP_BUCKET = -5
