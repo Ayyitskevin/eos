@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, config, db, invoices, stripe_checkout
+from .. import config, db, invoices, stripe_checkout, stripe_webhooks
 from ..render import templates
 
 log = logging.getLogger("eos.routes.pay")
@@ -82,21 +82,5 @@ async def stripe_webhook(request: Request):
     except Exception:
         raise HTTPException(status_code=400)
     if event["type"] == "checkout.session.completed":
-        sess = event["data"]["object"]
-        iid = sess.get("metadata", {}).get("invoice_id")
-        if iid:
-            inv = db.one(
-                "SELECT listing_id, invoice_kind, inquiry_id FROM invoices WHERE id=?",
-                (int(iid),),
-            )
-            invoices.mark_paid(int(iid))
-            from .. import upsell as upsell_mod
-
-            upsell_mod.mark_paid(int(iid))
-            if inv:
-                if inv.get("invoice_kind") == "deposit" and inv.get("inquiry_id"):
-                    automations.on_deposit_paid(inv["inquiry_id"], inv["listing_id"])
-                else:
-                    automations.on_invoice_paid(inv["listing_id"])
-            log.info("invoice %s paid via stripe", iid)
+        stripe_webhooks.handle_invoice_checkout_completed(event["data"]["object"])
     return {"ok": True}

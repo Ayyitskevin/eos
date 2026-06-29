@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-- **What:** Multi-tenant RE photography SaaS (Aryeo competitor), v1.8.0, port 8410
+- **What:** Multi-tenant RE photography SaaS (Aryeo competitor), v1.9.0, port 8410
 - **Stack:** FastAPI + Jinja/HTMX + SQLite + optional S3
 - **Rule #1:** Every DB query/mutation must scope `studio_id` via `STUDIO_ID`
 - **Rule #2:** Minimal diffs — extend modules, append migrations, run `make test lint`

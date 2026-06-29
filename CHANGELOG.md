@@ -2,6 +2,13 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## 1.9.0 — Phase 19 (Stripe test-mode dogfood)
+
+- Platform webhook handles Connect client `checkout.session.completed` (invoice/deposit payments)
+- Shared `stripe_webhooks` module; legacy `/stripe/webhook` uses same handler
+- Auto-refresh Connect account status on onboarding return (`?thanks=1`)
+- `docs/STRIPE_TEST.md`, `make check-stripe`, `make stripe-listen`, `scripts/check-stripe-env.py`
+
 ## 1.8.0 — Phase 18 (email + beta signup)
 
 - Per-tenant transactional email — Postmark API or Gmail SMTP; studio-branded From + Reply-To

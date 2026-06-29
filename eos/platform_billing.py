@@ -134,8 +134,13 @@ def apply_subscription(
 
 
 def handle_webhook_event(event: dict) -> None:
+    from . import stripe_webhooks
+
     etype = event["type"]
     obj = event["data"]["object"]
+    if etype == "checkout.session.completed" and obj.get("mode") == "payment":
+        if stripe_webhooks.handle_invoice_checkout_completed(obj):
+            return
     if etype == "checkout.session.completed" and obj.get("mode") == "subscription":
         studio_id = obj.get("metadata", {}).get("studio_id")
         sub_id = obj.get("subscription")

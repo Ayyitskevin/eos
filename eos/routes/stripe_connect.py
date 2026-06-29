@@ -11,6 +11,8 @@ router = APIRouter(prefix="/admin/stripe", dependencies=[Depends(security.requir
 
 @router.get("/connect", response_class=HTMLResponse)
 async def connect_settings(request: Request):
+    if request.query_params.get("thanks") or request.query_params.get("refresh"):
+        stripe_connect.refresh_account_status()
     status = payments.connect_status()
     return templates.TemplateResponse(
         request,

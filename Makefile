@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format run dogfood migrate check-env coverage
+.PHONY: install dev test lint format run dogfood migrate check-env check-stripe coverage stripe-listen
 
 install:
 	python3 -m venv .venv
@@ -32,6 +32,13 @@ migrate:
 
 check-env:
 	.venv/bin/python scripts/check-env.py
+
+check-stripe:
+	@set -a && [ -f .env ] && . ./.env; set +a; .venv/bin/python scripts/check-stripe-env.py
+
+stripe-listen:
+	@echo "Forward platform webhooks to local Eos (paste whsec into EOS_STRIPE_PLATFORM_WEBHOOK_SECRET):"
+	stripe listen --forward-to http://127.0.0.1:8410/stripe/platform/webhook
 
 security:
 	.venv/bin/bandit -c pyproject.toml -r eos -ll -q

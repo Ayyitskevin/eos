@@ -87,7 +87,7 @@ EOS_S3_BUCKET=your-bucket
   billing       Connect        storage
 ```
 
-**v1.8.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · Postmark · boto3 (prod)
+**v1.9.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · Postmark · boto3 (prod)
 
 ## Platform admin
 
@@ -99,7 +99,8 @@ Suspend tenants, override plans, view usage, impersonate (audit logged).
 
 ```bash
 make lint          # ruff
-make test          # 78 tests
+make test          # 81 tests
+make check-stripe  # verify test keys in .env
 make dogfood       # seed 1420 Maple Dr
 make check-env     # validate .env
 ```

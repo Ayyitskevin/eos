@@ -29,7 +29,7 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 
 HOST = os.environ.get("EOS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EOS_PORT", "8410"))

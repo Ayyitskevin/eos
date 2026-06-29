@@ -1,5 +1,20 @@
 # Eos work log
 
+## 2026-06-29 — Phase 19 shipped (Stripe test-mode dogfood)
+
+**Repo:** github.com/Ayyitskevin/eos · **Version:** v1.9.0 · **Focus:** repo-only (no production deploy)
+
+### Shipped
+
+- **Connect client payment webhooks** — `checkout.session.completed` with `invoice_id` on `/stripe/platform/webhook`
+- **`eos/stripe_webhooks.py`** — shared handler for platform + legacy webhooks
+- **Connect UX** — auto `refresh_account_status` when returning from Stripe onboarding
+- **Docs/tooling** — `docs/STRIPE_TEST.md`, `make check-stripe`, `make stripe-listen`
+
+### Dogfood (local, with test keys)
+
+See `docs/STRIPE_TEST.md`: platform key + price IDs + `stripe listen` → Connect → billing → deposit.
+
 ## 2026-06-28 — Phase 18 shipped + local beta dogfood
 
 **Repo:** [github.com/Ayyitskevin/eos](https://github.com/Ayyitskevin/eos) · **Commit:** `c658559` on `main` · **Version:** v1.8.0 · **Tests:** 78 passing
