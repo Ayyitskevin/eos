@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import contracts, db, proposals, security
 from ..render import templates
+from ..vocab import STUDIO_ID
 
 log = logging.getLogger("eos.routes.docs")
 router = APIRouter()
@@ -17,14 +18,16 @@ router = APIRouter()
 async def view_proposal(request: Request, slug: str):
     d = proposals.get_proposal_by_slug(slug)
     listing = db.one(
-        "SELECT title, address_line1, city FROM listings WHERE id=?", (d["listing_id"],)
+        "SELECT title, address_line1, city FROM listings WHERE id=? AND studio_id=?",
+        (d["listing_id"], STUDIO_ID),
     )
     client = None
     if listing:
         row = db.one(
             """SELECT c.name, c.company FROM listings l
-               JOIN clients c ON c.id=l.client_id WHERE l.id=?""",
-            (d["listing_id"],),
+               JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
+               WHERE l.id=? AND l.studio_id=?""",
+            (d["listing_id"], STUDIO_ID),
         )
         client = row
     if d["status"] == "sent" and not d["viewed_at"]:
@@ -57,7 +60,10 @@ async def decline_proposal(slug: str):
 @router.get("/c/{slug}", response_class=HTMLResponse)
 async def view_contract(request: Request, slug: str):
     d = contracts.get_contract_by_slug(slug)
-    listing = db.one("SELECT title FROM listings WHERE id=?", (d["listing_id"],))
+    listing = db.one(
+        "SELECT title FROM listings WHERE id=? AND studio_id=?",
+        (d["listing_id"], STUDIO_ID),
+    )
     if d["status"] == "sent":
         contracts.mark_viewed(d["id"])
         log.info("contract %s viewed from %s", d["id"], security.client_ip(request))

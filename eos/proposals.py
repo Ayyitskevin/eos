@@ -4,7 +4,7 @@ import json
 
 from fastapi import HTTPException
 
-from . import db, security, studio
+from . import db, listings, security, studio
 from .vocab import STUDIO_ID
 
 MAX_ITEM_ROWS = 12
@@ -14,6 +14,7 @@ def get_proposal(proposal_id: int):
     row = db.one("SELECT * FROM proposals WHERE id=? AND studio_id=?", (proposal_id, STUDIO_ID))
     if not row:
         raise HTTPException(status_code=404)
+    listings.get_listing(row["listing_id"])
     return row
 
 
@@ -21,13 +22,16 @@ def get_proposal_by_slug(slug: str):
     row = db.one("SELECT * FROM proposals WHERE slug=? AND studio_id=?", (slug, STUDIO_ID))
     if not row or row["status"] == "draft":
         raise HTTPException(status_code=404)
+    listings.get_listing(row["listing_id"])
     return row
 
 
 def list_for_listing(listing_id: int):
+    listings.get_listing(listing_id)
     return db.all_(
-        "SELECT * FROM proposals WHERE listing_id=? ORDER BY created_at DESC",
-        (listing_id,),
+        """SELECT * FROM proposals
+           WHERE listing_id=? AND studio_id=? ORDER BY created_at DESC""",
+        (listing_id, STUDIO_ID),
     )
 
 
@@ -66,6 +70,7 @@ def parse_items(form) -> tuple[str, int]:
 
 
 def create_proposal(listing_id: int, *, preset: str = "blank") -> int:
+    listings.get_listing(listing_id)
     presets = package_presets()
     tpl = presets.get(preset, presets["blank"])
     pid = db.run(
@@ -93,8 +98,9 @@ def update_proposal(
     if prop["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent proposals are locked")
     db.run(
-        "UPDATE proposals SET title=?, intro=?, line_items=?, total_cents=? WHERE id=?",
-        (title.strip(), intro.strip(), line_items, total_cents, proposal_id),
+        """UPDATE proposals SET title=?, intro=?, line_items=?, total_cents=?
+           WHERE id=? AND studio_id=?""",
+        (title.strip(), intro.strip(), line_items, total_cents, proposal_id, STUDIO_ID),
     )
 
 
@@ -103,25 +109,30 @@ def mark_sent(proposal_id: int) -> None:
     if prop["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")
     db.run(
-        "UPDATE proposals SET status='sent', sent_at=datetime('now') WHERE id=?",
-        (proposal_id,),
+        """UPDATE proposals SET status='sent', sent_at=datetime('now')
+           WHERE id=? AND studio_id=?""",
+        (proposal_id, STUDIO_ID),
     )
     db.run(
-        "UPDATE listings SET status='booked' WHERE id=? AND status='lead'",
-        (prop["listing_id"],),
+        "UPDATE listings SET status='booked' WHERE id=? AND studio_id=? AND status='lead'",
+        (prop["listing_id"], STUDIO_ID),
     )
     from . import automations
 
     automations.on_proposal_sent(prop["listing_id"])
-    row = db.one("SELECT status FROM listings WHERE id=?", (prop["listing_id"],))
+    row = db.one(
+        "SELECT status FROM listings WHERE id=? AND studio_id=?", (prop["listing_id"], STUDIO_ID)
+    )
     if row and row["status"] == "booked":
         automations.on_listing_booked(prop["listing_id"])
 
 
 def mark_viewed(proposal_id: int) -> None:
+    get_proposal(proposal_id)
     db.run(
-        "UPDATE proposals SET viewed_at=datetime('now') WHERE id=? AND viewed_at IS NULL",
-        (proposal_id,),
+        """UPDATE proposals SET viewed_at=datetime('now')
+           WHERE id=? AND studio_id=? AND viewed_at IS NULL""",
+        (proposal_id, STUDIO_ID),
     )
 
 
@@ -130,16 +141,15 @@ def accept_by_slug(slug: str) -> None:
     if row["status"] != "sent":
         raise HTTPException(status_code=400, detail="proposal is not open for acceptance")
     db.run(
-        "UPDATE proposals SET status='accepted', accepted_at=datetime('now') WHERE id=?",
-        (row["id"],),
+        """UPDATE proposals SET status='accepted', accepted_at=datetime('now')
+           WHERE id=? AND studio_id=?""",
+        (row["id"], STUDIO_ID),
     )
     db.run(
-        "UPDATE listings SET status='booked' WHERE id=? AND status IN ('lead','booked')",
-        (row["listing_id"],),
+        """UPDATE listings SET status='booked'
+           WHERE id=? AND studio_id=? AND status IN ('lead','booked')""",
+        (row["listing_id"], STUDIO_ID),
     )
-    from . import automations
-
-    automations.on_listing_booked(row["listing_id"])
     from . import automations
 
     automations.on_listing_booked(row["listing_id"])
@@ -149,4 +159,7 @@ def decline_by_slug(slug: str) -> None:
     row = get_proposal_by_slug(slug)
     if row["status"] != "sent":
         raise HTTPException(status_code=400, detail="proposal is not open")
-    db.run("UPDATE proposals SET status='declined' WHERE id=?", (row["id"],))
+    db.run(
+        "UPDATE proposals SET status='declined' WHERE id=? AND studio_id=?",
+        (row["id"], STUDIO_ID),
+    )
