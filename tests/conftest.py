@@ -18,11 +18,25 @@ def reload_modules(modules: Iterable) -> None:
         importlib.reload(mod)
 
 
+def _solo_test_env(monkeypatch) -> None:
+    """Reset SaaS flags so a developer's .env does not break solo-mode tests."""
+    monkeypatch.setenv("EOS_SAAS_MODE", "false")
+    monkeypatch.setenv("EOS_SIGNUP_ENABLED", "false")
+    monkeypatch.setenv("EOS_SIGNUP_INVITE_ONLY", "false")
+    monkeypatch.setenv("EOS_BILLING_ENFORCE", "false")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dev_env(monkeypatch):
+    _solo_test_env(monkeypatch)
+
+
 def _set_base_env(monkeypatch, tmp_path, **extra: str) -> None:
     monkeypatch.setenv("EOS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("EOS_SECRET_KEY", "test-secret-key-32chars-minimum!!")
     monkeypatch.setenv("EOS_ADMIN_PASSWORD", "test-admin-pass")
     monkeypatch.setenv("EOS_DEMO_ENABLED", "false")
+    _solo_test_env(monkeypatch)
     for key, val in extra.items():
         monkeypatch.setenv(key, val)
 

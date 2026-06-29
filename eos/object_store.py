@@ -68,12 +68,15 @@ def sync_gallery_file(
 ) -> bool:
     if not enabled():
         return False
-    return upload_file(local_path, media_key(
-        studio_id=studio_id,
-        gallery_id=gallery_id,
-        sub=sub,
-        filename=local_path.name,
-    ))
+    return upload_file(
+        local_path,
+        media_key(
+            studio_id=studio_id,
+            gallery_id=gallery_id,
+            sub=sub,
+            filename=local_path.name,
+        ),
+    )
 
 
 def studio_storage_bytes(*, studio_id: str) -> int:

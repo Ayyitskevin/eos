@@ -7,7 +7,7 @@ import logging
 import stripe
 from fastapi import HTTPException
 
-from . import config, db, tenant
+from . import config, db
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.stripe_connect")

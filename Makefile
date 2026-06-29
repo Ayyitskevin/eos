@@ -34,5 +34,5 @@ check-env:
 	.venv/bin/python scripts/check-env.py
 
 security:
-	.venv/bin/bandit -r eos -ll -q
+	.venv/bin/bandit -c pyproject.toml -r eos -ll -q
 	.venv/bin/pip-audit -r requirements.txt

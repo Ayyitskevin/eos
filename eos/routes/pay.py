@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, db, invoices, stripe_checkout
+from .. import automations, config, db, invoices, stripe_checkout
 from ..render import templates
 
 log = logging.getLogger("eos.routes.pay")

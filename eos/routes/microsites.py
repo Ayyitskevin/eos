@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import bundles, config, db, marketing_kit, microsites, paywall, security, stripe_checkout, studio
+from .. import bundles, db, marketing_kit, microsites, paywall, security, stripe_checkout, studio
 from ..render import templates
 from ..vocab import STUDIO_ID
 

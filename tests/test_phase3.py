@@ -1,6 +1,5 @@
 """Phase 3 — proposals, contracts, section reorder."""
 
-
 import eos.db as db
 import pytest
 from httpx import ASGITransport, AsyncClient

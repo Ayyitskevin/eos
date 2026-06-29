@@ -44,7 +44,9 @@ async def pricing(request: Request):
         "site/pricing.html",
         {
             "signup_enabled": config.SIGNUP_ENABLED,
-            "invite_only": __import__("eos.invites", fromlist=["invite_required"]).invite_required(),
+            "invite_only": __import__(
+                "eos.invites", fromlist=["invite_required"]
+            ).invite_required(),
             "plans": plan_limits.LIMITS,
         },
     )

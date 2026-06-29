@@ -76,9 +76,6 @@ from .routes import (
     platform_billing as platform_billing_routes,
 )
 from .routes import (
-    stripe_connect as stripe_connect_routes,
-)
-from .routes import (
     portal as portal_routes,
 )
 from .routes import (
@@ -86,6 +83,9 @@ from .routes import (
 )
 from .routes import (
     signup as signup_routes,
+)
+from .routes import (
+    stripe_connect as stripe_connect_routes,
 )
 
 logging.basicConfig(

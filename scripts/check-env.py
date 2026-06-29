@@ -51,9 +51,13 @@ def main() -> int:
         if saas and not os.environ.get("EOS_PLATFORM_ADMIN_EMAILS", "").strip():
             _warn("EOS_PLATFORM_ADMIN_EMAILS not set — no platform super-admin")
         if saas and billing_enforce and not platform_stripe:
-            _warn("EOS_BILLING_ENFORCE without EOS_STRIPE_PLATFORM_SECRET_KEY — subscriptions disabled")
+            _warn(
+                "EOS_BILLING_ENFORCE without EOS_STRIPE_PLATFORM_SECRET_KEY — subscriptions disabled"
+            )
         if saas and not s3_bucket:
-            _warn("EOS_S3_BUCKET not set — media stored on local disk only (not recommended at scale)")
+            _warn(
+                "EOS_S3_BUCKET not set — media stored on local disk only (not recommended at scale)"
+            )
 
     print("env check ok", f"(mode={mode}, saas={saas})")
     return 0

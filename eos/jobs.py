@@ -39,9 +39,7 @@ def _sync_derivatives(gallery_id: int, dirs: dict[str, Path], base: str) -> None
     for sub, fname in (("web", f"{base}.jpg"), ("thumb", f"{base}.jpg")):
         path = dirs[sub] / fname
         if path.is_file():
-            object_store.sync_gallery_file(
-                path, studio_id=sid, gallery_id=gallery_id, sub=sub
-            )
+            object_store.sync_gallery_file(path, studio_id=sid, gallery_id=gallery_id, sub=sub)
 
 
 def _h_image(p: dict) -> None:

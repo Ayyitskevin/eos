@@ -17,14 +17,14 @@ def status() -> dict:
     done = bool(profile["onboarding_done"])
     step = int(profile["onboarding_step"] or 0)
     from . import platform_billing, stripe_connect
-    from .integrations import google_calendar
 
     checks = {
         "profile": bool(profile["service_area"] and profile["headline"]),
         "packages": bool(studio.list_packages(active_only=True)),
         "stripe": stripe_connect.payments_ready(),
         "publish": bool(profile["published"] and profile["booking_enabled"]),
-        "billing": platform_billing.studio_billing().get("billing_status") in (
+        "billing": platform_billing.studio_billing().get("billing_status")
+        in (
             "active",
             "trialing",
         ),
