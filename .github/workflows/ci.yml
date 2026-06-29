@@ -36,5 +36,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install bandit==1.9.4 pip-audit==2.10.1
-      - run: bandit -r eos -ll -q
+      - run: bandit -c pyproject.toml -r eos -ll -q
       - run: pip-audit -r requirements.txt
