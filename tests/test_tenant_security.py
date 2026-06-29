@@ -1,13 +1,16 @@
 """Tenant isolation and auth hardening tests."""
 
 import importlib
+from unittest.mock import patch
 
 import eos.config as config
 import eos.db as db
 import eos.jobs as jobs
+import eos.mailer as mailer
 import eos.main as main
 import eos.onboarding as onboarding
 import eos.security as security
+import eos.sequences as sequences
 import eos.tenant as tenant
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -21,7 +24,7 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EOS_SIGNUP_ENABLED", "true")
     monkeypatch.setenv("EOS_BASE_DOMAIN", "eos.test")
     monkeypatch.setenv("EOS_SAAS_MODE", "true")
-    for mod in (config, db, jobs, security, tenant, onboarding, main):
+    for mod in (config, db, jobs, security, tenant, mailer, sequences, onboarding, main):
         importlib.reload(mod)
     config.ensure_dirs()
     db.migrate()
@@ -389,3 +392,79 @@ async def test_cross_tenant_upsell_public_confirm_rejects_foreign_listing(app_en
             follow_redirects=False,
         )
         assert blocked.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_sequence_run_cancel_blocked(app_env):
+    tenant.set_studio("alpha")
+    seq_id = db.run(
+        """INSERT INTO email_sequences
+           (studio_id, slug, name, trigger_event, subject, body_template)
+           VALUES ('alpha', 'alpha-seq', 'Alpha Seq', 'listing.booked', 'Hi', 'Body')"""
+    )
+    run_id = db.run(
+        """INSERT INTO email_sequence_runs
+           (studio_id, sequence_id, to_email, scheduled_at)
+           VALUES ('alpha', ?, 'agent@alpha.test', datetime('now', '+1 hour'))""",
+        (seq_id,),
+    )
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "b@beta.test", "password": "beta-pass-1"},
+            headers={"host": "beta.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        blocked = await client.post(
+            f"/admin/sequences/runs/{run_id}/cancel",
+            data={security.CSRF_FORM: csrf},
+            headers={"host": "beta.eos.test", "sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+        assert blocked.status_code == 404
+        row = db.one("SELECT status FROM email_sequence_runs WHERE id=?", (run_id,))
+        assert row["status"] == "scheduled"
+
+
+def test_sequence_worker_binds_each_run_studio(app_env, monkeypatch):
+    monkeypatch.setattr(config, "GMAIL_USER", "test@gmail.com")
+    monkeypatch.setattr(config, "GMAIL_APP_PASSWORD", "app-pass")
+    tenant.set_studio("beta")
+    client_id = db.run(
+        "INSERT INTO clients (studio_id, name, email) VALUES ('beta', 'Beta Agent', 'agent@beta.test')"
+    )
+    listing_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status)
+           VALUES ('beta', ?, 'Beta Listing', 'booked')""",
+        (client_id,),
+    )
+    seq_id = db.run(
+        """INSERT INTO email_sequences
+           (studio_id, slug, name, trigger_event, subject, body_template)
+           VALUES ('beta', 'beta-seq', 'Beta Seq', 'listing.booked',
+                   'Booked {listing_title}', 'Hi {client_first} from {site_name}')"""
+    )
+    run_id = db.run(
+        """INSERT INTO email_sequence_runs
+           (studio_id, sequence_id, listing_id, client_id, to_email, scheduled_at)
+           VALUES ('beta', ?, ?, ?, 'agent@beta.test', datetime('now', '-1 minute'))""",
+        (seq_id, listing_id, client_id),
+    )
+    tenant.set_studio("default")
+
+    with patch("eos.mailer.send") as send:
+        assert sequences.process_due() == 1
+
+    send.assert_called_once()
+    assert send.call_args.kwargs["from_name"].startswith("Beta via")
+    assert "Beta Listing" in send.call_args.args[1]
+    assert "Hi Beta from Beta" in send.call_args.args[2]
+    row = db.one("SELECT status FROM email_sequence_runs WHERE id=?", (run_id,))
+    assert row["status"] == "sent"
+    assert tenant.get_studio_id() == "default"
