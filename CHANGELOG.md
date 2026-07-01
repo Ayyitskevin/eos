@@ -2,6 +2,11 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## Unreleased
+
+- Agent rebooking cockpit ranks inactive agents by prior listing value and links directly into a preselected new-listing flow.
+- Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
+
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)
 
 - Platform webhook handles Connect client `checkout.session.completed` (invoice/deposit payments)

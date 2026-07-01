@@ -42,6 +42,16 @@
   </section>
   {% endif %}
 
+  {% if rebooking %}
+  <section class="card">
+    <h2>Repeat listing opportunity</h2>
+    <p><span class="badge badge-{{ rebooking.priority_key }}">{{ rebooking.priority }}</span>
+      <span class="muted">{{ rebooking.reason_line }}</span></p>
+    <p class="muted">{{ rebooking.next_action }}</p>
+    <a href="{{ rebooking.book_href }}" class="btn btn-accent">Start next listing</a>
+  </section>
+  {% endif %}
+
   <form method="post" action="/admin/clients/{{ c.id }}" class="form-grid card">
     <label>Name <input name="name" value="{{ c.name }}" required></label>
     <label>Type

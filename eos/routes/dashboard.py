@@ -34,6 +34,6 @@ async def dashboard(request: Request):
             "packages": studio.list_packages(),
             "presets": studio.list_crop_presets(),
             "base_url": config.BASE_URL,
-            "inactive_agents": churn.inactive_agents(),
+            "rebooking_opportunities": churn.rebooking_opportunities(),
         },
     )

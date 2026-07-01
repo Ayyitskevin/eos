@@ -30,13 +30,18 @@
     {% endfor %}
   </section>
 
-  {% if inactive_agents %}
-  <details class="alert-banner">
-    <summary>{{ inactive_agents|length }} agent{{ "s" if inactive_agents|length != 1 }} inactive 90+ days</summary>
-    <ul class="due-list">
-      {% for a in inactive_agents %}
-      <li><a href="/admin/clients/{{ a.id }}">{{ a.name }}</a>
-        {% if a.last_listing_at %}<span class="muted">last booked {{ a.last_listing_at[:10] }}</span>{% else %}<span class="muted">never booked</span>{% endif %}</li>
+  {% if rebooking_opportunities %}
+  <details class="alert-banner" open>
+    <summary>Agent rebooking cockpit · {{ rebooking_opportunities|length }} warm opportunit{{ "ies" if rebooking_opportunities|length != 1 else "y" }}</summary>
+    <ul class="due-list rebooking-list">
+      {% for a in rebooking_opportunities %}
+      <li>
+        <a href="{{ a.client_href }}"><strong>{{ a.name }}</strong></a>
+        {% if a.company %}<span class="muted"> · {{ a.company }}</span>{% endif %}
+        <span class="badge badge-{{ a.priority_key }}">{{ a.priority }}</span>
+        <span class="muted">{{ a.reason_line }}</span>
+        <a href="{{ a.book_href }}" class="rebooking-action">Start listing</a>
+      </li>
       {% endfor %}
     </ul>
   </details>

@@ -39,7 +39,7 @@
         <select name="client_id">
           <option value="">— none —</option>
           {% for c in client_list %}
-          <option value="{{ c.id }}">{{ c.name }}{% if c.company %} · {{ c.company }}{% endif %}</option>
+          <option value="{{ c.id }}" {% if preselect_client_id == c.id %}selected{% endif %}>{{ c.name }}{% if c.company %} · {{ c.company }}{% endif %}</option>
           {% endfor %}
         </select>
       </label>

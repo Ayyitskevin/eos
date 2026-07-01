@@ -23,13 +23,14 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin
 
 
 @router.get("/listings/new", response_class=HTMLResponse)
-async def listing_new_form(request: Request):
+async def listing_new_form(request: Request, client_id: int | None = None):
     return templates.TemplateResponse(
         request,
         "admin/listing_new.html",
         {
             "client_list": clients.list_clients(),
             "property_types": PROPERTY_TYPES,
+            "preselect_client_id": client_id,
         },
     )
 

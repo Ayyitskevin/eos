@@ -18,6 +18,7 @@ Studios get `{slug}.yourdomain.com`, branded booking and delivery, agent portals
 - **Signup & subdomain** — 14-day trial, Starter/Pro plans, billing enforcement
 - **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow
 - **Pipeline** — listing tasks, Kanban, calendar, photographer assignment
+- **Retention** — agent rebooking cockpit ranked by prior listing value
 - **Delivery** — PIN galleries, property sites, agent portal, MLS/Zillow crops
 - **Payments** — Connect onboarding at `/admin/stripe/connect`
 - **Integrations** — Google Calendar, Dropbox ingest, API v1, webhooks
@@ -112,7 +113,7 @@ make check-env     # validate .env
 
 **Read [docs/AI_AGENTS.md](docs/AI_AGENTS.md) before changing code.** It documents tenant isolation rules, payment rails, migration patterns, and what not to break.
 
-Short pointer: [AGENTS.md](AGENTS.md)
+Short pointer: [AGENTS.md](AGENTS.md) · MicroSaaS loop: [docs/MICROSAAS_LOOP.md](docs/MICROSAAS_LOOP.md)
 
 ## Roadmap
 
