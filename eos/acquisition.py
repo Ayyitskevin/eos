@@ -1,7 +1,9 @@
 """Agent acquisition and referral tracking reports."""
 
 import csv
+import datetime as dt
 import io
+import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -11,9 +13,15 @@ from . import clients, db, mailer, tenant
 from .vocab import STUDIO_ID
 
 COOLDOWN_DAYS = 14
+FOLLOW_UP_DAYS = 7
 ACTION_SENT = "acquisition.intro.sent"
 ACTION_DRAFT = "acquisition.intro.draft"
 ACTION_FAILED = "acquisition.intro.failed"
+ACTION_FOLLOW_UP_SENT = "acquisition.follow_up.sent"
+ACTION_FOLLOW_UP_DRAFT = "acquisition.follow_up.draft"
+ACTION_FOLLOW_UP_FAILED = "acquisition.follow_up.failed"
+FOLLOW_UP_DOC_KIND = "acquisition_follow_up"
+_CLIENT_RE = re.compile(r"\bclient_id=(\d+)\b")
 QUEUE_FILTERS = {
     "all": "All",
     "needs_code": "Needs code",
@@ -38,6 +46,23 @@ def _detail(client_id: int, email: str, subject: str = "") -> str:
     return f"client_id={client_id}; email={email}; subject={subject[:120]}"
 
 
+def _client_id_from_detail(detail: str | None) -> int | None:
+    if not detail:
+        return None
+    match = _CLIENT_RE.search(detail)
+    return int(match.group(1)) if match else None
+
+
+def _days_since_timestamp(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        seen = dt.datetime.fromisoformat(value[:19].replace(" ", "T"))
+    except ValueError:
+        return None
+    return max(0, (dt.datetime.now() - seen).days)
+
+
 def _referral_url(code: str) -> str:
     return f"{tenant.get_base_url()}/book?ref={quote(code)}"
 
@@ -49,6 +74,17 @@ def recent_intro_sent_at(client_id: int, *, days: int = COOLDOWN_DAYS) -> str | 
              AND created_at >= datetime('now', ?)
            ORDER BY created_at DESC LIMIT 1""",
         (STUDIO_ID, ACTION_SENT, f"client_id={client_id};%", f"-{days} days"),
+    )
+    return row["created_at"] if row else None
+
+
+def recent_follow_up_sent_at(client_id: int, *, days: int = COOLDOWN_DAYS) -> str | None:
+    row = db.one(
+        """SELECT created_at FROM audit_log
+           WHERE studio_id=? AND action=? AND detail LIKE ?
+             AND created_at >= datetime('now', ?)
+           ORDER BY created_at DESC LIMIT 1""",
+        (STUDIO_ID, ACTION_FOLLOW_UP_SENT, f"client_id={client_id};%", f"-{days} days"),
     )
     return row["created_at"] if row else None
 
@@ -421,6 +457,169 @@ def send_intro_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> d
     return {"status": "sent", "draft": draft}
 
 
+def _latest_intro_sent_rows(*, days: int = 90) -> list[Any]:
+    rows = db.all_(
+        """SELECT action, detail, created_at
+           FROM audit_log
+           WHERE studio_id=? AND action=?
+             AND created_at >= datetime('now', ?)
+           ORDER BY created_at DESC""",
+        (STUDIO_ID, ACTION_SENT, f"-{days} days"),
+    )
+    latest: dict[int, Any] = {}
+    for row in rows:
+        client_id = _client_id_from_detail(row["detail"])
+        if client_id is None or client_id in latest:
+            continue
+        latest[client_id] = row
+    return list(latest.values())
+
+
+def _attributed_booking_after(client_id: int, sent_at: str) -> dict[str, Any] | None:
+    row = db.one(
+        """SELECT q.id, q.name, q.property_address, q.created_at, q.listing_id,
+                  r.code AS referral_code
+             FROM inquiries q
+             JOIN referral_codes r
+               ON r.studio_id=q.studio_id
+              AND upper(r.code)=upper(q.promo_code)
+            WHERE q.studio_id=?
+              AND r.referrer_client_id=?
+              AND q.created_at >= ?
+            ORDER BY q.created_at ASC LIMIT 1""",
+        (STUDIO_ID, client_id, sent_at),
+    )
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "property_address": row["property_address"],
+        "created_at": row["created_at"],
+        "listing_id": row["listing_id"],
+        "listing_href": f"/admin/listings/{row['listing_id']}" if row["listing_id"] else "",
+        "referral_code": row["referral_code"],
+    }
+
+
+def follow_up_queue(
+    *, follow_up_days: int = FOLLOW_UP_DAYS, lookback_days: int = 90, limit: int = 8
+) -> list[dict[str, Any]]:
+    queue: list[dict[str, Any]] = []
+    for row in _latest_intro_sent_rows(days=lookback_days):
+        days_waiting = _days_since_timestamp(row["created_at"])
+        if days_waiting is None or days_waiting < follow_up_days:
+            continue
+        client_id = _client_id_from_detail(row["detail"])
+        if client_id is None or _attributed_booking_after(client_id, row["created_at"]):
+            continue
+        value = _agent_value(client_id)
+        if not value or not value.get("email"):
+            continue
+        code = _active_referral_code(client_id)
+        follow_up_sent = recent_follow_up_sent_at(client_id)
+        queue.append(
+            {
+                **value,
+                "sent_at": row["created_at"],
+                "days_waiting": days_waiting,
+                "active_referral_code": code["code"] if code else "",
+                "booking_link": _referral_url(code["code"])
+                if code
+                else f"{tenant.get_base_url()}/book",
+                "last_follow_up_sent_at": follow_up_sent,
+                "can_send_follow_up": not follow_up_sent,
+                "cooldown_active": bool(follow_up_sent),
+                "reason_line": f"intro sent {days_waiting} days ago · no attributed booking yet",
+                "next_action": "Send second touch" if not follow_up_sent else "Wait for reply",
+            }
+        )
+        if len(queue) >= limit:
+            break
+    return queue
+
+
+def build_follow_up_email(client_id: int) -> dict[str, str | int | None]:
+    client = clients.get_client(client_id)
+    if client["client_type"] != "agent":
+        raise HTTPException(status_code=400, detail="acquisition follow-up is only for agents")
+    if not client["email"]:
+        raise HTTPException(status_code=400, detail="agent email required")
+    value = _agent_value(client_id)
+    if not value:
+        raise HTTPException(status_code=404)
+    code = _active_referral_code(client_id)
+    code_text = code["code"] if code else _suggested_code(client["name"])
+    booking_link = _referral_url(code_text) if code else f"{tenant.get_base_url()}/book"
+    code_line = (
+        f"Your referral code is {code_text}; forwarding the booking link is the easiest path."
+        if code
+        else f"I can still set up {code_text} as your referral code before anyone books."
+    )
+
+    subject = "Quick follow-up on agent introductions"
+    body = f"""Hi {_first(client["name"])},
+
+Quick follow-up on the introduction note I sent. If another agent in your office has a listing coming up, I would be grateful for the referral.
+
+{code_line}
+
+Booking link:
+{booking_link}
+
+You can forward the link directly or reply with their name and email and I will take it from there.
+
+Thanks,
+{tenant.get_site_name()}"""
+    email = client["email"].strip()
+    return {
+        "client_id": client_id,
+        "to": email,
+        "subject": subject,
+        "body": body,
+        "suggested_code": code_text,
+        "active_referral_code": code["code"] if code else None,
+        "mailto_href": f"mailto:{email}?{urlencode({'subject': subject, 'body': body})}",
+    }
+
+
+def send_follow_up_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> dict[str, Any]:
+    draft = build_follow_up_email(client_id)
+    recent = recent_follow_up_sent_at(client_id, days=cooldown_days)
+    if recent:
+        return {"status": "cooldown", "last_sent_at": recent, "draft": draft}
+
+    if not mailer.configured():
+        db.audit(
+            "admin",
+            ACTION_FOLLOW_UP_DRAFT,
+            _detail(client_id, str(draft["to"]), str(draft["subject"])),
+        )
+        return {"status": "draft", "draft": draft}
+
+    try:
+        mailer.send_for_studio(str(draft["to"]), str(draft["subject"]), str(draft["body"]))
+    except Exception as exc:
+        db.audit(
+            "admin",
+            ACTION_FOLLOW_UP_FAILED,
+            f"{_detail(client_id, str(draft['to']), str(draft['subject']))}; error={str(exc)[:120]}",
+        )
+        raise HTTPException(status_code=502, detail="acquisition follow-up email failed") from exc
+
+    db.run(
+        """INSERT INTO emails_log (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
+           VALUES (?,?,?,?,?,?)""",
+        (STUDIO_ID, None, FOLLOW_UP_DOC_KIND, client_id, draft["to"], draft["subject"]),
+    )
+    db.audit(
+        "admin",
+        ACTION_FOLLOW_UP_SENT,
+        _detail(client_id, str(draft["to"]), str(draft["subject"])),
+    )
+    return {"status": "sent", "draft": draft}
+
+
 def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> dict[str, int | str]:
     selected = normalize_queue_filter(queue_filter)
     candidates = filter_intro_asks(intro_ask_queue(limit=limit), selected)
@@ -756,9 +955,14 @@ def agent_referral_summary(
     return out[:limit]
 
 
-def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None) -> dict:
+def summary(
+    referrals: list[dict] | None = None,
+    asks: list[dict] | None = None,
+    followups: list[dict] | None = None,
+) -> dict:
     referrals = referrals if referrals is not None else referral_performance()
     asks = asks if asks is not None else intro_ask_queue()
+    followups = followups if followups is not None else follow_up_queue()
     paid_cents = sum(row["referred_paid_cents"] for row in referrals)
     open_cents = sum(row["referred_open_cents"] for row in referrals)
     return {
@@ -769,6 +973,8 @@ def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None)
         "n_intro_asks": len(asks),
         "n_intro_ready": sum(1 for row in asks if row["can_email_intro"]),
         "n_intro_cooldown": sum(1 for row in asks if row["cooldown_active"]),
+        "n_follow_ups": len(followups),
+        "n_follow_up_ready": sum(1 for row in followups if row["can_send_follow_up"]),
         "referred_paid_cents": paid_cents,
         "referred_open_cents": open_cents,
         "referred_paid_display": _money(paid_cents),
@@ -780,13 +986,15 @@ def dashboard(*, queue_filter: str = "all") -> dict:
     referrals = referral_performance()
     all_asks = intro_ask_queue()
     attribution = attributed_bookings()
+    followups = follow_up_queue()
     selected = normalize_queue_filter(queue_filter)
     asks = filter_intro_asks(all_asks, selected)
     return {
-        "summary": summary(referrals, all_asks),
+        "summary": summary(referrals, all_asks, followups),
         "referrals": referrals,
         "intro_asks": asks,
         "all_intro_asks": all_asks,
+        "follow_ups": followups,
         "attribution": attribution,
         "attribution_summary": attribution_summary(attribution),
         "queue_filter": selected,
@@ -878,6 +1086,37 @@ def acquisition_csv() -> str:
                 row["listing_id"] or "",
                 row["paid_cents"],
                 row["open_cents"],
+            ]
+        )
+    writer.writerow([])
+    writer.writerow(["Follow-up queue"])
+    writer.writerow(
+        [
+            "agent",
+            "company",
+            "brokerage",
+            "email",
+            "intro_sent_at",
+            "days_waiting",
+            "code",
+            "booking_link",
+            "can_send",
+            "last_follow_up_sent_at",
+        ]
+    )
+    for row in data["follow_ups"]:
+        writer.writerow(
+            [
+                row["name"],
+                row["company"] or "",
+                row["brokerage_name"] or "",
+                row["email"] or "",
+                (row["sent_at"] or "")[:10],
+                row["days_waiting"],
+                row["active_referral_code"] or "",
+                row["booking_link"],
+                "yes" if row["can_send_follow_up"] else "no",
+                (row["last_follow_up_sent_at"] or "")[:10],
             ]
         )
     writer.writerow([])

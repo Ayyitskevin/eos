@@ -12,7 +12,13 @@
     </nav>
   </header>
 
-  {% if acquisition_notice == 'sent' %}
+  {% if acquisition_follow_up_notice and acquisition_notice == 'sent' %}
+  <p class="alert-banner ok">Referral follow-up email sent.</p>
+  {% elif acquisition_follow_up_notice and acquisition_notice == 'cooldown' %}
+  <p class="alert-banner">That agent already received a referral follow-up recently.</p>
+  {% elif acquisition_follow_up_notice and acquisition_notice == 'draft' %}
+  <p class="alert-banner">Email is not configured yet. Use the follow-up draft below.</p>
+  {% elif acquisition_notice == 'sent' %}
   <p class="alert-banner ok">Referral introduction email sent.</p>
   {% elif acquisition_notice == 'cooldown' %}
   <p class="alert-banner">That agent already received a referral introduction email recently.</p>
@@ -52,6 +58,10 @@
     <div class="pipeline-card {% if summary.n_intro_ready %}has-items{% endif %}">
       <span class="pipeline-count">{{ summary.n_intro_ready }}</span>
       <span class="pipeline-label">Ready to email</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_follow_ups %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_follow_ups }}</span>
+      <span class="pipeline-label">Follow-ups due</span>
     </div>
   </section>
 
@@ -95,6 +105,36 @@
       {% endfor %}
     </table>
     {% else %}<p class="muted">No high-value agents match this queue filter right now.</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Follow-up queue</h2>
+    {% if follow_ups %}
+    <table class="list compact">
+      <tr><th>Agent</th><th>Brokerage</th><th>Intro sent</th><th>Code</th><th>Action</th></tr>
+      {% for f in follow_ups %}
+      <tr>
+        <td><a href="{{ f.client_href }}">{{ f.name }}</a>{% if f.company %}<span class="muted"> · {{ f.company }}</span>{% endif %}
+          <br><span class="muted small">{{ f.reason_line }}</span></td>
+        <td>{{ f.brokerage_name or "—" }}</td>
+        <td>{{ f.sent_at[:10] }}</td>
+        <td>{% if f.active_referral_code %}<code>{{ f.active_referral_code }}</code>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>
+          {% if f.cooldown_active %}
+          <span class="muted small">followed up {{ f.last_follow_up_sent_at[:10] }}</span>
+          {% else %}
+          <form method="post" action="/admin/reports/acquisition/{{ f.id }}/follow-up" class="inline-form rebooking-inline">
+            <input type="hidden" name="redirect" value="/admin/reports/acquisition">
+            <button type="submit" class="link">{{ "Send follow-up" if acquisition_mailer_on else "Draft follow-up" }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No stale referral introduction asks need follow-up right now.</p>
+    {% endif %}
   </section>
 
   <section class="card">
@@ -161,7 +201,7 @@
 
   {% if acquisition_draft %}
   <section class="card">
-    <h2>Referral introduction email draft</h2>
+    <h2>{{ "Referral follow-up email draft" if acquisition_follow_up_notice else "Referral introduction email draft" }}</h2>
     <p class="muted">To: {{ acquisition_draft.to }}</p>
     <div class="form-grid compact">
       <label>Subject <input readonly value="{{ acquisition_draft.subject }}"></label>

@@ -22,9 +22,14 @@ def _safe_admin_redirect(path: str, fallback: str = "/admin/reports/acquisition"
     return path if path.startswith("/admin") else fallback
 
 
-def _with_acquisition_notice(path: str, *, status: str, client_id: int) -> str:
+def _with_acquisition_notice(
+    path: str, *, status: str, client_id: int, follow_up: bool = False
+) -> str:
     sep = "&" if "?" in path else "?"
-    return f"{path}{sep}{urlencode({'acquisition': status, 'client_id': client_id})}"
+    data = {"acquisition": status, "client_id": client_id}
+    if follow_up:
+        data["follow_up"] = "1"
+    return f"{path}{sep}{urlencode(data)}"
 
 
 def _query_int(request: Request, key: str) -> int:
@@ -121,16 +126,22 @@ async def acquisition_dashboard(request: Request):
     queue_filter = acquisition.normalize_queue_filter(request.query_params.get("queue"))
     data = acquisition.dashboard(queue_filter=queue_filter)
     notice = request.query_params.get("acquisition")
+    follow_up_notice = request.query_params.get("follow_up") == "1"
     draft = None
     raw_client_id = request.query_params.get("client_id", "")
     if notice == "draft" and raw_client_id.isdigit():
         try:
-            draft = acquisition.build_intro_email(int(raw_client_id))
+            draft = (
+                acquisition.build_follow_up_email(int(raw_client_id))
+                if follow_up_notice
+                else acquisition.build_intro_email(int(raw_client_id))
+            )
         except HTTPException:
             draft = None
     data.update(
         {
             "acquisition_notice": notice,
+            "acquisition_follow_up_notice": follow_up_notice,
             "acquisition_draft": draft,
             "acquisition_mailer_on": mailer.configured(),
             "acquisition_bulk": {
@@ -160,6 +171,24 @@ async def acquisition_intro_send(
     target = _safe_admin_redirect(redirect)
     return RedirectResponse(
         _with_acquisition_notice(target, status=result["status"], client_id=client_id),
+        status_code=303,
+    )
+
+
+@router.post("/reports/acquisition/{client_id}/follow-up")
+async def acquisition_follow_up_send(
+    client_id: int,
+    redirect: str = Form("/admin/reports/acquisition"),
+):
+    result = acquisition.send_follow_up_email(client_id)
+    target = _safe_admin_redirect(redirect)
+    return RedirectResponse(
+        _with_acquisition_notice(
+            target,
+            status=result["status"],
+            client_id=client_id,
+            follow_up=True,
+        ),
         status_code=303,
     )
 

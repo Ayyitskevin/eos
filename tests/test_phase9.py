@@ -408,6 +408,13 @@ def _seed_acquisition_report(*, other_studio: bool = False):
     }
 
 
+def _age_acquisition_action(client_id: int, action: str, days: int) -> None:
+    db.run(
+        "UPDATE audit_log SET created_at=datetime('now', ?) WHERE studio_id=? AND action=? AND detail LIKE ?",
+        (f"-{days} days", "default", action, f"client_id={client_id};%"),
+    )
+
+
 @pytest.mark.asyncio
 async def test_reports_dashboard_shows_revenue(app_env):
     lid = db.run(
@@ -742,6 +749,66 @@ def test_acquisition_intro_email_sends_and_cooldown_logs(app_env, monkeypatch):
     assert ask_rows["No Code Agent"]["can_email_intro"] is False
 
 
+def test_acquisition_follow_up_queue_sends_and_skips_converted(app_env, monkeypatch):
+    ids = _seed_acquisition_report()
+    sent: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        acquisition.mailer,
+        "send_for_studio",
+        lambda to, subject, body: sent.append((to, subject, body)),
+    )
+
+    assert acquisition.send_intro_email(ids["no_code_id"])["status"] == "sent"
+    assert acquisition.send_intro_email(ids["zero_use_id"])["status"] == "sent"
+    _age_acquisition_action(ids["no_code_id"], acquisition.ACTION_SENT, 8)
+    _age_acquisition_action(ids["zero_use_id"], acquisition.ACTION_SENT, 8)
+    db.run(
+        """INSERT INTO inquiries
+           (studio_id, name, email, property_address, status, promo_code,
+            client_id, total_cents, deposit_cents, created_at)
+           VALUES ('default', 'Zero Referral', 'zero-ref@test.com', 'Zero Referral House',
+                   'confirmed', 'ZERO25', ?, 25000, 0, datetime('now', '-2 days'))""",
+        (ids["zero_use_id"],),
+    )
+
+    queue = acquisition.follow_up_queue()
+    assert [row["name"] for row in queue] == ["No Code Agent"]
+    assert queue[0]["can_send_follow_up"] is True
+    assert queue[0]["reason_line"].startswith("intro sent")
+
+    result = acquisition.send_follow_up_email(ids["no_code_id"])
+    second = acquisition.send_follow_up_email(ids["no_code_id"])
+
+    assert result["status"] == "sent"
+    assert second["status"] == "cooldown"
+    assert sent[-1][0] == "nocode@example.com"
+    assert "Quick follow-up" in sent[-1][1]
+    assert "NOCODEAG25" in sent[-1][2]
+    email_log = db.one(
+        """SELECT doc_kind, doc_id, to_email
+           FROM emails_log
+           WHERE studio_id=? AND doc_kind=?""",
+        ("default", acquisition.FOLLOW_UP_DOC_KIND),
+    )
+    assert dict(email_log) == {
+        "doc_kind": acquisition.FOLLOW_UP_DOC_KIND,
+        "doc_id": ids["no_code_id"],
+        "to_email": "nocode@example.com",
+    }
+    audit = db.one(
+        "SELECT action, detail FROM audit_log WHERE studio_id=? AND action=?",
+        ("default", acquisition.ACTION_FOLLOW_UP_SENT),
+    )
+    assert audit["detail"].startswith(f"client_id={ids['no_code_id']};")
+
+    dashboard = acquisition.dashboard()
+    assert dashboard["summary"]["n_follow_ups"] == 1
+    assert dashboard["summary"]["n_follow_up_ready"] == 0
+    assert dashboard["follow_ups"][0]["cooldown_active"] is True
+
+
 def test_acquisition_intro_email_drafts_and_requires_current_studio_agent(app_env, monkeypatch):
     ids = _seed_acquisition_report()
     monkeypatch.setattr(acquisition.mailer, "configured", lambda: False)
@@ -820,8 +887,20 @@ def test_acquisition_queue_filters_and_bulk_send_reuse_cooldown(app_env, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_acquisition_dashboard_and_csv_routes(app_env):
+async def test_acquisition_dashboard_and_csv_routes(app_env, monkeypatch):
     ids = _seed_acquisition_report()
+    sent: list[tuple[str, str, str]] = []
+
+    def configured() -> bool:
+        return True
+
+    def send_for_studio(to: str, subject: str, body: str) -> None:
+        sent.append((to, subject, body))
+
+    monkeypatch.setattr(acquisition.mailer, "configured", configured)
+    monkeypatch.setattr(acquisition.mailer, "send_for_studio", send_for_studio)
+    assert acquisition.send_intro_email(ids["zero_use_id"])["status"] == "sent"
+    _age_acquisition_action(ids["zero_use_id"], acquisition.ACTION_SENT, 8)
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -839,10 +918,14 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "$300" in r.text
         assert "Attributed bookings" in r.text
         assert "Good Realty Office" in r.text
-        assert "Draft intro ask" in r.text
+        assert "Send intro ask" in r.text
         assert "Needs code (1)" in r.text
         assert "Needs intro (1)" in r.text
-        assert "Ready (2)" in r.text
+        assert "Ready (1)" in r.text
+        assert "Cooldown (1)" in r.text
+        assert "Follow-up queue" in r.text
+        assert "Zero Use Agent" in r.text
+        assert "Send follow-up" in r.text
 
         agent = await client.get(f"/admin/clients/{ids['referrer_id']}", headers={"cookie": cookie})
         assert agent.status_code == 200
@@ -851,11 +934,26 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "Good Realty Office" in agent.text
         assert "/book?ref=REF25" in agent.text
 
+        monkeypatch.setattr(acquisition.mailer, "configured", lambda: False)
+        follow = await client.post(
+            f"/admin/reports/acquisition/{ids['zero_use_id']}/follow-up",
+            data={"redirect": "/admin/reports/acquisition"},
+            headers={"cookie": cookie},
+            follow_redirects=False,
+        )
+        assert follow.status_code == 303
+        assert "acquisition=draft" in follow.headers["location"]
+        assert "follow_up=1" in follow.headers["location"]
+        draft = await client.get(follow.headers["location"], headers={"cookie": cookie})
+        assert "Referral follow-up email draft" in draft.text
+        assert "Quick follow-up on agent introductions" in draft.text
+
         export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-acquisition.csv" in export.headers["content-disposition"]
         assert "Referral codes" in export.text
+        assert "Follow-up queue" in export.text
         assert "REF25,Referrer Agent,Good Realty,referrer@example.com,1" in export.text
         assert "Agent referral summary" in export.text
 
