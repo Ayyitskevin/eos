@@ -3,7 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-from .. import churn, config, listings, security, studio
+from .. import churn, config, listings, mailer, rebooking, security, studio
 from ..render import templates
 from ..vocab import LISTING_STATUSES
 
@@ -22,6 +22,7 @@ async def dashboard(request: Request):
         and r["status"] not in ("delivered", "archived")
         and r["due_at"][:10] <= (today + dt.timedelta(days=2)).isoformat()
     ]
+    rebooking_opportunities = rebooking.decorate_opportunities(churn.rebooking_opportunities())
     return templates.TemplateResponse(
         request,
         "admin/dashboard.html",
@@ -34,6 +35,7 @@ async def dashboard(request: Request):
             "packages": studio.list_packages(),
             "presets": studio.list_crop_presets(),
             "base_url": config.BASE_URL,
-            "rebooking_opportunities": churn.rebooking_opportunities(),
+            "rebooking_opportunities": rebooking_opportunities,
+            "rebooking_mailer_on": mailer.configured(),
         },
     )

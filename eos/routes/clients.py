@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import brand_kits, churn, clients, portal, security
+from .. import brand_kits, churn, clients, mailer, portal, security
+from .. import rebooking as rebooking_email
 from ..render import templates
 from ..vocab import CLIENT_TYPE_LABELS, CLIENT_TYPES, STUDIO_ID
 
@@ -59,6 +60,17 @@ async def client_detail(request: Request, client_id: int):
         brokerage_link = portal.brokerage_portal_url(client_id)
     from .. import credits
 
+    rebooking_opportunity = churn.rebooking_for_client(client_id)
+    if rebooking_opportunity:
+        rebooking_opportunity = rebooking_email.decorate_opportunity(rebooking_opportunity)
+    rebooking_notice = request.query_params.get("rebooking")
+    rebooking_draft = None
+    if rebooking_notice == "draft":
+        try:
+            rebooking_draft = rebooking_email.build_email(client_id)
+        except HTTPException:
+            rebooking_draft = None
+
     return templates.TemplateResponse(
         request,
         "admin/client.html",
@@ -74,7 +86,10 @@ async def client_detail(request: Request, client_id: int):
             "brand_kit": brand_kits.get_kit(client_id),
             "portal_link": portal_link,
             "client_type_labels": CLIENT_TYPE_LABELS,
-            "rebooking": churn.rebooking_for_client(client_id),
+            "rebooking": rebooking_opportunity,
+            "rebooking_draft": rebooking_draft,
+            "rebooking_notice": rebooking_notice,
+            "rebooking_mailer_on": mailer.configured(),
         },
     )
 

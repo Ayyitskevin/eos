@@ -80,6 +80,9 @@ from .routes import (
     portal as portal_routes,
 )
 from .routes import (
+    rebooking as rebooking_routes,
+)
+from .routes import (
     reports as reports_routes,
 )
 from .routes import (
@@ -215,6 +218,7 @@ for r in (
     contracts_admin.router,
     docs.router,
     emails.router,
+    rebooking_routes.router,
     questionnaires.admin,
     questionnaires.router,
     studio_admin.router,

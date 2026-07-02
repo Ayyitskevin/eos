@@ -30,6 +30,12 @@
     {% endfor %}
   </section>
 
+  {% if request.query_params.get('rebooking') == 'sent' %}
+  <p class="alert-banner ok">Rebooking email sent.</p>
+  {% elif request.query_params.get('rebooking') == 'cooldown' %}
+  <p class="alert-banner">That agent already received a rebooking email recently.</p>
+  {% endif %}
+
   {% if rebooking_opportunities %}
   <details class="alert-banner" open>
     <summary>Agent rebooking cockpit · {{ rebooking_opportunities|length }} warm opportunit{{ "ies" if rebooking_opportunities|length != 1 else "y" }}</summary>
@@ -41,6 +47,18 @@
         <span class="badge badge-{{ a.priority_key }}">{{ a.priority }}</span>
         <span class="muted">{{ a.reason_line }}</span>
         <a href="{{ a.book_href }}" class="rebooking-action">Start listing</a>
+        {% if a.email %}
+          {% if a.cooldown_active %}
+          <span class="muted rebooking-action">emailed {{ a.last_rebooking_email_at[:10] }}</span>
+          {% else %}
+          <form method="post" action="/admin/rebooking/{{ a.id }}/send" class="inline-form rebooking-inline">
+            <input type="hidden" name="redirect" value="{{ '/admin' if rebooking_mailer_on else a.client_href }}">
+            <button type="submit" class="link">{{ "Send rebooking email" if rebooking_mailer_on else "Draft email" }}</button>
+          </form>
+          {% endif %}
+        {% else %}
+        <span class="muted rebooking-action">add email before outreach</span>
+        {% endif %}
       </li>
       {% endfor %}
     </ul>

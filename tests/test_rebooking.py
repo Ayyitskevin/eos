@@ -5,8 +5,11 @@ import eos.clients as clients
 import eos.db as db
 import eos.invoices as invoices
 import eos.listings as listings
+import eos.rebooking as rebooking
+import eos.security as security
 import eos.tenant as tenant
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 
@@ -80,6 +83,74 @@ def test_rebooking_opportunities_skip_agents_with_active_listings(app_env):
     assert agent_id not in {r["id"] for r in rows}
 
 
+def test_rebooking_email_sends_and_cooldown_logs(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Email Agent", email="email@example.com", client_type="agent")
+    _delivered_listing(agent_id, "Email listing")
+    sent: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        rebooking.mailer,
+        "send_for_studio",
+        lambda to, subject, body: sent.append((to, subject, body)),
+    )
+
+    result = rebooking.send_email(agent_id)
+    second = rebooking.send_email(agent_id)
+
+    assert result["status"] == "sent"
+    assert second["status"] == "cooldown"
+    assert len(sent) == 1
+    assert sent[0][0] == "email@example.com"
+    assert "/book" in sent[0][2]
+    email_log = db.one(
+        "SELECT doc_kind, doc_id, to_email FROM emails_log WHERE studio_id=? AND doc_kind='rebooking'",
+        ("default",),
+    )
+    assert dict(email_log) == {
+        "doc_kind": "rebooking",
+        "doc_id": agent_id,
+        "to_email": "email@example.com",
+    }
+    audit = db.one(
+        "SELECT action, detail FROM audit_log WHERE studio_id=? AND action=?",
+        ("default", rebooking.ACTION_SENT),
+    )
+    assert audit["detail"].startswith(f"client_id={agent_id};")
+
+
+def test_rebooking_email_drafts_when_mailer_is_not_configured(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Draft Agent", email="draft@example.com", client_type="agent")
+    _delivered_listing(agent_id, "Draft listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: False)
+
+    result = rebooking.send_email(agent_id)
+
+    assert result["status"] == "draft"
+    assert result["draft"]["to"] == "draft@example.com"
+    assert "Ready for your next listing?" == result["draft"]["subject"]
+    assert db.one("SELECT 1 FROM emails_log WHERE doc_kind='rebooking'") is None
+    audit = db.one(
+        "SELECT action, detail FROM audit_log WHERE studio_id=? AND action=?",
+        ("default", rebooking.ACTION_DRAFT),
+    )
+    assert "client_id=" in audit["detail"]
+
+
+def test_rebooking_email_requires_current_studio_agent(app_env):
+    tenant.set_studio("default")
+    db.run("INSERT INTO studio (id, name, slug) VALUES ('other', 'Other', 'other')")
+    other_id = db.run(
+        """INSERT INTO clients (studio_id, client_type, name, email)
+           VALUES ('other', 'agent', 'Other Agent', 'other@example.com')"""
+    )
+
+    with pytest.raises(HTTPException):
+        rebooking.build_email(other_id)
+
+
 @pytest.mark.asyncio
 async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
     tenant.set_studio("default")
@@ -109,6 +180,32 @@ async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
 
 
 @pytest.mark.asyncio
+async def test_rebooking_send_route_redirects_with_notice(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Route Agent", email="route@example.com", client_type="agent")
+    _delivered_listing(agent_id, "Route listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+
+        sent = await client.post(
+            f"/admin/rebooking/{agent_id}/send",
+            data={"redirect": "/admin", security.CSRF_FORM: csrf},
+            headers={"sec-fetch-site": "same-origin"},
+            follow_redirects=False,
+        )
+
+    assert sent.status_code == 303
+    assert sent.headers["location"] == f"/admin?rebooking=sent&client_id={agent_id}"
+
+
+@pytest.mark.asyncio
 async def test_client_detail_shows_repeat_listing_cta(app_env):
     tenant.set_studio("default")
     agent_id = clients.create_client("Client Detail Agent", email="client@example.com")
@@ -126,3 +223,26 @@ async def test_client_detail_shows_repeat_listing_cta(app_env):
     assert page.status_code == 200
     assert "Repeat listing opportunity" in page.text
     assert f"/admin/listings/new?client_id={agent_id}" in page.text
+
+
+@pytest.mark.asyncio
+async def test_client_detail_shows_rebooking_draft_when_email_unconfigured(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Draft Detail Agent", email="detail@example.com")
+    _delivered_listing(agent_id, "Draft detail listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: False)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+
+        page = await client.get(
+            f"/admin/clients/{agent_id}?rebooking=draft", headers={"cookie": cookie}
+        )
+
+    assert page.status_code == 200
+    assert "Rebooking email draft" in page.text
+    assert "detail@example.com" in page.text

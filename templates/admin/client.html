@@ -42,6 +42,14 @@
   </section>
   {% endif %}
 
+  {% if rebooking_notice == 'sent' %}
+  <p class="alert-banner ok">Rebooking email sent.</p>
+  {% elif rebooking_notice == 'cooldown' %}
+  <p class="alert-banner">A rebooking email was already sent recently.</p>
+  {% elif rebooking_notice == 'draft' %}
+  <p class="alert-banner">Email is not configured yet. Use the draft below.</p>
+  {% endif %}
+
   {% if rebooking %}
   <section class="card">
     <h2>Repeat listing opportunity</h2>
@@ -49,6 +57,28 @@
       <span class="muted">{{ rebooking.reason_line }}</span></p>
     <p class="muted">{{ rebooking.next_action }}</p>
     <a href="{{ rebooking.book_href }}" class="btn btn-accent">Start next listing</a>
+    {% if rebooking.email %}
+      {% if rebooking.cooldown_active %}
+      <p class="muted small">Rebooking email sent {{ rebooking.last_rebooking_email_at[:10] }}.</p>
+      {% else %}
+      <form method="post" action="/admin/rebooking/{{ c.id }}/send" class="inline-form">
+        <input type="hidden" name="redirect" value="/admin/clients/{{ c.id }}">
+        <button type="submit">{{ "Send rebooking email" if rebooking_mailer_on else "Draft email" }}</button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if rebooking_draft %}
+  <section class="card">
+    <h2>Rebooking email draft</h2>
+    <p class="muted">To: {{ rebooking_draft.to }}</p>
+    <div class="form-grid compact">
+      <label>Subject <input readonly value="{{ rebooking_draft.subject }}"></label>
+      <label>Message <textarea readonly rows="10">{{ rebooking_draft.body }}</textarea></label>
+    </div>
+    <p><a href="{{ rebooking_draft.mailto_href }}" class="btn btn-accent">Open email draft</a></p>
   </section>
   {% endif %}
 
