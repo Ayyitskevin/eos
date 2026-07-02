@@ -16,6 +16,7 @@ import eos.reports as reports
 import eos.reports_export as reports_export
 import eos.revenue_optimizer as revenue_optimizer
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 
@@ -268,20 +269,24 @@ def _seed_revenue_optimizer(*, other_studio: bool = False):
 
 def _seed_acquisition_report(*, other_studio: bool = False):
     referrer_id = db.run(
-        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
-           VALUES ('default', 'Referrer Agent', 'agent', 'Good Realty', 'ref-agent')""",
+        """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
+           VALUES ('default', 'Referrer Agent', 'agent', 'Good Realty',
+                   'referrer@example.com', 'ref-agent')""",
     )
     no_code_id = db.run(
-        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
-           VALUES ('default', 'No Code Agent', 'agent', 'Good Realty', 'nocode-agent')""",
+        """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
+           VALUES ('default', 'No Code Agent', 'agent', 'Good Realty',
+                   'nocode@example.com', 'nocode-agent')""",
     )
     zero_use_id = db.run(
-        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
-           VALUES ('default', 'Zero Use Agent', 'agent', 'Good Realty', 'zerouse-agent')""",
+        """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
+           VALUES ('default', 'Zero Use Agent', 'agent', 'Good Realty',
+                   'zerouse@example.com', 'zerouse-agent')""",
     )
     referred_id = db.run(
-        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
-           VALUES ('default', 'Referred Agent', 'agent', 'New Realty', 'referred-agent')""",
+        """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
+           VALUES ('default', 'Referred Agent', 'agent', 'New Realty',
+                   'referred@example.com', 'referred-agent')""",
     )
 
     referrals.create_code(code="REF25", credit_cents=2500, referrer_client_id=referrer_id)
@@ -610,6 +615,74 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
     assert "OTHER25" not in body
 
 
+def test_acquisition_intro_email_sends_and_cooldown_logs(app_env, monkeypatch):
+    ids = _seed_acquisition_report()
+    sent: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        acquisition.mailer,
+        "send_for_studio",
+        lambda to, subject, body: sent.append((to, subject, body)),
+    )
+
+    result = acquisition.send_intro_email(ids["no_code_id"])
+    second = acquisition.send_intro_email(ids["no_code_id"])
+
+    assert result["status"] == "sent"
+    assert second["status"] == "cooldown"
+    assert len(sent) == 1
+    assert sent[0][0] == "nocode@example.com"
+    assert "NOCODEAG25" in sent[0][2]
+    assert "/book" in sent[0][2]
+    email_log = db.one(
+        """SELECT doc_kind, doc_id, to_email
+           FROM emails_log
+           WHERE studio_id=? AND doc_kind='acquisition_intro'""",
+        ("default",),
+    )
+    assert dict(email_log) == {
+        "doc_kind": "acquisition_intro",
+        "doc_id": ids["no_code_id"],
+        "to_email": "nocode@example.com",
+    }
+    audit = db.one(
+        "SELECT action, detail FROM audit_log WHERE studio_id=? AND action=?",
+        ("default", acquisition.ACTION_SENT),
+    )
+    assert audit["detail"].startswith(f"client_id={ids['no_code_id']};")
+
+    ask_rows = {row["name"]: row for row in acquisition.dashboard()["intro_asks"]}
+    assert ask_rows["No Code Agent"]["cooldown_active"] is True
+    assert ask_rows["No Code Agent"]["can_email_intro"] is False
+
+
+def test_acquisition_intro_email_drafts_and_requires_current_studio_agent(app_env, monkeypatch):
+    ids = _seed_acquisition_report()
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: False)
+
+    result = acquisition.send_intro_email(ids["zero_use_id"])
+
+    assert result["status"] == "draft"
+    assert result["draft"]["to"] == "zerouse@example.com"
+    assert result["draft"]["active_referral_code"] == "ZERO25"
+    assert "ZERO25" in result["draft"]["body"]
+    assert db.one("SELECT 1 FROM emails_log WHERE doc_kind='acquisition_intro'") is None
+    audit = db.one(
+        "SELECT action, detail FROM audit_log WHERE studio_id=? AND action=?",
+        ("default", acquisition.ACTION_DRAFT),
+    )
+    assert audit["detail"].startswith(f"client_id={ids['zero_use_id']};")
+
+    db.run("INSERT INTO studio (id, name, slug) VALUES ('other', 'Other Studio', 'other')")
+    other_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, email)
+           VALUES ('other', 'Other Agent', 'agent', 'other@example.com')""",
+    )
+    with pytest.raises(HTTPException):
+        acquisition.build_intro_email(other_id)
+
+
 @pytest.mark.asyncio
 async def test_acquisition_dashboard_and_csv_routes(app_env):
     _seed_acquisition_report()
@@ -628,6 +701,7 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "Zero Use Agent" in r.text
         assert "REF25" in r.text
         assert "$300" in r.text
+        assert "Draft intro ask" in r.text
 
         export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
         assert export.status_code == 200
@@ -635,6 +709,34 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "eos-acquisition.csv" in export.headers["content-disposition"]
         assert "Referral codes" in export.text
         assert "REF25,Referrer Agent,1" in export.text
+
+
+@pytest.mark.asyncio
+async def test_acquisition_intro_route_drafts_and_shows_mailto(app_env, monkeypatch):
+    ids = _seed_acquisition_report()
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: False)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+        sent = await client.post(
+            f"/admin/reports/acquisition/{ids['zero_use_id']}/send",
+            data={"redirect": "/admin/reports/acquisition"},
+            headers={"cookie": cookie},
+            follow_redirects=False,
+        )
+        assert sent.status_code == 303
+        assert "acquisition=draft" in sent.headers["location"]
+
+        page = await client.get(sent.headers["location"], headers={"cookie": cookie})
+
+    assert page.status_code == 200
+    assert "Referral introduction email draft" in page.text
+    assert "zerouse@example.com" in page.text
+    assert "ZERO25" in page.text
 
 
 @pytest.mark.asyncio

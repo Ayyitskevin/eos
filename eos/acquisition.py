@@ -2,9 +2,18 @@
 
 import csv
 import io
+from typing import Any
+from urllib.parse import urlencode
 
-from . import db
+from fastapi import HTTPException
+
+from . import clients, db, mailer, tenant
 from .vocab import STUDIO_ID
+
+COOLDOWN_DAYS = 14
+ACTION_SENT = "acquisition.intro.sent"
+ACTION_DRAFT = "acquisition.intro.draft"
+ACTION_FAILED = "acquisition.intro.failed"
 
 
 def _money(cents: int) -> str:
@@ -12,6 +21,36 @@ def _money(cents: int) -> str:
     if cents % 100 == 0:
         return f"${dollars:,.0f}"
     return f"${dollars:,.2f}"
+
+
+def _first(name: str) -> str:
+    return (name or "there").split()[0]
+
+
+def _detail(client_id: int, email: str, subject: str = "") -> str:
+    return f"client_id={client_id}; email={email}; subject={subject[:120]}"
+
+
+def recent_intro_sent_at(client_id: int, *, days: int = COOLDOWN_DAYS) -> str | None:
+    row = db.one(
+        """SELECT created_at FROM audit_log
+           WHERE studio_id=? AND action=? AND detail LIKE ?
+             AND created_at >= datetime('now', ?)
+           ORDER BY created_at DESC LIMIT 1""",
+        (STUDIO_ID, ACTION_SENT, f"client_id={client_id};%", f"-{days} days"),
+    )
+    return row["created_at"] if row else None
+
+
+def _active_referral_code(client_id: int) -> dict[str, Any] | None:
+    row = db.one(
+        """SELECT code, credit_cents
+           FROM referral_codes
+           WHERE studio_id=? AND referrer_client_id=? AND active=1
+           ORDER BY created_at DESC LIMIT 1""",
+        (STUDIO_ID, client_id),
+    )
+    return dict(row) if row else None
 
 
 def _agent_value(client_id: int) -> dict:
@@ -180,6 +219,12 @@ def intro_ask_queue(limit: int = 12) -> list[dict]:
                       WHERE r.studio_id=c.studio_id
                         AND r.referrer_client_id=c.id
                         AND r.active=1) AS referral_uses,
+                    (SELECT r.code
+                       FROM referral_codes r
+                      WHERE r.studio_id=c.studio_id
+                        AND r.referrer_client_id=c.id
+                        AND r.active=1
+                      ORDER BY r.created_at DESC LIMIT 1) AS active_referral_code,
                     COALESCE((SELECT SUM(i.amount_cents)
                        FROM invoices i
                        LEFT JOIN listings li
@@ -209,6 +254,7 @@ def intro_ask_queue(limit: int = 12) -> list[dict]:
         paid_cents = int(row["paid_cents"] or 0)
         n_active_codes = int(row["n_active_codes"] or 0)
         referral_uses = int(row["referral_uses"] or 0)
+        recent = recent_intro_sent_at(row["id"])
         if n_active_codes == 0:
             action = "Create referral code"
             reason = "High-value agent has no referral code."
@@ -228,6 +274,10 @@ def intro_ask_queue(limit: int = 12) -> list[dict]:
                 "paid_display": _money(paid_cents),
                 "n_active_codes": n_active_codes,
                 "referral_uses": referral_uses,
+                "active_referral_code": row["active_referral_code"],
+                "last_acquisition_email_at": recent,
+                "cooldown_active": bool(recent),
+                "can_email_intro": bool(row["email"]) and not recent,
                 "action": action,
                 "reason": reason,
                 "suggested_code": _suggested_code(row["name"]),
@@ -242,6 +292,93 @@ def _suggested_code(name: str) -> str:
     return f"{letters[:8] or 'AGENT'}25"
 
 
+def build_intro_email(client_id: int) -> dict[str, str | int | None]:
+    client = clients.get_client(client_id)
+    if client["client_type"] != "agent":
+        raise HTTPException(status_code=400, detail="acquisition outreach is only for agents")
+    if not client["email"]:
+        raise HTTPException(status_code=400, detail="agent email required")
+
+    value = _agent_value(client_id)
+    if not value:
+        raise HTTPException(status_code=404)
+    code = _active_referral_code(client_id)
+    code_text = code["code"] if code else _suggested_code(client["name"])
+    credit_text = _money(int(code["credit_cents"])) if code else "$25"
+    booking_link = f"{tenant.get_base_url()}/book"
+    if value["n_listings"]:
+        history_line = (
+            f"We have photographed {value['n_listings']} listing"
+            f"{'s' if value['n_listings'] != 1 else ''} together."
+        )
+    else:
+        history_line = "I have enjoyed working with you and your listings."
+    if code:
+        code_line = (
+            f"Your referral code is {code_text}; anyone who books with it gets "
+            f"{credit_text} tracked back to the introduction."
+        )
+    else:
+        code_line = (
+            f"I can set up {code_text} as your referral code with a {credit_text} credit "
+            "for the next agent you introduce."
+        )
+
+    subject = "Know another agent who needs listing photos?"
+    body = f"""Hi {_first(client["name"])},
+
+{history_line} If another agent in your office needs reliable listing photos, I would appreciate the introduction.
+
+{code_line}
+
+Booking link:
+{booking_link}
+
+You can forward this link or reply with the agent's name and email and I will take it from there.
+
+Thanks,
+{tenant.get_site_name()}"""
+    email = client["email"].strip()
+    return {
+        "client_id": client_id,
+        "to": email,
+        "subject": subject,
+        "body": body,
+        "suggested_code": code_text,
+        "active_referral_code": code["code"] if code else None,
+        "mailto_href": f"mailto:{email}?{urlencode({'subject': subject, 'body': body})}",
+    }
+
+
+def send_intro_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> dict[str, Any]:
+    draft = build_intro_email(client_id)
+    recent = recent_intro_sent_at(client_id, days=cooldown_days)
+    if recent:
+        return {"status": "cooldown", "last_sent_at": recent, "draft": draft}
+
+    if not mailer.configured():
+        db.audit("admin", ACTION_DRAFT, _detail(client_id, str(draft["to"]), str(draft["subject"])))
+        return {"status": "draft", "draft": draft}
+
+    try:
+        mailer.send_for_studio(str(draft["to"]), str(draft["subject"]), str(draft["body"]))
+    except Exception as exc:
+        db.audit(
+            "admin",
+            ACTION_FAILED,
+            f"{_detail(client_id, str(draft['to']), str(draft['subject']))}; error={str(exc)[:120]}",
+        )
+        raise HTTPException(status_code=502, detail="acquisition email failed") from exc
+
+    db.run(
+        """INSERT INTO emails_log (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
+           VALUES (?,?,?,?,?,?)""",
+        (STUDIO_ID, None, "acquisition_intro", client_id, draft["to"], draft["subject"]),
+    )
+    db.audit("admin", ACTION_SENT, _detail(client_id, str(draft["to"]), str(draft["subject"])))
+    return {"status": "sent", "draft": draft}
+
+
 def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None) -> dict:
     referrals = referrals if referrals is not None else referral_performance()
     asks = asks if asks is not None else intro_ask_queue()
@@ -253,6 +390,8 @@ def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None)
         "n_referred_inquiries": sum(row["n_inquiries"] for row in referrals),
         "n_referred_listings": sum(row["n_listings"] for row in referrals),
         "n_intro_asks": len(asks),
+        "n_intro_ready": sum(1 for row in asks if row["can_email_intro"]),
+        "n_intro_cooldown": sum(1 for row in asks if row["cooldown_active"]),
         "referred_paid_cents": paid_cents,
         "referred_open_cents": open_cents,
         "referred_paid_display": _money(paid_cents),

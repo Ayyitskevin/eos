@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, Response
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
     acquisition,
     brokerage,
     brokerage_reports,
     clients,
+    mailer,
     reports,
     revenue_optimizer,
     security,
@@ -13,6 +16,15 @@ from .. import (
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
+
+
+def _safe_admin_redirect(path: str, fallback: str = "/admin/reports/acquisition") -> str:
+    return path if path.startswith("/admin") else fallback
+
+
+def _with_acquisition_notice(path: str, *, status: str, client_id: int) -> str:
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{urlencode({'acquisition': status, 'client_id': client_id})}"
 
 
 @router.get("/reports", response_class=HTMLResponse)
@@ -102,10 +114,38 @@ async def revenue_optimizer_csv(_: None = Depends(security.require_admin)):
 @router.get("/reports/acquisition", response_class=HTMLResponse)
 async def acquisition_dashboard(request: Request):
     data = acquisition.dashboard()
+    notice = request.query_params.get("acquisition")
+    draft = None
+    raw_client_id = request.query_params.get("client_id", "")
+    if notice == "draft" and raw_client_id.isdigit():
+        try:
+            draft = acquisition.build_intro_email(int(raw_client_id))
+        except HTTPException:
+            draft = None
+    data.update(
+        {
+            "acquisition_notice": notice,
+            "acquisition_draft": draft,
+            "acquisition_mailer_on": mailer.configured(),
+        }
+    )
     return templates.TemplateResponse(
         request,
         "admin/acquisition.html",
         data,
+    )
+
+
+@router.post("/reports/acquisition/{client_id}/send")
+async def acquisition_intro_send(
+    client_id: int,
+    redirect: str = Form("/admin/reports/acquisition"),
+):
+    result = acquisition.send_intro_email(client_id)
+    target = _safe_admin_redirect(redirect)
+    return RedirectResponse(
+        _with_acquisition_notice(target, status=result["status"], client_id=client_id),
+        status_code=303,
     )
 
 

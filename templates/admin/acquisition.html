@@ -12,6 +12,14 @@
     </nav>
   </header>
 
+  {% if acquisition_notice == 'sent' %}
+  <p class="alert-banner ok">Referral introduction email sent.</p>
+  {% elif acquisition_notice == 'cooldown' %}
+  <p class="alert-banner">That agent already received a referral introduction email recently.</p>
+  {% elif acquisition_notice == 'draft' %}
+  <p class="alert-banner">Email is not configured yet. Use the draft below.</p>
+  {% endif %}
+
   <section class="pipeline-strip">
     <div class="pipeline-card {% if summary.n_active_codes %}has-items{% endif %}">
       <span class="pipeline-count">{{ summary.n_active_codes }}</span>
@@ -33,6 +41,10 @@
       <span class="pipeline-count">{{ summary.n_intro_asks }}</span>
       <span class="pipeline-label">Intro asks</span>
     </div>
+    <div class="pipeline-card {% if summary.n_intro_ready %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_intro_ready }}</span>
+      <span class="pipeline-label">Ready to email</span>
+    </div>
   </section>
 
   <section class="card">
@@ -46,8 +58,22 @@
         <td>{{ a.brokerage_name or "—" }}</td>
         <td>{{ a.n_listings }}</td>
         <td>{{ a.paid_display }}</td>
-        <td><code>{{ a.suggested_code }}</code></td>
-        <td>{{ a.action }}<br><span class="muted small">{{ a.reason }}</span></td>
+        <td><code>{{ a.active_referral_code or a.suggested_code }}</code></td>
+        <td>
+          {{ a.action }}<br><span class="muted small">{{ a.reason }}</span>
+          {% if a.email %}
+            {% if a.cooldown_active %}
+            <br><span class="muted small">emailed {{ a.last_acquisition_email_at[:10] }}</span>
+            {% else %}
+            <form method="post" action="/admin/reports/acquisition/{{ a.id }}/send" class="inline-form rebooking-inline">
+              <input type="hidden" name="redirect" value="/admin/reports/acquisition">
+              <button type="submit" class="link">{{ "Send intro ask" if acquisition_mailer_on else "Draft intro ask" }}</button>
+            </form>
+            {% endif %}
+          {% else %}
+          <br><span class="muted small">add email before outreach</span>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </table>
@@ -75,5 +101,17 @@
     <p class="muted">No referral codes yet. Add one from Studio settings and tie it to the agent who introduced you.</p>
     {% endif %}
   </section>
+
+  {% if acquisition_draft %}
+  <section class="card">
+    <h2>Referral introduction email draft</h2>
+    <p class="muted">To: {{ acquisition_draft.to }}</p>
+    <div class="form-grid compact">
+      <label>Subject <input readonly value="{{ acquisition_draft.subject }}"></label>
+      <label>Message <textarea readonly rows="10">{{ acquisition_draft.body }}</textarea></label>
+    </div>
+    <p><a href="{{ acquisition_draft.mailto_href }}" class="btn btn-accent">Open email draft</a></p>
+  </section>
+  {% endif %}
 </main>
 {% endblock %}
