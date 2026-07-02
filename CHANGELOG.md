@@ -6,6 +6,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
 - Agent rebooking cockpit ranks inactive agents by prior listing value and links directly into a preselected new-listing flow.
 - Manual rebooking outreach sends or drafts cooldown-safe agent follow-up emails without adding a new table.
+- Rebooking performance snapshot shows ready nudges, recent outreach, converted listings, and prior client value.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

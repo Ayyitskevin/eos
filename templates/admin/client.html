@@ -70,6 +70,21 @@
   </section>
   {% endif %}
 
+  {% if rebooking_history.latest_sent_at or rebooking_history.draft_count or rebooking_history.converted_listing %}
+  <section class="card">
+    <h2>Rebooking outreach</h2>
+    {% if rebooking_history.latest_sent_at %}
+    <p class="muted">Last sent {{ rebooking_history.latest_sent_at[:10] }}.</p>
+    {% endif %}
+    {% if rebooking_history.draft_count %}
+    <p class="muted">{{ rebooking_history.draft_count }} draft{{ "s" if rebooking_history.draft_count != 1 }} prepared recently.</p>
+    {% endif %}
+    {% if rebooking_history.converted_listing %}
+    <p>Converted into <a href="{{ rebooking_history.converted_listing.href }}">{{ rebooking_history.converted_listing.title }}</a>.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% if rebooking_draft %}
   <section class="card">
     <h2>Rebooking email draft</h2>

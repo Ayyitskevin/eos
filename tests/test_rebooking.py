@@ -151,6 +151,56 @@ def test_rebooking_email_requires_current_studio_agent(app_env):
         rebooking.build_email(other_id)
 
 
+def test_rebooking_performance_snapshot_counts_conversions(app_env, monkeypatch):
+    tenant.set_studio("default")
+    ready_id = clients.create_client("Ready Agent", email="ready@example.com", client_type="agent")
+    converted_id = clients.create_client(
+        "Converted Agent", email="converted@example.com", client_type="agent"
+    )
+    _delivered_listing(ready_id, "Ready old listing")
+    _delivered_listing(converted_id, "Converted old listing")
+
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    assert rebooking.send_email(converted_id)["status"] == "sent"
+    new_listing = listings.create_listing(
+        "Converted new listing", client_id=converted_id, seed_defaults=False
+    )
+    db.run(
+        "UPDATE listings SET created_at=datetime('now', '+1 minute') WHERE id=? AND studio_id=?",
+        (new_listing, "default"),
+    )
+
+    snapshot = rebooking.performance_snapshot()
+
+    assert snapshot["ready_count"] == 1
+    assert snapshot["sent_recent"] == 1
+    assert snapshot["converted_recent"] == 1
+    assert snapshot["conversion_rate_pct"] == 100
+    assert snapshot["converted_listings"][0]["listing_title"] == "Converted new listing"
+    assert "ready for outreach" in snapshot["next_action"]
+
+
+def test_rebooking_client_history_surfaces_conversion(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client(
+        "History Agent", email="history@example.com", client_type="agent"
+    )
+    _delivered_listing(agent_id, "History old listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    assert rebooking.send_email(agent_id)["status"] == "sent"
+    listing_id = listings.create_listing(
+        "History new listing", client_id=agent_id, seed_defaults=False
+    )
+
+    history = rebooking.client_history(agent_id)
+
+    assert history["latest_sent_at"]
+    assert history["converted_listing"]["id"] == listing_id
+    assert history["converted_listing"]["title"] == "History new listing"
+
+
 @pytest.mark.asyncio
 async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
     tenant.set_studio("default")
@@ -169,6 +219,7 @@ async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
         dashboard = await client.get("/admin", headers={"cookie": cookie})
         assert dashboard.status_code == 200
         assert "Agent rebooking cockpit" in dashboard.text
+        assert "Ready to nudge" in dashboard.text
         assert "Repeat Agent" in dashboard.text
         assert f"/admin/listings/new?client_id={agent_id}" in dashboard.text
 
@@ -246,3 +297,27 @@ async def test_client_detail_shows_rebooking_draft_when_email_unconfigured(app_e
     assert page.status_code == 200
     assert "Rebooking email draft" in page.text
     assert "detail@example.com" in page.text
+
+
+@pytest.mark.asyncio
+async def test_client_detail_shows_rebooking_conversion(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Converted Detail Agent", email="converted-detail@example.com")
+    _delivered_listing(agent_id, "Converted detail old")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    rebooking.send_email(agent_id)
+    listings.create_listing("Converted detail new", client_id=agent_id, seed_defaults=False)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+
+        page = await client.get(f"/admin/clients/{agent_id}", headers={"cookie": cookie})
+
+    assert page.status_code == 200
+    assert "Rebooking outreach" in page.text
+    assert "Converted detail new" in page.text

@@ -23,6 +23,7 @@ async def dashboard(request: Request):
         and r["due_at"][:10] <= (today + dt.timedelta(days=2)).isoformat()
     ]
     rebooking_opportunities = rebooking.decorate_opportunities(churn.rebooking_opportunities())
+    rebooking_summary = rebooking.performance_snapshot(rebooking_opportunities)
     return templates.TemplateResponse(
         request,
         "admin/dashboard.html",
@@ -36,6 +37,7 @@ async def dashboard(request: Request):
             "presets": studio.list_crop_presets(),
             "base_url": config.BASE_URL,
             "rebooking_opportunities": rebooking_opportunities,
+            "rebooking_summary": rebooking_summary,
             "rebooking_mailer_on": mailer.configured(),
         },
     )

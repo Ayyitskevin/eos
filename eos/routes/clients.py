@@ -90,6 +90,7 @@ async def client_detail(request: Request, client_id: int):
             "rebooking_draft": rebooking_draft,
             "rebooking_notice": rebooking_notice,
             "rebooking_mailer_on": mailer.configured(),
+            "rebooking_history": rebooking_email.client_history(client_id),
         },
     )
 

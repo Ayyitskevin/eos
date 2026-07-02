@@ -39,6 +39,33 @@
   {% if rebooking_opportunities %}
   <details class="alert-banner" open>
     <summary>Agent rebooking cockpit · {{ rebooking_opportunities|length }} warm opportunit{{ "ies" if rebooking_opportunities|length != 1 else "y" }}</summary>
+    <div class="pipeline-strip rebooking-metrics">
+      <div class="pipeline-card {% if rebooking_summary.ready_count %}has-items{% endif %}">
+        <span class="pipeline-count">{{ rebooking_summary.ready_count }}</span>
+        <span class="pipeline-label">Ready to nudge</span>
+      </div>
+      <div class="pipeline-card {% if rebooking_summary.sent_recent %}has-items{% endif %}">
+        <span class="pipeline-count">{{ rebooking_summary.sent_recent }}</span>
+        <span class="pipeline-label">{{ rebooking_summary.days }}d sends</span>
+      </div>
+      <div class="pipeline-card {% if rebooking_summary.converted_recent %}has-items{% endif %}">
+        <span class="pipeline-count">{{ rebooking_summary.converted_recent }}</span>
+        <span class="pipeline-label">Converted</span>
+      </div>
+      <div class="pipeline-card {% if rebooking_summary.at_risk_paid_cents %}has-items{% endif %}">
+        <span class="pipeline-count">{{ rebooking_summary.at_risk_paid_display }}</span>
+        <span class="pipeline-label">Prior value</span>
+      </div>
+    </div>
+    <p class="muted">{{ rebooking_summary.next_action }}</p>
+    {% if rebooking_summary.converted_listings %}
+    <ul class="due-list">
+      {% for c in rebooking_summary.converted_listings[:3] %}
+      <li><a href="{{ c.listing_href }}">{{ c.listing_title }}</a>
+        <span class="muted">booked after outreach to {{ c.client_name }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
     <ul class="due-list rebooking-list">
       {% for a in rebooking_opportunities %}
       <li>

@@ -93,6 +93,8 @@ button.link:hover { transform: none; text-decoration: underline; }
 .rebooking-action { margin-left: 0.4rem; font-weight: 600; }
 .rebooking-inline { display: inline-flex; margin-left: 0.4rem; }
 .rebooking-inline button { margin-top: 0; }
+.rebooking-metrics { margin: 0.75rem 0; }
+.rebooking-metrics .pipeline-card { padding: 0.75rem; }
 
 .list { width: 100%; border-collapse: collapse; background: var(--card);
   border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
