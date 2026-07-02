@@ -14,7 +14,14 @@ from eos import config, db  # noqa: E402
 
 def main() -> int:
     config.ensure_dirs()
-    before = {r["version"] for r in db.all_("SELECT version FROM schema_migrations")}
+    has_migration_table = db.one(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+    )
+    before = (
+        {r["version"] for r in db.all_("SELECT version FROM schema_migrations")}
+        if has_migration_table
+        else set()
+    )
     db.migrate()
     after = {r["version"] for r in db.all_("SELECT version FROM schema_migrations")}
     new = sorted(after - before)

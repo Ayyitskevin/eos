@@ -20,5 +20,7 @@ fi
 
 export EOS_BOOTSTRAP_EMAIL="${EOS_BOOTSTRAP_EMAIL:-owner@localhost}"
 export EOS_ADMIN_PASSWORD="${EOS_ADMIN_PASSWORD:-dogfood-admin}"
+export EOS_DATA_DIR="${EOS_DATA_DIR:-$ROOT/data}"
 
+.venv/bin/python scripts/migrate.py >/dev/null
 .venv/bin/python -m eos.dogfood "$@"

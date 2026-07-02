@@ -21,6 +21,7 @@ from . import (
     listings,
     media_paths,
     microsites,
+    referrals,
     scheduling,
     studio,
     studio_seed,
@@ -34,6 +35,7 @@ MARKER = "dogfood:v1"
 ADDRESS = "1420 Maple Dr"
 SITE_SLUG = "1420-maple-dr"
 GALLERY_PIN = "2847"
+REFERRAL_CODE = "SARAH25"
 
 _PHOTOS = [
     ("front-elevation.jpg", "Exterior & Curb Appeal", (62, 110, 78), True),
@@ -101,6 +103,22 @@ def _seed_photos(gallery_id: int) -> int:
     return cover_id or 0
 
 
+def _ensure_referral_code(agent_id: int) -> None:
+    row = db.one(
+        "SELECT id FROM referral_codes WHERE studio_id='default' AND upper(code)=?",
+        (REFERRAL_CODE,),
+    )
+    if row:
+        db.run(
+            """UPDATE referral_codes
+                  SET referrer_client_id=?, credit_cents=2500, active=1
+                WHERE id=? AND studio_id='default'""",
+            (agent_id, row["id"]),
+        )
+        return
+    referrals.create_code(code=REFERRAL_CODE, credit_cents=2500, referrer_client_id=agent_id)
+
+
 def seed(*, force: bool = False) -> dict:
     tenant.set_studio("default")
     db.migrate()
@@ -126,6 +144,10 @@ def seed(*, force: bool = False) -> dict:
             "SELECT id FROM clients WHERE studio_id='default' AND email='sarah.chen@kw.com'"
         )
         if agent:
+            db.run(
+                "DELETE FROM referral_codes WHERE studio_id='default' AND upper(code)=?",
+                (REFERRAL_CODE,),
+            )
             db.run("DELETE FROM credit_ledger WHERE client_id=?", (agent["id"],))
             db.run("DELETE FROM clients WHERE id=?", (agent["id"],))
         db.run("DELETE FROM clients WHERE studio_id='default' AND email='billing@maplebroker.com'")
@@ -163,6 +185,7 @@ def seed(*, force: bool = False) -> dict:
     )
     db.run("UPDATE clients SET portal_token=? WHERE id=?", ("df-agent-sarah", agent_id))
     credits.add_credit(agent_id, amount_cents=5000, note="Welcome referral credit")
+    _ensure_referral_code(agent_id)
 
     starts_at, ends_at, shoot_date = _shoot_times()
     due_at = (dt.date.today() + dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
@@ -249,6 +272,7 @@ def _summary(
         (listing_id,),
     )
     base = config.BASE_URL.rstrip("/")
+    _ensure_referral_code(agent["id"])
     out = {
         "listing_id": listing_id,
         "status": listing["status"],
@@ -260,6 +284,10 @@ def _summary(
         "gallery_pin": gallery["pin"],
         "site_url": f"{base}/l/{listing['site_slug']}",
         "agent_portal_url": f"{base}/portal/{agent['portal_token']}",
+        "referral_code": REFERRAL_CODE,
+        "referral_booking_url": f"{base}/book?ref={REFERRAL_CODE}",
+        "referral_short_url": f"{base}/r/{REFERRAL_CODE}",
+        "acquisition_url": f"{base}/admin/reports/acquisition",
         "broker_portal_url": f"{base}/portal/brokerage/{broker['portal_token']}"
         if broker
         else None,
