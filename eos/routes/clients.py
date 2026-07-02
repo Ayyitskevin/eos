@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import brand_kits, churn, clients, mailer, portal, security
+from .. import acquisition, brand_kits, churn, clients, mailer, portal, security
 from .. import rebooking as rebooking_email
 from ..render import templates
 from ..vocab import CLIENT_TYPE_LABELS, CLIENT_TYPES, STUDIO_ID
@@ -70,6 +70,9 @@ async def client_detail(request: Request, client_id: int):
             rebooking_draft = rebooking_email.build_email(client_id)
         except HTTPException:
             rebooking_draft = None
+    agent_growth = (
+        acquisition.agent_growth_panel(client_id) if c["client_type"] == "agent" else None
+    )
 
     return templates.TemplateResponse(
         request,
@@ -86,6 +89,7 @@ async def client_detail(request: Request, client_id: int):
             "brand_kit": brand_kits.get_kit(client_id),
             "portal_link": portal_link,
             "client_type_labels": CLIENT_TYPE_LABELS,
+            "agent_growth": agent_growth,
             "rebooking": rebooking_opportunity,
             "rebooking_draft": rebooking_draft,
             "rebooking_notice": rebooking_notice,

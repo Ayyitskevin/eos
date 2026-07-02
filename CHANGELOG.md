@@ -18,6 +18,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Acquisition queue filters and bulk intro-send/draft actions help studios work high-value referral asks faster.
 - Acquisition attribution now connects referral booking links to codes, referrers, brokerages, listings, and paid/open value.
 - Brokerage accounts now include a growth map with anchor-office, penetration, referral, and next-action signals.
+- Agent records now include a growth panel with revenue, referral, brokerage, and next-action signals.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

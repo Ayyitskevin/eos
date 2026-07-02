@@ -662,6 +662,20 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
     assert agent_rows["Zero Use Agent"]["code_list"] == "ZERO25"
     assert "Other Agent" not in agent_rows
 
+    growth = acquisition.agent_growth_panel(ids["referrer_id"])
+    assert growth["stage"] == "Referral advocate"
+    assert growth["brokerage_name"] == "Good Realty Office"
+    assert growth["code_list"] == "REF25"
+    assert growth["booking_link"].endswith("/book?ref=REF25")
+    assert growth["referral_uses"] == 1
+    assert growth["attributed_bookings"] == 1
+    assert growth["referred_paid_display"] == "$300"
+    assert growth["referred_open_display"] == "$50"
+
+    no_code_growth = acquisition.agent_growth_panel(ids["no_code_id"])
+    assert no_code_growth["stage"] == "Needs referral code"
+    assert no_code_growth["action_href"] == "/admin/studio#integrations"
+
     ask_rows = {row["name"]: row for row in data["intro_asks"]}
     assert ask_rows["No Code Agent"]["id"] == ids["no_code_id"]
     assert ask_rows["No Code Agent"]["action"] == "Create referral code"
@@ -807,7 +821,7 @@ def test_acquisition_queue_filters_and_bulk_send_reuse_cooldown(app_env, monkeyp
 
 @pytest.mark.asyncio
 async def test_acquisition_dashboard_and_csv_routes(app_env):
-    _seed_acquisition_report()
+    ids = _seed_acquisition_report()
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -829,6 +843,13 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "Needs code (1)" in r.text
         assert "Needs intro (1)" in r.text
         assert "Ready (2)" in r.text
+
+        agent = await client.get(f"/admin/clients/{ids['referrer_id']}", headers={"cookie": cookie})
+        assert agent.status_code == 200
+        assert "Agent growth" in agent.text
+        assert "Referral advocate" in agent.text
+        assert "Good Realty Office" in agent.text
+        assert "/book?ref=REF25" in agent.text
 
         export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
         assert export.status_code == 200

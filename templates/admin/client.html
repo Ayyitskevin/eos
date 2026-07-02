@@ -42,6 +42,41 @@
   </section>
   {% endif %}
 
+  {% if agent_growth %}
+  <section class="card">
+    <h2>Agent growth</h2>
+    <p><span class="badge">{{ agent_growth.stage }}</span> <span class="muted">{{ agent_growth.next_action }}</span></p>
+    <div class="pipeline-strip">
+      <div class="pipeline-card {% if agent_growth.n_listings %}has-items{% endif %}">
+        <span class="pipeline-count">{{ agent_growth.n_listings }}</span>
+        <span class="pipeline-label">Listings</span>
+      </div>
+      <div class="pipeline-card {% if agent_growth.paid_cents %}has-items{% endif %}">
+        <span class="pipeline-count">{{ agent_growth.paid_display }}</span>
+        <span class="pipeline-label">Paid value</span>
+      </div>
+      <div class="pipeline-card {% if agent_growth.referral_uses %}has-items{% endif %}">
+        <span class="pipeline-count">{{ agent_growth.referral_uses }}</span>
+        <span class="pipeline-label">Referral uses</span>
+      </div>
+      <div class="pipeline-card {% if agent_growth.attributed_bookings %}has-items{% endif %}">
+        <span class="pipeline-count">{{ agent_growth.attributed_bookings }}</span>
+        <span class="pipeline-label">Attributed bookings</span>
+      </div>
+    </div>
+    <p class="muted small">
+      Brokerage: {{ agent_growth.brokerage_name or "—" }} ·
+      Active codes: <code>{{ agent_growth.code_list }}</code> ·
+      Referred paid: {{ agent_growth.referred_paid_display }}
+      {% if agent_growth.referred_open_cents %} · Referred open: {{ agent_growth.referred_open_display }}{% endif %}
+    </p>
+    {% if agent_growth.booking_link %}
+    <p class="muted small">Referral booking link: <code class="slug">{{ agent_growth.booking_link }}</code></p>
+    {% endif %}
+    <p><a href="{{ agent_growth.action_href }}" class="btn btn-accent">{{ agent_growth.action_label }}</a></p>
+  </section>
+  {% endif %}
+
   {% if rebooking_notice == 'sent' %}
   <p class="alert-banner ok">Rebooking email sent.</p>
   {% elif rebooking_notice == 'cooldown' %}

@@ -553,6 +553,126 @@ def attribution_summary(rows: list[dict[str, Any]] | None = None) -> dict[str, A
     }
 
 
+def _referral_rows_for_agent(client_id: int) -> list[dict[str, Any]]:
+    rows = db.all_(
+        """SELECT r.id, r.code, r.credit_cents, r.uses, r.max_uses, r.active,
+                  (SELECT COUNT(*)
+                     FROM inquiries q
+                    WHERE q.studio_id=r.studio_id
+                      AND upper(q.promo_code)=upper(r.code)) AS n_inquiries,
+                  (SELECT COUNT(DISTINCT q.listing_id)
+                     FROM inquiries q
+                    WHERE q.studio_id=r.studio_id
+                      AND q.listing_id IS NOT NULL
+                      AND upper(q.promo_code)=upper(r.code)) AS n_listings,
+                  COALESCE((SELECT SUM(i.amount_cents)
+                     FROM invoices i
+                    WHERE i.studio_id=r.studio_id
+                      AND i.status='paid'
+                      AND EXISTS (
+                          SELECT 1
+                            FROM inquiries q
+                           WHERE q.studio_id=i.studio_id
+                             AND q.listing_id=i.listing_id
+                             AND upper(q.promo_code)=upper(r.code)
+                      )), 0) AS referred_paid_cents,
+                  COALESCE((SELECT SUM(i.amount_cents)
+                     FROM invoices i
+                    WHERE i.studio_id=r.studio_id
+                      AND i.status='sent'
+                      AND EXISTS (
+                          SELECT 1
+                            FROM inquiries q
+                           WHERE q.studio_id=i.studio_id
+                             AND q.listing_id=i.listing_id
+                             AND upper(q.promo_code)=upper(r.code)
+                      )), 0) AS referred_open_cents
+           FROM referral_codes r
+          WHERE r.studio_id=? AND r.referrer_client_id=?
+          ORDER BY r.active DESC, r.uses DESC, r.created_at DESC""",
+        (STUDIO_ID, client_id),
+    )
+    out = []
+    for row in rows:
+        paid_cents = int(row["referred_paid_cents"] or 0)
+        open_cents = int(row["referred_open_cents"] or 0)
+        out.append(
+            {
+                "id": row["id"],
+                "code": row["code"],
+                "credit_cents": int(row["credit_cents"] or 0),
+                "credit_display": _money(int(row["credit_cents"] or 0)),
+                "uses": int(row["uses"] or 0),
+                "max_uses": row["max_uses"],
+                "active": bool(row["active"]),
+                "n_inquiries": int(row["n_inquiries"] or 0),
+                "n_listings": int(row["n_listings"] or 0),
+                "referred_paid_cents": paid_cents,
+                "referred_open_cents": open_cents,
+                "referred_paid_display": _money(paid_cents),
+                "referred_open_display": _money(open_cents),
+                "source_url": _referral_url(row["code"]) if row["active"] else "",
+            }
+        )
+    return out
+
+
+def agent_growth_panel(client_id: int) -> dict[str, Any] | None:
+    value = _agent_value(client_id)
+    if not value:
+        return None
+    codes = _referral_rows_for_agent(client_id)
+    active_codes = [row for row in codes if row["active"]]
+    referral_uses = sum(row["uses"] for row in codes)
+    attributed_bookings = sum(row["n_inquiries"] for row in codes)
+    referred_paid_cents = sum(row["referred_paid_cents"] for row in codes)
+    referred_open_cents = sum(row["referred_open_cents"] for row in codes)
+
+    if not value["email"]:
+        stage = "Needs email"
+        next_action = "Add an email before outreach or portal sharing."
+        action_href = value["client_href"]
+        action_label = "Edit contact"
+    elif not active_codes:
+        stage = "Needs referral code"
+        next_action = "Create a referral code before asking for introductions."
+        action_href = "/admin/studio#integrations"
+        action_label = "Add code"
+    elif attributed_bookings:
+        stage = "Referral advocate"
+        next_action = "Thank this agent and ask for one more warm introduction."
+        action_href = "/admin/reports/acquisition?queue=all"
+        action_label = "Open acquisition"
+    elif value["n_listings"]:
+        stage = "Warm agent"
+        next_action = "Send an intro ask while the relationship is warm."
+        action_href = "/admin/reports/acquisition?queue=needs_intro"
+        action_label = "Ask for intro"
+    else:
+        stage = "New contact"
+        next_action = "Book the first listing or attach this agent to a brokerage."
+        action_href = f"/admin/listings/new?client_id={client_id}"
+        action_label = "Start listing"
+
+    return {
+        **value,
+        "stage": stage,
+        "next_action": next_action,
+        "action_href": action_href,
+        "action_label": action_label,
+        "codes": codes,
+        "active_codes": active_codes,
+        "code_list": ", ".join(row["code"] for row in active_codes) or "None",
+        "referral_uses": referral_uses,
+        "attributed_bookings": attributed_bookings,
+        "referred_paid_cents": referred_paid_cents,
+        "referred_open_cents": referred_open_cents,
+        "referred_paid_display": _money(referred_paid_cents),
+        "referred_open_display": _money(referred_open_cents),
+        "booking_link": active_codes[0]["source_url"] if active_codes else "",
+    }
+
+
 def _intro_status(client_id: int, email: str | None) -> dict[str, Any]:
     recent = recent_intro_sent_at(client_id)
     if recent:
