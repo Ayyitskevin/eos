@@ -11,6 +11,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Reports now include repeat-agent revenue with brokerage attribution and CSV export.
 - Brokerage account dashboard shows assigned agents, listing volume, paid value, open balance, recent listings, and CSV export.
 - Brokerage portal now gives brokerages a self-serve account summary with invoice status, agent activity, property sites, and gallery links.
+- Revenue optimizer reports package performance, listing-type value, add-on attach rate, missed upsells, and CSV export.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

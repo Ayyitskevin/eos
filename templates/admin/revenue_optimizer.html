@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Revenue optimizer · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Revenue optimizer</h1>
+    <nav>
+      <a href="/admin/reports/revenue-optimizer.csv">Export CSV</a> ·
+      <a href="/admin/reports">Reports</a> ·
+      <a href="/admin">Pipeline</a>
+    </nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card {% if summary.paid_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.paid_display }}</span>
+      <span class="pipeline-label">Paid value</span>
+    </div>
+    <div class="pipeline-card {% if summary.open_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.open_display }}</span>
+      <span class="pipeline-label">Open value</span>
+    </div>
+    <div class="pipeline-card {% if summary.avg_paid_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.avg_paid_display }}</span>
+      <span class="pipeline-label">Avg paid listing</span>
+    </div>
+    <div class="pipeline-card {% if summary.addon_attach_rate %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.addon_attach_rate }}%</span>
+      <span class="pipeline-label">Add-on attach</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_opportunities %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_opportunities }}</span>
+      <span class="pipeline-label">Upsell misses</span>
+    </div>
+    <div class="pipeline-card {% if summary.suggested_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.suggested_display }}</span>
+      <span class="pipeline-label">Suggested add-on value</span>
+    </div>
+  </section>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Package performance</h2>
+      {% if packages %}
+      <table class="list compact">
+        <tr><th>Package</th><th>Listings</th><th>Paid</th><th>Avg</th><th>Attach</th><th>Missed</th></tr>
+        {% for p in packages %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.n_listings }}</td>
+          <td>{{ p.paid_display }}</td>
+          <td>{{ p.avg_paid_display }}</td>
+          <td>{{ p.addon_attach_rate }}%</td>
+          <td>{% if p.missed_upsell_count %}<span class="warn">{{ p.missed_upsell_count }}</span>{% else %}<span class="ok">0</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">Package performance appears after listings have booking or invoice history.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Listing type performance</h2>
+      {% if property_types %}
+      <table class="list compact">
+        <tr><th>Type</th><th>Listings</th><th>Paid</th><th>Open</th><th>Attach</th><th>Missed</th></tr>
+        {% for p in property_types %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.n_listings }}</td>
+          <td>{{ p.paid_display }}</td>
+          <td>{{ p.open_display }}</td>
+          <td>{{ p.addon_attach_rate }}%</td>
+          <td>{% if p.missed_upsell_count %}<span class="warn">{{ p.missed_upsell_count }}</span>{% else %}<span class="ok">0</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No listing type history yet.</p>{% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Upsell opportunities</h2>
+    {% if opportunities %}
+    <table class="list compact">
+      <tr><th>Listing</th><th>Agent</th><th>Package</th><th>Type</th><th>Paid</th><th>Recommended add-ons</th></tr>
+      {% for o in opportunities %}
+      <tr>
+        <td><a href="{{ o.listing_href }}">{{ o.title }}</a></td>
+        <td>{{ o.client_name or "—" }}</td>
+        <td>{{ o.package_name }}</td>
+        <td>{{ o.property_type_label }}</td>
+        <td>{{ o.paid_display }}</td>
+        <td>{{ o.recommended_names }} <span class="muted">({{ o.suggested_display }})</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No missed add-on opportunities found in paid active listings.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

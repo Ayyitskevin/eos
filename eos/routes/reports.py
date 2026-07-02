@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 
-from .. import brokerage, brokerage_reports, clients, reports, security
+from .. import brokerage, brokerage_reports, clients, reports, revenue_optimizer, security
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -68,6 +68,26 @@ async def brokerage_accounts_csv(_: None = Depends(security.require_admin)):
         content=body,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="eos-brokerages.csv"'},
+    )
+
+
+@router.get("/reports/revenue-optimizer", response_class=HTMLResponse)
+async def revenue_optimizer_dashboard(request: Request):
+    data = revenue_optimizer.dashboard()
+    return templates.TemplateResponse(
+        request,
+        "admin/revenue_optimizer.html",
+        data,
+    )
+
+
+@router.get("/reports/revenue-optimizer.csv")
+async def revenue_optimizer_csv(_: None = Depends(security.require_admin)):
+    body = revenue_optimizer.optimizer_csv()
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="eos-revenue-optimizer.csv"'},
     )
 
 
