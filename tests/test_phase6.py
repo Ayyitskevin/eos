@@ -94,8 +94,15 @@ async def test_booking_ref_query_prefills_and_records_referral_code(app_env):
     slot = _first_slot()
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        short = await client.get("/r/ref25", follow_redirects=False)
+        assert short.status_code == 303
+        assert short.headers["location"] == "/book?ref=REF25"
+
         form = await client.get("/book?ref=ref25")
         assert form.status_code == 200
+        assert "Referral code" in form.text
+        assert "Referral Source" in form.text
+        assert "$25 credit will be applied at checkout" in form.text
         assert 'name="promo_code" value="REF25"' in form.text
 
         r = await client.post(

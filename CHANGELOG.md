@@ -20,6 +20,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Brokerage accounts now include a growth map with anchor-office, penetration, referral, and next-action signals.
 - Agent records now include a growth panel with revenue, referral, brokerage, and next-action signals.
 - Acquisition now surfaces stale referral intro asks for second-touch follow-up emails with cooldown tracking.
+- Public referral links now support `/r/CODE` short links and show applied referral credit on booking.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

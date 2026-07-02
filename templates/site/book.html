@@ -9,6 +9,12 @@
   {% if profile.service_area %}<p class="muted">Serving {{ profile.service_area }}</p>{% endif %}
 
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if referral_context %}
+  <p class="alert-banner ok">
+    Referral code <strong>{{ referral_context.code }}</strong> applied{% if referral_context.referrer_name %} from {{ referral_context.referrer_name }}{% endif %}.
+    {{ referral_context.credit_display }} credit will be applied at checkout.
+  </p>
+  {% endif %}
   {% if not slots %}<p class="muted">Online scheduling is temporarily unavailable — contact us directly.</p>{% endif %}
 
   <form method="post" action="/book" class="form-grid card">

@@ -1,10 +1,12 @@
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import commerce, config, scheduling, security, stripe_checkout, studio, tenant
+from .. import commerce, config, db, scheduling, security, stripe_checkout, studio, tenant
 from ..render import templates
+from ..vocab import STUDIO_ID
 
 router = APIRouter()
 INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo", "/pricing"}
@@ -16,7 +18,40 @@ def _clean_booking_code(value: str | None) -> str:
     return "".join(ch for ch in raw if ch.isalnum() or ch in {"-", "_"})[:40]
 
 
+def _money(cents: int) -> str:
+    dollars = cents / 100
+    if cents % 100 == 0:
+        return f"${dollars:,.0f}"
+    return f"${dollars:,.2f}"
+
+
+def _referral_context(code: str) -> dict | None:
+    if not code:
+        return None
+    row = db.one(
+        """SELECT r.code, r.credit_cents, c.name AS referrer_name
+           FROM referral_codes r
+           LEFT JOIN clients c
+             ON c.id=r.referrer_client_id
+            AND c.studio_id=r.studio_id
+          WHERE r.studio_id=?
+            AND upper(r.code)=?
+            AND r.active=1
+          LIMIT 1""",
+        (STUDIO_ID, code),
+    )
+    if not row:
+        return None
+    return {
+        "code": row["code"],
+        "credit_cents": int(row["credit_cents"] or 0),
+        "credit_display": _money(int(row["credit_cents"] or 0)),
+        "referrer_name": row["referrer_name"],
+    }
+
+
 def _book_context(error: str | None = None, thanks: bool = False, promo_code: str = ""):
+    clean_code = _clean_booking_code(promo_code)
     profile = studio.get_profile()
     addons = studio.list_addons(active_only=True)
     twilight_addon = next((a for a in addons if a["slug"] == "twilight"), None)
@@ -35,7 +70,8 @@ def _book_context(error: str | None = None, thanks: bool = False, promo_code: st
         "payments_on": stripe_checkout.payments_configured(),
         "error": error,
         "thanks": thanks,
-        "promo_code": _clean_booking_code(promo_code),
+        "promo_code": clean_code,
+        "referral_context": _referral_context(clean_code),
     }
 
 
@@ -86,6 +122,13 @@ async def book_form(request: Request):
         "site/book.html",
         _book_context(promo_code=promo_code),
     )
+
+
+@router.get("/r/{code}")
+async def referral_shortlink(code: str):
+    clean_code = _clean_booking_code(code)
+    target = f"/book?ref={quote(clean_code)}" if clean_code else "/book"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/book")

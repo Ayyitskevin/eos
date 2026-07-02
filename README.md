@@ -16,7 +16,7 @@ Studios get `{slug}.yourdomain.com`, branded booking and delivery, agent portals
 ## What studios get
 
 - **Signup & subdomain** — 14-day trial, Starter/Pro plans, billing enforcement
-- **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow
+- **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow, public referral links
 - **Pipeline** — listing tasks, Kanban, calendar, photographer assignment
 - **Retention** — agent rebooking cockpit, agent growth panels, brokerage portfolio dashboard/portal, brokerage growth map, revenue optimizer, filtered acquisition tracking with referral attribution, intro/follow-up emails, per-agent summaries, follow-up queue, and repeat-agent reports
 - **Delivery** — PIN galleries, property sites, agent portal, MLS/Zillow crops
