@@ -4,53 +4,123 @@
 <main class="admin-main">
   <header class="admin-bar">
     <h1>{{ client.name }}</h1>
-    <p class="muted">Brokerage billing &amp; agent deliveries</p>
+    <p class="muted">Brokerage account</p>
   </header>
 
   <section class="pipeline-strip">
-    <div class="pipeline-card has-items">
-      <span class="pipeline-count">${{ "%.0f"|format(totals.open_cents / 100) }}</span>
+    <div class="pipeline-card {% if totals.n_agents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ totals.n_agents }}</span>
+      <span class="pipeline-label">Agents</span>
+    </div>
+    <div class="pipeline-card {% if totals.n_listings %}has-items{% endif %}">
+      <span class="pipeline-count">{{ totals.n_listings }}</span>
+      <span class="pipeline-label">Listings</span>
+    </div>
+    <div class="pipeline-card {% if totals.n_delivered %}has-items{% endif %}">
+      <span class="pipeline-count">{{ totals.n_delivered }}</span>
+      <span class="pipeline-label">Delivered</span>
+    </div>
+    <div class="pipeline-card {% if totals.open_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ totals.open_display }}</span>
       <span class="pipeline-label">Open AR</span>
     </div>
-    <div class="pipeline-card has-items">
-      <span class="pipeline-count">${{ "%.0f"|format(totals.paid_cents / 100) }}</span>
-      <span class="pipeline-label">Paid YTD</span>
+    <div class="pipeline-card {% if totals.paid_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ totals.paid_display }}</span>
+      <span class="pipeline-label">Paid</span>
     </div>
   </section>
 
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Open invoices</h2>
+      {% if open_invoices %}
+      <table class="list compact">
+        <tr><th>Invoice</th><th>Agent</th><th>Listing</th><th>Amount</th><th></th></tr>
+        {% for r in open_invoices %}
+        <tr>
+          <td>{{ r.title }}</td>
+          <td>{{ r.agent_name or '—' }}</td>
+          <td>{{ r.listing_title or '—' }}</td>
+          <td>{{ r.amount_display }}</td>
+          <td><a href="{{ r.invoice_href }}">{{ "Pay" if payments_on else "View" }}</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No open invoices.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Agent activity</h2>
+      {% if agent_activity %}
+      <table class="list compact">
+        <tr><th>Agent</th><th>Listings</th><th>Delivered</th><th>Paid</th><th>Open</th><th>Last</th></tr>
+        {% for a in agent_activity %}
+        <tr>
+          <td>{{ a.name }}</td>
+          <td>{{ a.n_listings }}</td>
+          <td>{{ a.n_delivered }}</td>
+          <td>{{ a.paid_display }}</td>
+          <td>{{ a.open_display }}</td>
+          <td class="muted">{{ a.last_activity_at[:10] if a.last_activity_at else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No agent activity yet.</p>{% endif %}
+    </section>
+  </div>
+
   <section class="card">
-    <h2>Open invoices</h2>
-    {% if statement_rows %}
+    <h2>Recent listings</h2>
+    {% if deliveries %}
     <table class="list compact">
-      <tr><th>Invoice</th><th>Agent</th><th>Listing</th><th>Amount</th><th>Status</th></tr>
-      {% for r in statement_rows %}
+      <tr><th>Listing</th><th>Agent</th><th>Status</th><th>Site</th><th>Gallery</th><th>Invoice</th></tr>
+      {% for d in deliveries %}
       <tr>
-        <td>{{ r.title }}</td>
-        <td>{{ r.agent_name or '—' }}</td>
-        <td>{{ r.listing_title or '—' }}</td>
-        <td>${{ "%.2f"|format(r.amount_cents / 100) }}</td>
-        <td>{{ r.status }}</td>
+        <td>
+          <strong>{{ d.title }}</strong>
+          {% if d.address_line1 %}<span class="muted listing-sub">{{ d.address_line1 }}</span>{% endif %}
+        </td>
+        <td>{{ d.agent_name }}</td>
+        <td>{{ d.status }}</td>
+        <td>
+          {% if d.site_published and d.site_slug %}
+          <a href="{{ base_url }}/l/{{ d.site_slug }}" target="_blank">Property site</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% if d.gallery_published %}
+          <a href="{{ base_url }}/g/{{ d.gallery_slug }}" target="_blank">Gallery</a>
+          {% if d.gallery_pin %}<span class="muted">PIN {{ d.gallery_pin }}</span>{% endif %}
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% if d.unpaid_invoice_slug %}
+          <a href="{{ base_url }}/i/{{ d.unpaid_invoice_slug }}">{{ "Pay invoice" if payments_on else "Invoice sent" }}</a>
+          {% elif d.has_paid %}<span class="ok">Paid</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </table>
-    {% else %}<p class="muted">No invoices on file.</p>{% endif %}
+    {% else %}<p class="muted">No listing activity yet.</p>{% endif %}
   </section>
 
   <section class="card">
-    <h2>Recent agent deliveries</h2>
-    {% if deliveries %}
+    <h2>Paid invoices</h2>
+    {% if paid_invoices %}
     <table class="list compact">
-      <tr><th>Listing</th><th>Agent</th><th>Status</th><th>Gallery</th></tr>
-      {% for d in deliveries %}
+      <tr><th>Invoice</th><th>Agent</th><th>Listing</th><th>Amount</th><th>Paid</th></tr>
+      {% for r in paid_invoices[:10] %}
       <tr>
-        <td>{{ d.title }}</td>
-        <td>{{ d.agent_name }}</td>
-        <td>{{ d.status }}</td>
-        <td>{% if d.gallery_published %}<a href="{{ base_url }}/g/{{ d.gallery_slug }}">View</a>{% else %}—{% endif %}</td>
+        <td><a href="{{ r.invoice_href }}">{{ r.title }}</a></td>
+        <td>{{ r.agent_name or '—' }}</td>
+        <td>{{ r.listing_title or '—' }}</td>
+        <td>{{ r.amount_display }}</td>
+        <td class="muted">{{ r.paid_at[:10] if r.paid_at else "—" }}</td>
       </tr>
       {% endfor %}
     </table>
-    {% else %}<p class="muted">No deliveries yet.</p>{% endif %}
+    {% else %}<p class="muted">No paid invoices yet.</p>{% endif %}
   </section>
 </main>
 {% endblock %}

@@ -77,8 +77,11 @@ async def brokerage_portal_view(request: Request, token: str):
         {
             "client": client,
             "totals": data["totals"],
-            "statement_rows": data["statement_rows"],
+            "open_invoices": data["open_invoices"],
+            "paid_invoices": data["paid_invoices"],
+            "agent_activity": data["agent_activity"],
             "deliveries": data["deliveries"],
             "base_url": tenant.get_base_url(),
+            "payments_on": stripe_checkout.payments_configured(),
         },
     )
