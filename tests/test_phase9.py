@@ -136,6 +136,20 @@ def _seed_brokerage_account():
     invoices.mark_paid(first_invoice_id)
     invoices.mark_paid(second_invoice_id)
     invoices.mark_sent(open_invoice_id)
+    db.run(
+        """INSERT INTO referral_codes
+           (studio_id, code, credit_cents, referrer_client_id, uses)
+           VALUES ('default', 'KAY25', 2500, ?, 1)""",
+        (first_agent_id,),
+    )
+    db.run(
+        """INSERT INTO inquiries
+           (studio_id, name, email, property_address, status, promo_code,
+            listing_id, client_id, total_cents, deposit_cents, created_at)
+           VALUES ('default', 'Kay Referral', 'kay-ref@test.com', 'Referral Condo',
+                   'confirmed', 'KAY25', ?, ?, 25000, 0, '2026-02-06T09:00:00')""",
+        (second_listing_id, second_agent_id),
+    )
     return broker_id
 
 
@@ -476,7 +490,18 @@ def test_brokerage_accounts_roll_up_values_and_isolate_studios(app_env):
     assert rows[0]["id"] == broker_id
     assert rows[0]["name"] == "Big Broker"
     assert rows[0]["n_agents"] == 2
+    assert rows[0]["n_active_agents"] == 2
+    assert rows[0]["n_repeat_agents"] == 0
+    assert rows[0]["agent_penetration_pct"] == 100
     assert rows[0]["n_listings"] == 2
+    assert rows[0]["n_referral_codes"] == 1
+    assert rows[0]["n_referral_uses"] == 1
+    assert rows[0]["n_attributed_bookings"] == 1
+    assert rows[0]["growth_stage"] == "Anchor office"
+    assert (
+        rows[0]["growth_next_action"]
+        == "Ask the broker for two warm agent introductions this week."
+    )
     assert rows[0]["n_paid_invoices"] == 2
     assert rows[0]["n_open_invoices"] == 1
     assert rows[0]["paid_cents"] == 55000
@@ -488,12 +513,17 @@ def test_brokerage_accounts_roll_up_values_and_isolate_studios(app_env):
     summary = brokerage_reports.brokerage_summary()
     assert summary["n_brokerages"] == 1
     assert summary["n_agents"] == 2
+    assert summary["n_active_agents"] == 2
+    assert summary["n_anchor_offices"] == 1
+    assert summary["n_referral_codes"] == 1
+    assert summary["n_attributed_bookings"] == 1
+    assert summary["agent_penetration_pct"] == 100
     assert summary["paid_display"] == "$550"
     assert summary["open_display"] == "$250"
 
     body = brokerage_reports.brokerage_accounts_csv()
-    assert "brokerage,company,agents,listings,paid_cents,open_cents" in body
-    assert "Big Broker,,2,2,55000,25000,2,1,2026-02-04" in body
+    assert "brokerage,company,agents,active_agents,repeat_agents,agent_penetration_pct" in body
+    assert "Big Broker,,2,2,0,100,2,55000,25000,2,1,1,1,1,Anchor office" in body
     assert "Other Broker" not in body
 
 
@@ -513,6 +543,10 @@ async def test_brokerage_dashboard_and_csv_routes(app_env):
         assert "Big Broker" in r.text
         assert "$550 paid" in r.text
         assert "$250 open" in r.text
+        assert "Brokerage growth map" in r.text
+        assert "Anchor office" in r.text
+        assert "2/2 active" in r.text
+        assert "1 codes" in r.text
         assert "Agent Kay" in r.text
         assert "Cedar Portfolio" in r.text
 
@@ -520,7 +554,7 @@ async def test_brokerage_dashboard_and_csv_routes(app_env):
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-brokerages.csv" in export.headers["content-disposition"]
-        assert "Big Broker,,2,2,55000,25000" in export.text
+        assert "Big Broker,,2,2,0,100,2,55000,25000" in export.text
 
 
 def test_revenue_optimizer_reports_packages_property_types_and_upsells(app_env):

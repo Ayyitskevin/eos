@@ -20,6 +20,14 @@
       <span class="pipeline-count">{{ summary.n_agents }}</span>
       <span class="pipeline-label">Assigned agents</span>
     </div>
+    <div class="pipeline-card {% if summary.n_active_agents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_active_agents }}</span>
+      <span class="pipeline-label">Active agents</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_anchor_offices %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_anchor_offices }}</span>
+      <span class="pipeline-label">Anchor offices</span>
+    </div>
     <div class="pipeline-card {% if summary.n_listings %}has-items{% endif %}">
       <span class="pipeline-count">{{ summary.n_listings }}</span>
       <span class="pipeline-label">Listings</span>
@@ -35,19 +43,43 @@
   </section>
 
   {% if accounts %}
+  <section class="card">
+    <h2>Brokerage growth map</h2>
+    <table class="list compact">
+      <tr><th>Office</th><th>Stage</th><th>Agent penetration</th><th>Referral signal</th><th>Next action</th></tr>
+      {% for b in accounts %}
+      <tr>
+        <td><a href="{{ b.client_href }}">{{ b.name }}</a><br><span class="muted small">{{ b.portfolio_display }} portfolio</span></td>
+        <td>{{ b.growth_stage }}</td>
+        <td>{{ b.n_active_agents }}/{{ b.n_agents }} active · {{ b.agent_penetration_pct }}%</td>
+        <td>{{ b.n_referral_codes }} codes · {{ b.n_attributed_bookings }} bookings</td>
+        <td>{{ b.growth_next_action }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+
   <div class="detail-grid">
     {% for b in accounts %}
     <section class="card">
       <h2><a href="{{ b.client_href }}">{{ b.name }}</a></h2>
       {% if b.company %}<p class="muted">{{ b.company }}</p>{% endif %}
+      <p><span class="badge">{{ b.growth_stage }}</span> <span class="muted">{{ b.growth_next_action }}</span></p>
       <p>
         <strong>{{ b.portfolio_display }}</strong> portfolio ·
         {{ b.paid_display }} paid ·
         {{ b.open_display }} open
       </p>
       <p class="muted small">
-        {{ b.n_agents }} agents · {{ b.n_listings }} listings ·
+        {{ b.n_active_agents }}/{{ b.n_agents }} active agents ·
+        {{ b.n_repeat_agents }} repeat agents ·
+        {{ b.n_listings }} listings ·
         {{ b.n_paid_invoices }} paid invoices · {{ b.n_open_invoices }} open invoices
+      </p>
+      <p class="muted small">
+        {{ b.n_referral_codes }} referral codes ·
+        {{ b.n_referral_uses }} referral uses ·
+        {{ b.n_attributed_bookings }} attributed bookings
       </p>
       <p>
         <a href="{{ b.statement_href }}">Statement</a> ·

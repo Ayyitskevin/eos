@@ -15,6 +15,12 @@ def _money(cents: int) -> str:
     return f"${dollars:,.2f}"
 
 
+def _percent(part: int, total: int) -> int:
+    if total <= 0:
+        return 0
+    return round((part / total) * 100)
+
+
 def _invoice_matches_brokerage_clause() -> str:
     return """(
         i.bill_to_client_id=c.id
@@ -130,15 +136,49 @@ def recent_listings_for_brokerage(brokerage_id: int, *, limit: int = 3) -> list[
     ]
 
 
+def _growth_stage(account: dict) -> tuple[str, str, int]:
+    if account["paid_cents"] >= 50_000 and account["n_active_agents"] >= 2:
+        return (
+            "Anchor office",
+            "Ask the broker for two warm agent introductions this week.",
+            4,
+        )
+    if account["n_active_agents"] and (account["open_cents"] or account["n_referral_codes"]):
+        return (
+            "Expansion office",
+            "Turn active agents into referral advocates.",
+            3,
+        )
+    if account["n_agents"]:
+        return (
+            "Seed office",
+            "Book the first listing and add referral codes for active agents.",
+            2,
+        )
+    return (
+        "Watch list",
+        "Add agents or billing contacts before outreach.",
+        1,
+    )
+
+
 def _hydrate_account(row: Any) -> dict:
     paid_cents = int(row["paid_cents"] or 0)
     open_cents = int(row["open_cents"] or 0)
+    n_agents = int(row["n_agents"] or 0)
+    n_active_agents = int(row["n_active_agents"] or 0)
+    n_repeat_agents = int(row["n_repeat_agents"] or 0)
     account = {
         "id": row["id"],
         "name": row["name"],
         "company": row["company"],
         "email": row["email"],
-        "n_agents": int(row["n_agents"] or 0),
+        "n_agents": n_agents,
+        "n_active_agents": n_active_agents,
+        "n_repeat_agents": n_repeat_agents,
+        "n_referral_codes": int(row["n_referral_codes"] or 0),
+        "n_referral_uses": int(row["n_referral_uses"] or 0),
+        "n_attributed_bookings": int(row["n_attributed_bookings"] or 0),
         "n_listings": int(row["n_listings"] or 0),
         "n_paid_invoices": int(row["n_paid_invoices"] or 0),
         "n_open_invoices": int(row["n_open_invoices"] or 0),
@@ -152,6 +192,12 @@ def _hydrate_account(row: Any) -> dict:
         "client_href": f"/admin/clients/{row['id']}",
         "statement_href": f"/admin/reports/brokerage/{row['id']}",
     }
+    account["agent_penetration_pct"] = _percent(n_active_agents, n_agents)
+    account["repeat_agent_pct"] = _percent(n_repeat_agents, n_agents)
+    stage, next_action, rank = _growth_stage(account)
+    account["growth_stage"] = stage
+    account["growth_next_action"] = next_action
+    account["growth_rank"] = rank
     account["top_agents"] = top_agents_for_brokerage(row["id"])
     account["recent_listings"] = recent_listings_for_brokerage(row["id"])
     return account
@@ -177,6 +223,58 @@ def brokerage_accounts(*, limit: int = 50) -> list[dict]:
                         AND a.client_type='agent'
                       WHERE l.studio_id=c.studio_id
                         AND a.parent_id=c.id) AS n_listings,
+                    (SELECT COUNT(*)
+                       FROM clients a
+                      WHERE a.studio_id=c.studio_id
+                        AND a.parent_id=c.id
+                        AND a.client_type='agent'
+                        AND EXISTS (
+                            SELECT 1
+                              FROM listings l
+                             WHERE l.studio_id=a.studio_id
+                               AND l.client_id=a.id
+                        )) AS n_active_agents,
+                    (SELECT COUNT(*)
+                       FROM clients a
+                      WHERE a.studio_id=c.studio_id
+                        AND a.parent_id=c.id
+                        AND a.client_type='agent'
+                        AND (
+                            SELECT COUNT(*)
+                              FROM listings l
+                             WHERE l.studio_id=a.studio_id
+                               AND l.client_id=a.id
+                        ) >= 2) AS n_repeat_agents,
+                    (SELECT COUNT(*)
+                       FROM referral_codes r
+                       JOIN clients a
+                         ON a.id=r.referrer_client_id
+                        AND a.studio_id=r.studio_id
+                        AND a.client_type='agent'
+                      WHERE r.studio_id=c.studio_id
+                        AND r.active=1
+                        AND a.parent_id=c.id) AS n_referral_codes,
+                    COALESCE((SELECT SUM(r.uses)
+                       FROM referral_codes r
+                       JOIN clients a
+                         ON a.id=r.referrer_client_id
+                        AND a.studio_id=r.studio_id
+                        AND a.client_type='agent'
+                      WHERE r.studio_id=c.studio_id
+                        AND r.active=1
+                        AND a.parent_id=c.id), 0) AS n_referral_uses,
+                    (SELECT COUNT(*)
+                       FROM inquiries q
+                       JOIN referral_codes r
+                         ON r.studio_id=q.studio_id
+                        AND upper(r.code)=upper(q.promo_code)
+                       JOIN clients a
+                         ON a.id=r.referrer_client_id
+                        AND a.studio_id=r.studio_id
+                        AND a.client_type='agent'
+                      WHERE q.studio_id=c.studio_id
+                        AND trim(q.promo_code) <> ''
+                        AND a.parent_id=c.id) AS n_attributed_bookings,
                     (SELECT MAX(l.created_at)
                        FROM listings l
                        JOIN clients a
@@ -229,11 +327,23 @@ def brokerage_summary(rows: list[dict] | None = None) -> dict:
     paid_cents = sum(row["paid_cents"] for row in rows)
     open_cents = sum(row["open_cents"] for row in rows)
     n_agents = sum(row["n_agents"] for row in rows)
+    n_active_agents = sum(row["n_active_agents"] for row in rows)
+    n_repeat_agents = sum(row["n_repeat_agents"] for row in rows)
     n_listings = sum(row["n_listings"] for row in rows)
     return {
         "n_brokerages": len(rows),
         "n_agents": n_agents,
+        "n_active_agents": n_active_agents,
+        "n_repeat_agents": n_repeat_agents,
         "n_listings": n_listings,
+        "n_anchor_offices": sum(1 for row in rows if row["growth_stage"] == "Anchor office"),
+        "n_expansion_offices": sum(1 for row in rows if row["growth_stage"] == "Expansion office"),
+        "n_seed_offices": sum(1 for row in rows if row["growth_stage"] == "Seed office"),
+        "n_referral_codes": sum(row["n_referral_codes"] for row in rows),
+        "n_referral_uses": sum(row["n_referral_uses"] for row in rows),
+        "n_attributed_bookings": sum(row["n_attributed_bookings"] for row in rows),
+        "agent_penetration_pct": _percent(n_active_agents, n_agents),
+        "repeat_agent_pct": _percent(n_repeat_agents, n_agents),
         "paid_cents": paid_cents,
         "open_cents": open_cents,
         "portfolio_cents": paid_cents + open_cents,
@@ -251,11 +361,19 @@ def brokerage_accounts_csv() -> str:
             "brokerage",
             "company",
             "agents",
+            "active_agents",
+            "repeat_agents",
+            "agent_penetration_pct",
             "listings",
             "paid_cents",
             "open_cents",
             "paid_invoices",
             "open_invoices",
+            "referral_codes",
+            "referral_uses",
+            "attributed_bookings",
+            "growth_stage",
+            "growth_next_action",
             "last_listing_at",
             "top_agents",
             "recent_listings",
@@ -267,11 +385,19 @@ def brokerage_accounts_csv() -> str:
                 row["name"],
                 row["company"] or "",
                 row["n_agents"],
+                row["n_active_agents"],
+                row["n_repeat_agents"],
+                row["agent_penetration_pct"],
                 row["n_listings"],
                 row["paid_cents"],
                 row["open_cents"],
                 row["n_paid_invoices"],
                 row["n_open_invoices"],
+                row["n_referral_codes"],
+                row["n_referral_uses"],
+                row["n_attributed_bookings"],
+                row["growth_stage"],
+                row["growth_next_action"],
                 (row["last_listing_at"] or "")[:10],
                 "; ".join(a["name"] for a in row["top_agents"]),
                 "; ".join(listing["title"] for listing in row["recent_listings"]),
