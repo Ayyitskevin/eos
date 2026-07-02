@@ -6,6 +6,7 @@
     <h1>Ops reports</h1>
     <nav>
       <a href="/admin/reports/export.csv">Export CSV</a> ·
+      <a href="/admin/reports/repeat-agents.csv">Repeat CSV</a> ·
       <a href="/admin/reports/export-quickbooks.csv">QuickBooks CSV</a> ·
       <a href="/admin">Pipeline</a> · <a href="/admin/kanban">Kanban</a>
     </nav>
@@ -39,6 +40,26 @@
   </section>
 
   <div class="detail-grid">
+    <section class="card">
+      <h2>Repeat agent revenue</h2>
+      {% if repeat_agents %}
+      <p class="muted">{{ repeat_agent_summary.repeat_agent_count }} repeat agents · {{ repeat_agent_summary.paid_display }} paid · {{ repeat_agent_summary.avg_listing_value_display }} avg paid listing</p>
+      <table class="list compact">
+        <tr><th>Agent</th><th>Brokerage</th><th>Listings</th><th>Paid</th><th>Avg</th><th>Last</th></tr>
+        {% for a in repeat_agents %}
+        <tr>
+          <td><a href="{{ a.client_href }}">{{ a.name }}</a>{% if a.company %}<span class="muted"> · {{ a.company }}</span>{% endif %}</td>
+          <td>{{ a.brokerage_name or "—" }}</td>
+          <td>{{ a.n_listings }}</td>
+          <td>{{ a.paid_display }}</td>
+          <td>{{ a.avg_listing_value_display }}</td>
+          <td class="muted">{{ a.last_listing_at[:10] if a.last_listing_at else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">Repeat agents appear after their second linked listing.</p>{% endif %}
+    </section>
+
     <section class="card">
       <h2>Top agents</h2>
       {% if top_agents %}

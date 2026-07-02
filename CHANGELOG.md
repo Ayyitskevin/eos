@@ -8,6 +8,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Manual rebooking outreach sends or drafts cooldown-safe agent follow-up emails without adding a new table.
 - Rebooking performance snapshot shows ready nudges, recent outreach, converted listings, and prior client value.
 - Rebooking follow-up queue flags agents nudged 7+ days ago without a repeat listing.
+- Reports now include repeat-agent revenue with brokerage attribution and CSV export.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

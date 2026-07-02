@@ -1,6 +1,7 @@
 """Ops reporting — revenue, bookings, AR, top agents."""
 
 import datetime as dt
+from typing import Any
 
 from . import db
 from .vocab import STUDIO_ID
@@ -91,6 +92,113 @@ def top_agents(*, limit: int = 10) -> list:
            LIMIT ?""",
         (STUDIO_ID, limit),
     )
+
+
+def _money(cents: int) -> str:
+    dollars = cents / 100
+    if cents % 100 == 0:
+        return f"${dollars:,.0f}"
+    return f"${dollars:,.2f}"
+
+
+def _hydrate_repeat_agent(row: Any) -> dict:
+    paid_cents = int(row["paid_cents"] or 0)
+    open_cents = int(row["open_cents"] or 0)
+    n_listings = int(row["n_listings"] or 0)
+    n_paid_listings = int(row["n_paid_listings"] or 0)
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "company": row["company"],
+        "brokerage_name": row["brokerage_name"],
+        "n_listings": n_listings,
+        "n_paid_listings": n_paid_listings,
+        "paid_cents": paid_cents,
+        "open_cents": open_cents,
+        "paid_display": _money(paid_cents),
+        "open_display": _money(open_cents),
+        "last_listing_at": row["last_listing_at"],
+        "client_href": f"/admin/clients/{row['id']}",
+        "avg_listing_value_cents": paid_cents // n_paid_listings if n_paid_listings else 0,
+        "avg_listing_value_display": _money(paid_cents // n_paid_listings)
+        if n_paid_listings
+        else "$0",
+    }
+
+
+def repeat_agent_revenue(*, min_listings: int = 2, limit: int = 12) -> list[dict]:
+    """Agents with repeat listing volume, paid value, and brokerage attribution."""
+
+    rows = db.all_(
+        """SELECT * FROM (
+             SELECT c.id, c.name, c.company,
+                    parent.name AS brokerage_name,
+                    (SELECT COUNT(*)
+                       FROM listings l
+                      WHERE l.studio_id=c.studio_id AND l.client_id=c.id) AS n_listings,
+                    (SELECT MAX(l.created_at)
+                       FROM listings l
+                      WHERE l.studio_id=c.studio_id AND l.client_id=c.id) AS last_listing_at,
+                    (SELECT COUNT(DISTINCT i.listing_id)
+                       FROM invoices i
+                       LEFT JOIN listings li
+                         ON li.id=i.listing_id AND li.studio_id=i.studio_id
+                      WHERE i.studio_id=c.studio_id
+                        AND i.status='paid'
+                        AND (
+                             i.agent_client_id=c.id
+                             OR (i.agent_client_id IS NULL AND i.client_id=c.id)
+                             OR (i.agent_client_id IS NULL AND i.client_id IS NULL AND li.client_id=c.id)
+                        )) AS n_paid_listings,
+                    COALESCE((SELECT SUM(i.amount_cents)
+                       FROM invoices i
+                       LEFT JOIN listings li
+                         ON li.id=i.listing_id AND li.studio_id=i.studio_id
+                      WHERE i.studio_id=c.studio_id
+                        AND i.status='paid'
+                        AND (
+                             i.agent_client_id=c.id
+                             OR (i.agent_client_id IS NULL AND i.client_id=c.id)
+                             OR (i.agent_client_id IS NULL AND i.client_id IS NULL AND li.client_id=c.id)
+                        )), 0) AS paid_cents,
+                    COALESCE((SELECT SUM(i.amount_cents)
+                       FROM invoices i
+                       LEFT JOIN listings li
+                         ON li.id=i.listing_id AND li.studio_id=i.studio_id
+                      WHERE i.studio_id=c.studio_id
+                        AND i.status='sent'
+                        AND (
+                             i.agent_client_id=c.id
+                             OR (i.agent_client_id IS NULL AND i.client_id=c.id)
+                             OR (i.agent_client_id IS NULL AND i.client_id IS NULL AND li.client_id=c.id)
+                        )), 0) AS open_cents
+               FROM clients c
+               LEFT JOIN clients parent
+                 ON parent.id=c.parent_id
+                AND parent.studio_id=c.studio_id
+                AND parent.client_type='brokerage'
+              WHERE c.studio_id=? AND c.client_type='agent'
+           ) agents
+           WHERE n_listings >= ?
+           ORDER BY paid_cents DESC, n_listings DESC, last_listing_at DESC
+           LIMIT ?""",
+        (STUDIO_ID, min_listings, limit),
+    )
+    return [_hydrate_repeat_agent(row) for row in rows]
+
+
+def repeat_agent_summary(*, min_listings: int = 2) -> dict:
+    rows = repeat_agent_revenue(min_listings=min_listings, limit=100)
+    paid_cents = sum(r["paid_cents"] for r in rows)
+    paid_listings = sum(r["n_paid_listings"] for r in rows)
+    return {
+        "repeat_agent_count": len(rows),
+        "paid_cents": paid_cents,
+        "paid_display": _money(paid_cents),
+        "paid_listing_count": paid_listings,
+        "avg_listing_value_cents": paid_cents // paid_listings if paid_listings else 0,
+        "avg_listing_value_display": _money(paid_cents // paid_listings) if paid_listings else "$0",
+    }
 
 
 def overdue_invoices() -> list:

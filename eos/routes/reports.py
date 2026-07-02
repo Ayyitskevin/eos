@@ -15,6 +15,8 @@ async def reports_dashboard(request: Request):
         {
             "summary": reports.summary(),
             "top_agents": reports.top_agents(),
+            "repeat_agents": reports.repeat_agent_revenue(),
+            "repeat_agent_summary": reports.repeat_agent_summary(),
             "overdue": reports.overdue_invoices(),
             "brokerages": reports.brokerages_with_balance(),
             "client_list": clients.list_clients(),
@@ -31,6 +33,18 @@ async def reports_csv(_: None = Depends(security.require_admin)):
         content=body,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="eos-reports.csv"'},
+    )
+
+
+@router.get("/reports/repeat-agents.csv")
+async def reports_repeat_agents_csv(_: None = Depends(security.require_admin)):
+    from .. import reports_export
+
+    body = reports_export.repeat_agents_csv()
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="eos-repeat-agents.csv"'},
     )
 
 

@@ -31,8 +31,41 @@ def agents_csv() -> str:
     return buf.getvalue()
 
 
+def repeat_agents_csv() -> str:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        [
+            "agent",
+            "company",
+            "brokerage",
+            "listings",
+            "paid_listings",
+            "paid_cents",
+            "open_cents",
+            "avg_listing_value_cents",
+            "last_listing_at",
+        ]
+    )
+    for row in reports.repeat_agent_revenue(limit=100):
+        w.writerow(
+            [
+                row["name"],
+                row["company"] or "",
+                row["brokerage_name"] or "",
+                row["n_listings"],
+                row["n_paid_listings"],
+                row["paid_cents"],
+                row["open_cents"],
+                row["avg_listing_value_cents"],
+                (row["last_listing_at"] or "")[:10],
+            ]
+        )
+    return buf.getvalue()
+
+
 def full_csv() -> str:
-    return summary_csv() + "\n\n" + agents_csv()
+    return summary_csv() + "\n\n" + agents_csv() + "\n\nRepeat agents\n" + repeat_agents_csv()
 
 
 def quickbooks_csv() -> str:
