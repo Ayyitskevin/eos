@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Brokerage accounts · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Brokerage accounts</h1>
+    <nav>
+      <a href="/admin/brokerages.csv">Export CSV</a> ·
+      <a href="/admin/reports">Reports</a> ·
+      <a href="/admin">Pipeline</a>
+    </nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card {% if summary.n_brokerages %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_brokerages }}</span>
+      <span class="pipeline-label">Brokerages</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_agents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_agents }}</span>
+      <span class="pipeline-label">Assigned agents</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_listings %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_listings }}</span>
+      <span class="pipeline-label">Listings</span>
+    </div>
+    <div class="pipeline-card {% if summary.paid_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.paid_display }}</span>
+      <span class="pipeline-label">Paid value</span>
+    </div>
+    <div class="pipeline-card {% if summary.open_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.open_display }}</span>
+      <span class="pipeline-label">Open balance</span>
+    </div>
+  </section>
+
+  {% if accounts %}
+  <div class="detail-grid">
+    {% for b in accounts %}
+    <section class="card">
+      <h2><a href="{{ b.client_href }}">{{ b.name }}</a></h2>
+      {% if b.company %}<p class="muted">{{ b.company }}</p>{% endif %}
+      <p>
+        <strong>{{ b.portfolio_display }}</strong> portfolio ·
+        {{ b.paid_display }} paid ·
+        {{ b.open_display }} open
+      </p>
+      <p class="muted small">
+        {{ b.n_agents }} agents · {{ b.n_listings }} listings ·
+        {{ b.n_paid_invoices }} paid invoices · {{ b.n_open_invoices }} open invoices
+      </p>
+      <p>
+        <a href="{{ b.statement_href }}">Statement</a> ·
+        <a href="{{ b.client_href }}">Client record</a>
+      </p>
+
+      <h3>Top agents</h3>
+      {% if b.top_agents %}
+      <ul class="pkg-list">
+        {% for a in b.top_agents %}
+        <li>
+          <a href="{{ a.client_href }}">{{ a.name }}</a>
+          <span class="price">{{ a.paid_display }}</span>
+          <span class="muted small">{{ a.n_listings }} listings{% if a.open_cents %} · {{ a.open_display }} open{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted small">No assigned agents yet.</p>
+      {% endif %}
+
+      <h3>Recent listings</h3>
+      {% if b.recent_listings %}
+      <ul class="pkg-list">
+        {% for l in b.recent_listings %}
+        <li>
+          <a href="{{ l.listing_href }}">{{ l.title }}</a>
+          <span class="price">{{ l.status }}</span>
+          <span class="muted small">
+            <a href="{{ l.agent_href }}">{{ l.agent_name }}</a>
+            {% if l.shoot_date %} · {{ l.shoot_date[:10] }}{% else %} · {{ l.created_at[:10] }}{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted small">No listing activity yet.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <section class="empty-state">
+    <h2>No brokerage accounts yet</h2>
+    <p class="muted">Create brokerage clients and assign agents to see portfolio value, open balance, and recent listing activity here.</p>
+    <p><a href="/admin/clients" class="btn btn-accent">Add brokerage</a></p>
+  </section>
+  {% endif %}
+</main>
+{% endblock %}

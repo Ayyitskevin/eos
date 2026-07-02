@@ -9,6 +9,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Rebooking performance snapshot shows ready nudges, recent outreach, converted listings, and prior client value.
 - Rebooking follow-up queue flags agents nudged 7+ days ago without a repeat listing.
 - Reports now include repeat-agent revenue with brokerage attribution and CSV export.
+- Brokerage account dashboard shows assigned agents, listing volume, paid value, open balance, recent listings, and CSV export.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 
-from .. import brokerage, clients, reports, security
+from .. import brokerage, brokerage_reports, clients, reports, security
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -45,6 +45,29 @@ async def reports_repeat_agents_csv(_: None = Depends(security.require_admin)):
         content=body,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="eos-repeat-agents.csv"'},
+    )
+
+
+@router.get("/brokerages", response_class=HTMLResponse)
+async def brokerage_accounts(request: Request):
+    accounts = brokerage_reports.brokerage_accounts()
+    return templates.TemplateResponse(
+        request,
+        "admin/brokerages.html",
+        {
+            "accounts": accounts,
+            "summary": brokerage_reports.brokerage_summary(accounts),
+        },
+    )
+
+
+@router.get("/brokerages.csv")
+async def brokerage_accounts_csv(_: None = Depends(security.require_admin)):
+    body = brokerage_reports.brokerage_accounts_csv()
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="eos-brokerages.csv"'},
     )
 
 
