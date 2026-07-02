@@ -379,6 +379,89 @@ def send_intro_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> d
     return {"status": "sent", "draft": draft}
 
 
+def _intro_status(client_id: int, email: str | None) -> dict[str, Any]:
+    recent = recent_intro_sent_at(client_id)
+    if recent:
+        return {
+            "last_acquisition_email_at": recent,
+            "can_email_intro": False,
+            "intro_status": f"emailed {recent[:10]}",
+        }
+    if email:
+        return {
+            "last_acquisition_email_at": None,
+            "can_email_intro": True,
+            "intro_status": "ready",
+        }
+    return {
+        "last_acquisition_email_at": None,
+        "can_email_intro": False,
+        "intro_status": "missing email",
+    }
+
+
+def agent_referral_summary(
+    referrals: list[dict] | None = None, *, limit: int = 50
+) -> list[dict[str, Any]]:
+    referrals = referrals if referrals is not None else referral_performance(limit=200)
+    grouped: dict[int, dict[str, Any]] = {}
+    for row in referrals:
+        client_id = row["referrer_client_id"]
+        if not client_id:
+            continue
+        referrer = row["referrer"] or _agent_value(client_id)
+        item = grouped.setdefault(
+            client_id,
+            {
+                "id": client_id,
+                "name": row["referrer_name"] or referrer.get("name") or "Unknown agent",
+                "company": row["referrer_company"] or referrer.get("company") or "",
+                "email": referrer.get("email") or "",
+                "brokerage_name": referrer.get("brokerage_name") or "",
+                "client_href": f"/admin/clients/{client_id}",
+                "codes": [],
+                "code_count": 0,
+                "active_code_count": 0,
+                "uses": 0,
+                "n_inquiries": 0,
+                "n_listings": 0,
+                "referred_paid_cents": 0,
+                "referred_open_cents": 0,
+                "last_used_at": None,
+            },
+        )
+        item["codes"].append(row["code"])
+        item["code_count"] += 1
+        item["active_code_count"] += 1 if row["active"] else 0
+        item["uses"] += row["uses"]
+        item["n_inquiries"] += row["n_inquiries"]
+        item["n_listings"] += row["n_listings"]
+        item["referred_paid_cents"] += row["referred_paid_cents"]
+        item["referred_open_cents"] += row["referred_open_cents"]
+        if row["last_used_at"] and (
+            item["last_used_at"] is None or row["last_used_at"] > item["last_used_at"]
+        ):
+            item["last_used_at"] = row["last_used_at"]
+
+    out = []
+    for item in grouped.values():
+        item["code_list"] = ", ".join(item["codes"])
+        item["referred_paid_display"] = _money(item["referred_paid_cents"])
+        item["referred_open_display"] = _money(item["referred_open_cents"])
+        item.update(_intro_status(item["id"], item["email"]))
+        out.append(item)
+    out.sort(
+        key=lambda row: (
+            row["referred_paid_cents"],
+            row["uses"],
+            row["n_listings"],
+            row["last_used_at"] or "",
+        ),
+        reverse=True,
+    )
+    return out[:limit]
+
+
 def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None) -> dict:
     referrals = referrals if referrals is not None else referral_performance()
     asks = asks if asks is not None else intro_ask_queue()
@@ -406,6 +489,7 @@ def dashboard() -> dict:
         "summary": summary(referrals, asks),
         "referrals": referrals,
         "intro_asks": asks,
+        "agent_referrals": agent_referral_summary(referrals),
     }
 
 
@@ -418,6 +502,8 @@ def acquisition_csv() -> str:
         [
             "code",
             "referrer",
+            "referrer_company",
+            "referrer_email",
             "uses",
             "max_uses",
             "credit_cents",
@@ -426,13 +512,23 @@ def acquisition_csv() -> str:
             "referred_paid_cents",
             "referred_open_cents",
             "last_used_at",
+            "intro_status",
+            "last_intro_sent_at",
         ]
     )
     for row in data["referrals"]:
+        referrer = row["referrer"] or {}
+        intro = (
+            _intro_status(row["referrer_client_id"], referrer.get("email"))
+            if row["referrer_client_id"]
+            else {}
+        )
         writer.writerow(
             [
                 row["code"],
                 row["referrer_name"] or "",
+                row["referrer_company"] or "",
+                referrer.get("email") or "",
                 row["uses"],
                 row["max_uses"] or "",
                 row["credit_cents"],
@@ -441,6 +537,47 @@ def acquisition_csv() -> str:
                 row["referred_paid_cents"],
                 row["referred_open_cents"],
                 (row["last_used_at"] or "")[:10],
+                intro.get("intro_status", ""),
+                (intro.get("last_acquisition_email_at") or "")[:10],
+            ]
+        )
+    writer.writerow([])
+    writer.writerow(["Agent referral summary"])
+    writer.writerow(
+        [
+            "agent",
+            "company",
+            "email",
+            "brokerage",
+            "codes",
+            "active_codes",
+            "uses",
+            "referred_inquiries",
+            "referred_listings",
+            "referred_paid_cents",
+            "referred_open_cents",
+            "last_used_at",
+            "intro_status",
+            "last_intro_sent_at",
+        ]
+    )
+    for row in data["agent_referrals"]:
+        writer.writerow(
+            [
+                row["name"],
+                row["company"] or "",
+                row["email"] or "",
+                row["brokerage_name"] or "",
+                row["code_list"],
+                row["active_code_count"],
+                row["uses"],
+                row["n_inquiries"],
+                row["n_listings"],
+                row["referred_paid_cents"],
+                row["referred_open_cents"],
+                (row["last_used_at"] or "")[:10],
+                row["intro_status"],
+                (row["last_acquisition_email_at"] or "")[:10],
             ]
         )
     writer.writerow([])

@@ -599,6 +599,16 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
     assert referral_rows["ZERO25"]["uses"] == 0
     assert "OTHER25" not in referral_rows
 
+    agent_rows = {row["name"]: row for row in data["agent_referrals"]}
+    assert agent_rows["Referrer Agent"]["code_list"] == "REF25"
+    assert agent_rows["Referrer Agent"]["email"] == "referrer@example.com"
+    assert agent_rows["Referrer Agent"]["uses"] == 1
+    assert agent_rows["Referrer Agent"]["n_listings"] == 1
+    assert agent_rows["Referrer Agent"]["referred_paid_display"] == "$300"
+    assert agent_rows["Referrer Agent"]["intro_status"] == "ready"
+    assert agent_rows["Zero Use Agent"]["code_list"] == "ZERO25"
+    assert "Other Agent" not in agent_rows
+
     ask_rows = {row["name"]: row for row in data["intro_asks"]}
     assert ask_rows["No Code Agent"]["id"] == ids["no_code_id"]
     assert ask_rows["No Code Agent"]["action"] == "Create referral code"
@@ -610,7 +620,9 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
 
     body = acquisition.acquisition_csv()
     assert "Referral codes" in body
-    assert "REF25,Referrer Agent,1" in body
+    assert "REF25,Referrer Agent,Good Realty,referrer@example.com,1" in body
+    assert "Agent referral summary" in body
+    assert "Referrer Agent,Good Realty,referrer@example.com,,REF25,1,1,1,1,30000,5000" in body
     assert "No Code Agent,Good Realty,,2,45000" in body
     assert "OTHER25" not in body
 
@@ -708,7 +720,27 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-acquisition.csv" in export.headers["content-disposition"]
         assert "Referral codes" in export.text
-        assert "REF25,Referrer Agent,1" in export.text
+        assert "REF25,Referrer Agent,Good Realty,referrer@example.com,1" in export.text
+        assert "Agent referral summary" in export.text
+
+
+@pytest.mark.asyncio
+async def test_studio_settings_show_agent_referral_performance(app_env):
+    _seed_acquisition_report()
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+        r = await client.get("/admin/studio", headers={"cookie": cookie})
+
+    assert r.status_code == 200
+    assert "Agent referral performance" in r.text
+    assert "Referrer Agent" in r.text
+    assert "ZERO25" in r.text
+    assert "$300" in r.text
 
 
 @pytest.mark.asyncio

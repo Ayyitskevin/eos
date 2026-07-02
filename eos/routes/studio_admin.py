@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import (
+    acquisition,
     api_tokens,
     clients,
     config,
@@ -51,6 +52,7 @@ async def studio_settings(request: Request):
             "api_tokens": api_tokens.list_tokens(),
             "webhooks": webhooks.list_subscriptions(),
             "referrals": referrals.list_codes(),
+            "referral_performance": acquisition.agent_referral_summary(),
             "client_list": clients.list_clients(),
             "webhook_events": webhooks.EVENTS,
             "signup_enabled": config.SIGNUP_ENABLED,
@@ -65,7 +67,7 @@ async def studio_settings(request: Request):
             "plan_limits": plan_limits.limits_for(),
             "payments": payments.connect_status(),
             "domain_instructions": domain_instr,
-            "integration_events": integration_events.list_recent(15),
+            "integration_events": integration_events.list_recent(limit=15),
             "dropbox_log": db.all_(
                 """SELECT * FROM dropbox_ingest_log WHERE studio_id=?
                    ORDER BY created_at DESC LIMIT 15""",

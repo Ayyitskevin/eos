@@ -192,6 +192,23 @@
       {% endfor %}
     </table>
     {% endif %}
+    {% if referral_performance %}
+    <h4>Agent referral performance</h4>
+    <table class="list compact">
+      <tr><th>Agent</th><th>Codes</th><th>Uses</th><th>Listings</th><th>Paid</th><th>Open</th><th>Intro</th></tr>
+      {% for r in referral_performance %}
+      <tr>
+        <td><a href="{{ r.client_href }}">{{ r.name }}</a>{% if r.company %}<span class="muted"> · {{ r.company }}</span>{% endif %}</td>
+        <td><code>{{ r.code_list }}</code></td>
+        <td>{{ r.uses }}</td>
+        <td>{{ r.n_listings }}</td>
+        <td>{{ r.referred_paid_display }}</td>
+        <td>{{ r.referred_open_display }}</td>
+        <td>{{ r.intro_status }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
     <form method="post" action="/admin/studio/referrals" class="inline-form">
       <input name="code" placeholder="AGENT25" required>
       <select name="referrer_client_id">
