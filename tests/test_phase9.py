@@ -268,10 +268,16 @@ def _seed_revenue_optimizer(*, other_studio: bool = False):
 
 
 def _seed_acquisition_report(*, other_studio: bool = False):
+    broker_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, portal_token)
+           VALUES ('default', 'Good Realty Office', 'brokerage', 'good-office')""",
+    )
     referrer_id = db.run(
-        """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
-           VALUES ('default', 'Referrer Agent', 'agent', 'Good Realty',
+        """INSERT INTO clients
+           (studio_id, parent_id, name, client_type, company, email, portal_token)
+           VALUES ('default', ?, 'Referrer Agent', 'agent', 'Good Realty',
                    'referrer@example.com', 'ref-agent')""",
+        (broker_id,),
     )
     no_code_id = db.run(
         """INSERT INTO clients (studio_id, name, client_type, company, email, portal_token)
@@ -599,6 +605,19 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
     assert referral_rows["ZERO25"]["uses"] == 0
     assert "OTHER25" not in referral_rows
 
+    attribution_rows = {row["promo_code"]: row for row in data["attribution"]}
+    assert attribution_rows["REF25"]["source_type"] == "referral"
+    assert attribution_rows["REF25"]["source_url"].endswith("/book?ref=REF25")
+    assert attribution_rows["REF25"]["referrer_name"] == "Referrer Agent"
+    assert attribution_rows["REF25"]["brokerage_name"] == "Good Realty Office"
+    assert attribution_rows["REF25"]["paid_display"] == "$300"
+    assert attribution_rows["REF25"]["open_display"] == "$50"
+    assert data["attribution_summary"]["n_attributed_bookings"] == 1
+    assert data["attribution_summary"]["n_referral_bookings"] == 1
+    assert data["attribution_summary"]["n_brokerages"] == 1
+    assert data["attribution_summary"]["paid_cents"] == 30000
+    assert data["attribution_summary"]["open_cents"] == 5000
+
     agent_rows = {row["name"]: row for row in data["agent_referrals"]}
     assert agent_rows["Referrer Agent"]["code_list"] == "REF25"
     assert agent_rows["Referrer Agent"]["email"] == "referrer@example.com"
@@ -621,8 +640,14 @@ def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
     body = acquisition.acquisition_csv()
     assert "Referral codes" in body
     assert "REF25,Referrer Agent,Good Realty,referrer@example.com,1" in body
+    assert "Attribution" in body
+    assert "/book?ref=REF25" in body
+    assert "REF25,Referrer Agent,Good Realty,Good Realty Office,Referred Agent" in body
     assert "Agent referral summary" in body
-    assert "Referrer Agent,Good Realty,referrer@example.com,,REF25,1,1,1,1,30000,5000" in body
+    assert (
+        "Referrer Agent,Good Realty,referrer@example.com,Good Realty Office,REF25,1,1,1,1,30000,5000"
+        in body
+    )
     assert "No Code Agent,Good Realty,,2,45000" in body
     assert "OTHER25" not in body
 
@@ -764,6 +789,8 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "Zero Use Agent" in r.text
         assert "REF25" in r.text
         assert "$300" in r.text
+        assert "Attributed bookings" in r.text
+        assert "Good Realty Office" in r.text
         assert "Draft intro ask" in r.text
         assert "Needs code (1)" in r.text
         assert "Needs intro (1)" in r.text

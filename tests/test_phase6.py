@@ -79,6 +79,54 @@ async def test_booking_creates_listing_and_appointment(app_env):
 
 
 @pytest.mark.asyncio
+async def test_booking_ref_query_prefills_and_records_referral_code(app_env):
+    referrer_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, email)
+           VALUES ('default', 'Referral Source', 'agent', 'source@example.com')"""
+    )
+    db.run(
+        """INSERT INTO referral_codes (studio_id, code, credit_cents, referrer_client_id)
+           VALUES ('default', 'REF25', 2500, ?)""",
+        (referrer_id,),
+    )
+    pkg = db.one("SELECT id FROM service_packages WHERE active=1 LIMIT 1")
+    db.run("UPDATE service_packages SET deposit_cents=0 WHERE id=?", (pkg["id"],))
+    slot = _first_slot()
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        form = await client.get("/book?ref=ref25")
+        assert form.status_code == 200
+        assert 'name="promo_code" value="REF25"' in form.text
+
+        r = await client.post(
+            "/book",
+            data={
+                "name": "Referral Booker",
+                "email": "referral@book.test",
+                "phone": "555-0101",
+                "property_address": "25 Referral Rd",
+                "package_id": pkg["id"],
+                "scheduled_at": slot,
+                "signer_name": "Referral Booker",
+                "promo_code": "REF25",
+            },
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 303
+    inq = db.one(
+        "SELECT promo_code, total_cents FROM inquiries WHERE email=?",
+        ("referral@book.test",),
+    )
+    assert inq["promo_code"] == "REF25"
+    assert inq["total_cents"] >= 0
+    assert (
+        db.one("SELECT uses FROM referral_codes WHERE studio_id='default' AND code='REF25'")["uses"]
+        == 1
+    )
+
+
+@pytest.mark.asyncio
 async def test_booking_deposit_pending_payment(app_env):
     pkg = db.one("SELECT id FROM service_packages WHERE name='Standard Listing'")
     db.run("UPDATE service_packages SET deposit_cents=5000 WHERE id=?", (pkg["id"],))

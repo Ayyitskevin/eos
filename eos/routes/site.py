@@ -11,7 +11,12 @@ INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo", "/pricing"}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _book_context(error: str | None = None, thanks: bool = False):
+def _clean_booking_code(value: str | None) -> str:
+    raw = (value or "").strip().upper()
+    return "".join(ch for ch in raw if ch.isalnum() or ch in {"-", "_"})[:40]
+
+
+def _book_context(error: str | None = None, thanks: bool = False, promo_code: str = ""):
     profile = studio.get_profile()
     addons = studio.list_addons(active_only=True)
     twilight_addon = next((a for a in addons if a["slug"] == "twilight"), None)
@@ -30,6 +35,7 @@ def _book_context(error: str | None = None, thanks: bool = False):
         "payments_on": stripe_checkout.payments_configured(),
         "error": error,
         "thanks": thanks,
+        "promo_code": _clean_booking_code(promo_code),
     }
 
 
@@ -74,7 +80,12 @@ async def home(request: Request):
 
 @router.get("/book", response_class=HTMLResponse)
 async def book_form(request: Request):
-    return templates.TemplateResponse(request, "site/book.html", _book_context())
+    promo_code = request.query_params.get("ref") or request.query_params.get("promo_code") or ""
+    return templates.TemplateResponse(
+        request,
+        "site/book.html",
+        _book_context(promo_code=promo_code),
+    )
 
 
 @router.post("/book")
@@ -100,14 +111,14 @@ async def book_submit(
         return templates.TemplateResponse(
             request,
             "site/book.html",
-            _book_context(error="Invalid email."),
+            _book_context(error="Invalid email.", promo_code=promo_code),
             status_code=400,
         )
     if not property_address.strip():
         return templates.TemplateResponse(
             request,
             "site/book.html",
-            _book_context(error="Property address is required."),
+            _book_context(error="Property address is required.", promo_code=promo_code),
             status_code=400,
         )
 
@@ -131,7 +142,7 @@ async def book_submit(
         return templates.TemplateResponse(
             request,
             "site/book.html",
-            _book_context(error=detail),
+            _book_context(error=detail, promo_code=promo_code),
             status_code=e.status_code,
         )
 

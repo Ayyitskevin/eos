@@ -3,7 +3,7 @@
 import csv
 import io
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import HTTPException
 
@@ -36,6 +36,10 @@ def _first(name: str) -> str:
 
 def _detail(client_id: int, email: str, subject: str = "") -> str:
     return f"client_id={client_id}; email={email}; subject={subject[:120]}"
+
+
+def _referral_url(code: str) -> str:
+    return f"{tenant.get_base_url()}/book?ref={quote(code)}"
 
 
 def recent_intro_sent_at(client_id: int, *, days: int = COOLDOWN_DAYS) -> str | None:
@@ -343,7 +347,7 @@ def build_intro_email(client_id: int) -> dict[str, str | int | None]:
     code = _active_referral_code(client_id)
     code_text = code["code"] if code else _suggested_code(client["name"])
     credit_text = _money(int(code["credit_cents"])) if code else "$25"
-    booking_link = f"{tenant.get_base_url()}/book"
+    booking_link = _referral_url(code_text) if code else f"{tenant.get_base_url()}/book"
     if value["n_listings"]:
         history_line = (
             f"We have photographed {value['n_listings']} listing"
@@ -443,6 +447,110 @@ def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> d
         else:
             result["skipped"] += 1
     return result
+
+
+def attributed_bookings(limit: int = 50) -> list[dict[str, Any]]:
+    rows = db.all_(
+        """SELECT q.id, q.name, q.email, q.property_address, q.status,
+                  q.created_at, q.scheduled_at, q.promo_code, q.total_cents,
+                  q.deposit_cents, q.listing_id,
+                  l.title AS listing_title,
+                  r.id AS referral_id,
+                  r.code AS referral_code,
+                  r.referrer_client_id,
+                  ref.name AS referrer_name,
+                  ref.company AS referrer_company,
+                  ref.email AS referrer_email,
+                  parent.name AS brokerage_name,
+                  COALESCE((SELECT SUM(i.amount_cents)
+                     FROM invoices i
+                    WHERE i.studio_id=q.studio_id
+                      AND i.listing_id=q.listing_id
+                      AND i.status='paid'), 0) AS paid_cents,
+                  COALESCE((SELECT SUM(i.amount_cents)
+                     FROM invoices i
+                    WHERE i.studio_id=q.studio_id
+                      AND i.listing_id=q.listing_id
+                      AND i.status='sent'), 0) AS open_cents
+           FROM inquiries q
+           LEFT JOIN referral_codes r
+             ON r.studio_id=q.studio_id
+            AND upper(r.code)=upper(q.promo_code)
+           LEFT JOIN clients ref
+             ON ref.id=r.referrer_client_id
+            AND ref.studio_id=q.studio_id
+           LEFT JOIN clients parent
+             ON parent.id=ref.parent_id
+            AND parent.studio_id=ref.studio_id
+            AND parent.client_type='brokerage'
+           LEFT JOIN listings l
+             ON l.id=q.listing_id
+            AND l.studio_id=q.studio_id
+          WHERE q.studio_id=?
+            AND trim(q.promo_code) <> ''
+          ORDER BY q.created_at DESC
+          LIMIT ?""",
+        (STUDIO_ID, limit),
+    )
+    out = []
+    for row in rows:
+        paid_cents = int(row["paid_cents"] or 0)
+        open_cents = int(row["open_cents"] or 0)
+        code = (row["referral_code"] or row["promo_code"] or "").strip().upper()
+        source_type = "referral" if row["referral_id"] else "promo"
+        out.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "email": row["email"],
+                "property_address": row["property_address"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "scheduled_at": row["scheduled_at"],
+                "promo_code": code,
+                "source_type": source_type,
+                "source_label": "Referral link" if source_type == "referral" else "Promo code",
+                "source_url": _referral_url(code) if source_type == "referral" else "",
+                "total_cents": int(row["total_cents"] or 0),
+                "deposit_cents": int(row["deposit_cents"] or 0),
+                "listing_id": row["listing_id"],
+                "listing_title": row["listing_title"],
+                "listing_href": f"/admin/listings/{row['listing_id']}" if row["listing_id"] else "",
+                "referral_id": row["referral_id"],
+                "referrer_client_id": row["referrer_client_id"],
+                "referrer_name": row["referrer_name"],
+                "referrer_company": row["referrer_company"],
+                "referrer_email": row["referrer_email"],
+                "brokerage_name": row["brokerage_name"],
+                "referrer_href": f"/admin/clients/{row['referrer_client_id']}"
+                if row["referrer_client_id"]
+                else "",
+                "paid_cents": paid_cents,
+                "open_cents": open_cents,
+                "paid_display": _money(paid_cents),
+                "open_display": _money(open_cents),
+            }
+        )
+    return out
+
+
+def attribution_summary(rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    rows = rows if rows is not None else attributed_bookings()
+    paid_cents = sum(row["paid_cents"] for row in rows)
+    open_cents = sum(row["open_cents"] for row in rows)
+    referrers = {row["referrer_client_id"] for row in rows if row["referrer_client_id"]}
+    brokerages = {row["brokerage_name"] for row in rows if row["brokerage_name"]}
+    referral_rows = [row for row in rows if row["source_type"] == "referral"]
+    return {
+        "n_attributed_bookings": len(rows),
+        "n_referral_bookings": len(referral_rows),
+        "n_referrers": len(referrers),
+        "n_brokerages": len(brokerages),
+        "paid_cents": paid_cents,
+        "open_cents": open_cents,
+        "paid_display": _money(paid_cents),
+        "open_display": _money(open_cents),
+    }
 
 
 def _intro_status(client_id: int, email: str | None) -> dict[str, Any]:
@@ -551,6 +659,7 @@ def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None)
 def dashboard(*, queue_filter: str = "all") -> dict:
     referrals = referral_performance()
     all_asks = intro_ask_queue()
+    attribution = attributed_bookings()
     selected = normalize_queue_filter(queue_filter)
     asks = filter_intro_asks(all_asks, selected)
     return {
@@ -558,6 +667,8 @@ def dashboard(*, queue_filter: str = "all") -> dict:
         "referrals": referrals,
         "intro_asks": asks,
         "all_intro_asks": all_asks,
+        "attribution": attribution,
+        "attribution_summary": attribution_summary(attribution),
         "queue_filter": selected,
         "queue_filters": queue_filter_options(all_asks, selected),
         "agent_referrals": agent_referral_summary(referrals),
@@ -610,6 +721,43 @@ def acquisition_csv() -> str:
                 (row["last_used_at"] or "")[:10],
                 intro.get("intro_status", ""),
                 (intro.get("last_acquisition_email_at") or "")[:10],
+            ]
+        )
+    writer.writerow([])
+    writer.writerow(["Attribution"])
+    writer.writerow(
+        [
+            "created_at",
+            "source_type",
+            "code",
+            "source_url",
+            "referrer",
+            "referrer_company",
+            "brokerage",
+            "client",
+            "property",
+            "status",
+            "listing_id",
+            "paid_cents",
+            "open_cents",
+        ]
+    )
+    for row in data["attribution"]:
+        writer.writerow(
+            [
+                (row["created_at"] or "")[:10],
+                row["source_type"],
+                row["promo_code"],
+                row["source_url"],
+                row["referrer_name"] or "",
+                row["referrer_company"] or "",
+                row["brokerage_name"] or "",
+                row["name"],
+                row["property_address"] or "",
+                row["status"] or "",
+                row["listing_id"] or "",
+                row["paid_cents"],
+                row["open_cents"],
             ]
         )
     writer.writerow([])

@@ -98,6 +98,46 @@
   </section>
 
   <section class="card">
+    <h2>Attributed bookings</h2>
+    <div class="pipeline-strip">
+      <div class="pipeline-card {% if attribution_summary.n_attributed_bookings %}has-items{% endif %}">
+        <span class="pipeline-count">{{ attribution_summary.n_attributed_bookings }}</span>
+        <span class="pipeline-label">Attributed</span>
+      </div>
+      <div class="pipeline-card {% if attribution_summary.n_referral_bookings %}has-items{% endif %}">
+        <span class="pipeline-count">{{ attribution_summary.n_referral_bookings }}</span>
+        <span class="pipeline-label">Referral bookings</span>
+      </div>
+      <div class="pipeline-card {% if attribution_summary.n_referrers %}has-items{% endif %}">
+        <span class="pipeline-count">{{ attribution_summary.n_referrers }}</span>
+        <span class="pipeline-label">Referrers</span>
+      </div>
+      <div class="pipeline-card {% if attribution_summary.paid_cents %}has-items{% endif %}">
+        <span class="pipeline-count">{{ attribution_summary.paid_display }}</span>
+        <span class="pipeline-label">Paid</span>
+      </div>
+    </div>
+    {% if attribution %}
+    <table class="list compact">
+      <tr><th>Booking</th><th>Source</th><th>Referrer</th><th>Brokerage</th><th>Paid</th><th>Open</th></tr>
+      {% for a in attribution[:10] %}
+      <tr>
+        <td>{% if a.listing_href %}<a href="{{ a.listing_href }}">{{ a.listing_title or a.property_address }}</a>{% else %}{{ a.property_address }}{% endif %}
+          <br><span class="muted small">{{ a.name }} · {{ a.created_at[:10] }}</span></td>
+        <td><code>{{ a.promo_code }}</code><br><span class="muted small">{{ a.source_label }}</span></td>
+        <td>{% if a.referrer_href %}<a href="{{ a.referrer_href }}">{{ a.referrer_name }}</a>{% else %}—{% endif %}</td>
+        <td>{{ a.brokerage_name or "—" }}</td>
+        <td>{{ a.paid_display }}</td>
+        <td>{{ a.open_display }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No referral or promo-attributed bookings yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
     <h2>Referral code performance</h2>
     {% if referrals %}
     <table class="list compact">
