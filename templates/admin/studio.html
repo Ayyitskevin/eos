@@ -186,14 +186,22 @@
     <h3>Referral codes</h3>
     {% if referrals %}
     <table class="list compact">
-      <tr><th>Code</th><th>Credit</th><th>Uses</th></tr>
+      <tr><th>Code</th><th>Referrer</th><th>Credit</th><th>Uses</th></tr>
       {% for r in referrals %}
-      <tr><td>{{ r.code }}</td><td>${{ "%.0f"|format(r.credit_cents / 100) }}</td><td>{{ r.uses }}{% if r.max_uses %}/{{ r.max_uses }}{% endif %}</td></tr>
+      <tr><td>{{ r.code }}</td><td>{{ r.referrer_name or "—" }}</td><td>${{ "%.0f"|format(r.credit_cents / 100) }}</td><td>{{ r.uses }}{% if r.max_uses %}/{{ r.max_uses }}{% endif %}</td></tr>
       {% endfor %}
     </table>
     {% endif %}
     <form method="post" action="/admin/studio/referrals" class="inline-form">
       <input name="code" placeholder="AGENT25" required>
+      <select name="referrer_client_id">
+        <option value="">No referrer</option>
+        {% for c in client_list %}
+        {% if c.client_type == "agent" %}
+        <option value="{{ c.id }}">{{ c.name }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
       <input name="credit_dollars" type="number" step="1" value="25" style="width:5rem">
       <input name="max_uses" placeholder="Max uses" style="width:5rem">
       <button type="submit">Add referral</button>

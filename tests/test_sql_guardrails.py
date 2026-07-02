@@ -29,6 +29,7 @@ TENANT_ID_TABLES = {
     "promo_codes",
     "proposals",
     "questionnaires",
+    "referral_codes",
     "service_addons",
     "service_packages",
     "studio_profiles",

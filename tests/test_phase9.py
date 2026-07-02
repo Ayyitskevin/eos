@@ -2,6 +2,7 @@
 
 import importlib
 
+import eos.acquisition as acquisition
 import eos.brokerage as brokerage
 import eos.brokerage_reports as brokerage_reports
 import eos.config as config
@@ -10,6 +11,7 @@ import eos.invoices as invoices
 import eos.jobs as jobs
 import eos.listings as listings
 import eos.main as main
+import eos.referrals as referrals
 import eos.reports as reports
 import eos.reports_export as reports_export
 import eos.revenue_optimizer as revenue_optimizer
@@ -26,6 +28,7 @@ def app_env(tmp_path, monkeypatch):
         config,
         db,
         jobs,
+        acquisition,
         brokerage,
         brokerage_reports,
         invoices,
@@ -33,6 +36,7 @@ def app_env(tmp_path, monkeypatch):
         reports,
         reports_export,
         revenue_optimizer,
+        referrals,
         main,
     ):
         importlib.reload(mod)
@@ -262,6 +266,123 @@ def _seed_revenue_optimizer(*, other_studio: bool = False):
         )
 
 
+def _seed_acquisition_report(*, other_studio: bool = False):
+    referrer_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
+           VALUES ('default', 'Referrer Agent', 'agent', 'Good Realty', 'ref-agent')""",
+    )
+    no_code_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
+           VALUES ('default', 'No Code Agent', 'agent', 'Good Realty', 'nocode-agent')""",
+    )
+    zero_use_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
+           VALUES ('default', 'Zero Use Agent', 'agent', 'Good Realty', 'zerouse-agent')""",
+    )
+    referred_id = db.run(
+        """INSERT INTO clients (studio_id, name, client_type, company, portal_token)
+           VALUES ('default', 'Referred Agent', 'agent', 'New Realty', 'referred-agent')""",
+    )
+
+    referrals.create_code(code="REF25", credit_cents=2500, referrer_client_id=referrer_id)
+    referrals.create_code(code="ZERO25", credit_cents=2500, referrer_client_id=zero_use_id)
+
+    ref_listing_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+           VALUES ('default', ?, 'Referrer Listing', 'delivered', '2026-01-01T09:00:00')""",
+        (referrer_id,),
+    )
+    no_code_first_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+           VALUES ('default', ?, 'No Code First', 'delivered', '2026-01-02T09:00:00')""",
+        (no_code_id,),
+    )
+    no_code_second_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+           VALUES ('default', ?, 'No Code Second', 'delivered', '2026-02-02T09:00:00')""",
+        (no_code_id,),
+    )
+    zero_use_listing_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+           VALUES ('default', ?, 'Zero Use Listing', 'delivered', '2026-03-02T09:00:00')""",
+        (zero_use_id,),
+    )
+    referred_listing_id = db.run(
+        """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+           VALUES ('default', ?, 'Referred Listing', 'delivered', '2026-04-02T09:00:00')""",
+        (referred_id,),
+    )
+
+    for listing_id, client_id, amount in (
+        (ref_listing_id, referrer_id, 45000),
+        (no_code_first_id, no_code_id, 20000),
+        (no_code_second_id, no_code_id, 25000),
+        (zero_use_listing_id, zero_use_id, 50000),
+        (referred_listing_id, referred_id, 30000),
+    ):
+        invoice_id = invoices.create_invoice(
+            listing_id,
+            title=f"Invoice {listing_id}",
+            amount_cents=amount,
+            client_id=client_id,
+        )
+        invoices.mark_paid(invoice_id)
+    open_id = invoices.create_invoice(
+        referred_listing_id,
+        title="Referred open",
+        amount_cents=5000,
+        client_id=referred_id,
+    )
+    invoices.mark_sent(open_id)
+    db.run(
+        """INSERT INTO inquiries
+           (studio_id, name, email, property_address, status, promo_code,
+            listing_id, client_id, total_cents, deposit_cents, created_at)
+           VALUES ('default', 'Referred Agent', 'r@test.com', 'Referral House',
+                   'confirmed', 'REF25', ?, ?, 35000, 0, '2026-04-01T09:00:00')""",
+        (referred_listing_id, referred_id),
+    )
+    db.run(
+        "UPDATE referral_codes SET uses=1 WHERE studio_id='default' AND code='REF25'",
+    )
+
+    if other_studio:
+        db.run("INSERT INTO studio (id, name, slug) VALUES ('other', 'Other Studio', 'other')")
+        other_client_id = db.run(
+            """INSERT INTO clients (studio_id, name, client_type, portal_token)
+               VALUES ('other', 'Other Agent', 'agent', 'other-agent-acq')""",
+        )
+        other_listing_id = db.run(
+            """INSERT INTO listings (studio_id, client_id, title, status, created_at)
+               VALUES ('other', ?, 'Other Referral Listing', 'delivered', '2026-05-01T09:00:00')""",
+            (other_client_id,),
+        )
+        db.run(
+            """INSERT INTO referral_codes
+               (studio_id, code, credit_cents, referrer_client_id, uses)
+               VALUES ('other', 'OTHER25', 2500, ?, 1)""",
+            (other_client_id,),
+        )
+        db.run(
+            """INSERT INTO inquiries
+               (studio_id, name, email, property_address, status, promo_code,
+                listing_id, client_id, total_cents, deposit_cents, created_at)
+               VALUES ('other', 'Other Agent', 'o@test.com', 'Other House',
+                       'confirmed', 'OTHER25', ?, ?, 99000, 0, '2026-05-01T09:00:00')""",
+            (other_listing_id, other_client_id),
+        )
+        db.run(
+            """INSERT INTO invoices (studio_id, listing_id, client_id, slug, title, amount_cents, status, paid_at)
+               VALUES ('other', ?, ?, 'other-acq-paid', 'Other paid', 99000, 'paid', '2026-05-02T09:00:00')""",
+            (other_listing_id, other_client_id),
+        )
+    return {
+        "referrer_id": referrer_id,
+        "no_code_id": no_code_id,
+        "zero_use_id": zero_use_id,
+    }
+
+
 @pytest.mark.asyncio
 async def test_reports_dashboard_shows_revenue(app_env):
     lid = db.run(
@@ -454,6 +575,66 @@ async def test_revenue_optimizer_dashboard_and_csv_routes(app_env):
         assert "eos-revenue-optimizer.csv" in export.headers["content-disposition"]
         assert "Package performance" in export.text
         assert "Maple Standard,Optimizer Agent,Standard Listing" in export.text
+
+
+def test_acquisition_report_tracks_referrals_and_intro_asks(app_env):
+    ids = _seed_acquisition_report(other_studio=True)
+
+    data = acquisition.dashboard()
+    assert data["summary"]["n_active_codes"] == 2
+    assert data["summary"]["n_referred_listings"] == 1
+    assert data["summary"]["referred_paid_cents"] == 30000
+    assert data["summary"]["referred_open_cents"] == 5000
+
+    referral_rows = {row["code"]: row for row in data["referrals"]}
+    assert referral_rows["REF25"]["referrer_name"] == "Referrer Agent"
+    assert referral_rows["REF25"]["uses"] == 1
+    assert referral_rows["REF25"]["n_inquiries"] == 1
+    assert referral_rows["REF25"]["referred_paid_display"] == "$300"
+    assert referral_rows["ZERO25"]["uses"] == 0
+    assert "OTHER25" not in referral_rows
+
+    ask_rows = {row["name"]: row for row in data["intro_asks"]}
+    assert ask_rows["No Code Agent"]["id"] == ids["no_code_id"]
+    assert ask_rows["No Code Agent"]["action"] == "Create referral code"
+    assert ask_rows["No Code Agent"]["suggested_code"] == "NOCODEAG25"
+    assert ask_rows["Zero Use Agent"]["id"] == ids["zero_use_id"]
+    assert ask_rows["Zero Use Agent"]["action"] == "Ask for an introduction"
+    assert "Referrer Agent" not in ask_rows
+    assert "Other Agent" not in ask_rows
+
+    body = acquisition.acquisition_csv()
+    assert "Referral codes" in body
+    assert "REF25,Referrer Agent,1" in body
+    assert "No Code Agent,Good Realty,,2,45000" in body
+    assert "OTHER25" not in body
+
+
+@pytest.mark.asyncio
+async def test_acquisition_dashboard_and_csv_routes(app_env):
+    _seed_acquisition_report()
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+        r = await client.get("/admin/reports/acquisition", headers={"cookie": cookie})
+        assert r.status_code == 200
+        assert "Agent acquisition" in r.text
+        assert "Intro ask queue" in r.text
+        assert "No Code Agent" in r.text
+        assert "Zero Use Agent" in r.text
+        assert "REF25" in r.text
+        assert "$300" in r.text
+
+        export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
+        assert export.status_code == 200
+        assert export.headers["content-type"].startswith("text/csv")
+        assert "eos-acquisition.csv" in export.headers["content-disposition"]
+        assert "Referral codes" in export.text
+        assert "REF25,Referrer Agent,1" in export.text
 
 
 @pytest.mark.asyncio

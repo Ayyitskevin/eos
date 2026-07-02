@@ -1,5 +1,7 @@
 """Agent referral credits — tracked codes applied at booking."""
 
+from fastapi import HTTPException
+
 from . import db
 from .vocab import STUDIO_ID
 
@@ -8,7 +10,7 @@ def list_codes():
     return db.all_(
         """SELECT r.*, c.name AS referrer_name
            FROM referral_codes r
-           LEFT JOIN clients c ON c.id=r.referrer_client_id
+           LEFT JOIN clients c ON c.id=r.referrer_client_id AND c.studio_id=r.studio_id
            WHERE r.studio_id=?
            ORDER BY r.code""",
         (str(STUDIO_ID),),
@@ -23,6 +25,13 @@ def create_code(
     max_uses: int | None = None,
 ) -> int:
     code = code.strip().upper()
+    if referrer_client_id is not None:
+        row = db.one(
+            "SELECT id FROM clients WHERE id=? AND studio_id=?",
+            (referrer_client_id, STUDIO_ID),
+        )
+        if not row:
+            raise HTTPException(status_code=404)
     rid = db.run(
         """INSERT INTO referral_codes
            (studio_id, code, credit_cents, referrer_client_id, max_uses)

@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import (
     api_tokens,
+    clients,
     config,
     db,
     domain_verify,
@@ -50,6 +51,7 @@ async def studio_settings(request: Request):
             "api_tokens": api_tokens.list_tokens(),
             "webhooks": webhooks.list_subscriptions(),
             "referrals": referrals.list_codes(),
+            "client_list": clients.list_clients(),
             "webhook_events": webhooks.EVENTS,
             "signup_enabled": config.SIGNUP_ENABLED,
             "base_domain": config.BASE_DOMAIN,
@@ -223,11 +225,14 @@ async def create_referral(
     code: str = Form(...),
     credit_dollars: float = Form(25),
     max_uses: str = Form(""),
+    referrer_client_id: str = Form(""),
 ):
     max_u = int(max_uses) if max_uses.strip().isdigit() else None
+    referrer_id = int(referrer_client_id) if referrer_client_id.strip().isdigit() else None
     referrals.create_code(
         code=code,
         credit_cents=round(credit_dollars * 100),
+        referrer_client_id=referrer_id,
         max_uses=max_u,
     )
     return RedirectResponse("/admin/studio#integrations", status_code=303)

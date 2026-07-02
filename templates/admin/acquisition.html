@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Agent acquisition · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Agent acquisition</h1>
+    <nav>
+      <a href="/admin/reports/acquisition.csv">Export CSV</a> ·
+      <a href="/admin/studio#integrations">Referral setup</a> ·
+      <a href="/admin/reports">Reports</a> ·
+      <a href="/admin">Pipeline</a>
+    </nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card {% if summary.n_active_codes %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_active_codes }}</span>
+      <span class="pipeline-label">Active codes</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_referred_listings %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_referred_listings }}</span>
+      <span class="pipeline-label">Referred listings</span>
+    </div>
+    <div class="pipeline-card {% if summary.referred_paid_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.referred_paid_display }}</span>
+      <span class="pipeline-label">Referred paid</span>
+    </div>
+    <div class="pipeline-card {% if summary.referred_open_cents %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.referred_open_display }}</span>
+      <span class="pipeline-label">Referred open</span>
+    </div>
+    <div class="pipeline-card {% if summary.n_intro_asks %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.n_intro_asks }}</span>
+      <span class="pipeline-label">Intro asks</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Intro ask queue</h2>
+    {% if intro_asks %}
+    <table class="list compact">
+      <tr><th>Agent</th><th>Brokerage</th><th>Listings</th><th>Paid</th><th>Suggested code</th><th>Action</th></tr>
+      {% for a in intro_asks %}
+      <tr>
+        <td><a href="{{ a.client_href }}">{{ a.name }}</a>{% if a.company %}<span class="muted"> · {{ a.company }}</span>{% endif %}</td>
+        <td>{{ a.brokerage_name or "—" }}</td>
+        <td>{{ a.n_listings }}</td>
+        <td>{{ a.paid_display }}</td>
+        <td><code>{{ a.suggested_code }}</code></td>
+        <td>{{ a.action }}<br><span class="muted small">{{ a.reason }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No high-value agents need an introduction ask right now.</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Referral code performance</h2>
+    {% if referrals %}
+    <table class="list compact">
+      <tr><th>Code</th><th>Referrer</th><th>Uses</th><th>Listings</th><th>Paid</th><th>Open</th><th>Last used</th></tr>
+      {% for r in referrals %}
+      <tr>
+        <td><code>{{ r.code }}</code>{% if not r.active %}<span class="muted"> · inactive</span>{% endif %}</td>
+        <td>{% if r.referrer_href %}<a href="{{ r.referrer_href }}">{{ r.referrer_name }}</a>{% else %}—{% endif %}</td>
+        <td>{{ r.uses }}{% if r.max_uses %}/{{ r.max_uses }}{% endif %}</td>
+        <td>{{ r.n_listings }}</td>
+        <td>{{ r.referred_paid_display }}</td>
+        <td>{{ r.referred_open_display }}</td>
+        <td class="muted">{{ r.last_used_at[:10] if r.last_used_at else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No referral codes yet. Add one from Studio settings and tie it to the agent who introduced you.</p>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}
