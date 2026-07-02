@@ -81,6 +81,14 @@
     {% endif %}
     {% if rebooking_history.converted_listing %}
     <p>Converted into <a href="{{ rebooking_history.converted_listing.href }}">{{ rebooking_history.converted_listing.title }}</a>.</p>
+    {% elif rebooking_history.follow_up_due %}
+    <p class="warn">Follow-up due: nudged {{ rebooking_history.days_since_sent }} days ago with no new listing yet.</p>
+      {% if rebooking_history.can_send_again and rebooking and rebooking.email %}
+      <form method="post" action="/admin/rebooking/{{ c.id }}/send" class="inline-form">
+        <input type="hidden" name="redirect" value="/admin/clients/{{ c.id }}">
+        <button type="submit">{{ "Send second touch" if rebooking_mailer_on else "Draft second touch" }}</button>
+      </form>
+      {% endif %}
     {% endif %}
   </section>
   {% endif %}

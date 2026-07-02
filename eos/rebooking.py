@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from typing import Any
 from urllib.parse import urlencode
@@ -12,6 +13,7 @@ from . import churn, clients, db, mailer, tenant
 from .vocab import STUDIO_ID
 
 COOLDOWN_DAYS = 14
+FOLLOW_UP_DAYS = 7
 ACTION_SENT = "rebooking.email.sent"
 ACTION_DRAFT = "rebooking.email.draft"
 ACTION_FAILED = "rebooking.email.failed"
@@ -31,6 +33,16 @@ def _money(cents: int) -> str:
     if cents % 100 == 0:
         return f"${dollars:,.0f}"
     return f"${dollars:,.2f}"
+
+
+def _days_since_timestamp(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        seen = dt.datetime.fromisoformat(value[:19].replace(" ", "T"))
+    except ValueError:
+        return None
+    return max(0, (dt.datetime.now() - seen).days)
 
 
 def _client_id_from_detail(detail: str | None) -> int | None:
@@ -105,11 +117,78 @@ def _conversion_for_outreach(row: Any) -> dict[str, Any] | None:
     }
 
 
+def _latest_sent_rows(*, days: int = 90) -> list[Any]:
+    rows = db.all_(
+        """SELECT action, detail, created_at
+           FROM audit_log
+           WHERE studio_id=? AND action=?
+             AND created_at >= datetime('now', ?)
+           ORDER BY created_at DESC""",
+        (STUDIO_ID, ACTION_SENT, f"-{days} days"),
+    )
+    latest: dict[int, Any] = {}
+    for row in rows:
+        client_id = _client_id_from_detail(row["detail"])
+        if client_id is None or client_id in latest:
+            continue
+        latest[client_id] = row
+    return list(latest.values())
+
+
+def follow_up_queue(
+    *, follow_up_days: int = FOLLOW_UP_DAYS, lookback_days: int = 90, limit: int = 8
+) -> list[dict[str, Any]]:
+    queue: list[dict[str, Any]] = []
+    for row in _latest_sent_rows(days=lookback_days):
+        days_waiting = _days_since_timestamp(row["created_at"])
+        if days_waiting is None or days_waiting < follow_up_days:
+            continue
+        if _conversion_for_outreach(row):
+            continue
+        client_id = _client_id_from_detail(row["detail"])
+        if client_id is None:
+            continue
+        client = db.one(
+            "SELECT id, name, company, email FROM clients WHERE id=? AND studio_id=? AND client_type='agent'",
+            (client_id, STUDIO_ID),
+        )
+        if not client:
+            continue
+        opportunity = churn.rebooking_for_client(client_id)
+        can_send_again = not recent_sent_at(client_id)
+        queue.append(
+            {
+                "id": client_id,
+                "name": client["name"],
+                "company": client["company"],
+                "email": client["email"],
+                "sent_at": row["created_at"],
+                "days_waiting": days_waiting,
+                "can_send_again": can_send_again,
+                "cooldown_active": not can_send_again,
+                "client_href": f"/admin/clients/{client_id}",
+                "book_href": f"/admin/listings/new?client_id={client_id}",
+                "next_action": "Send second touch" if can_send_again else "Manual check-in",
+                "reason_line": f"nudged {days_waiting} days ago · no repeat listing yet",
+                "priority": opportunity["priority"] if opportunity else "Warm",
+                "priority_key": opportunity["priority_key"] if opportunity else "priority-warm",
+            }
+        )
+        if len(queue) >= limit:
+            break
+    return queue
+
+
 def performance_snapshot(
-    opportunities: list[dict[str, Any]] | None = None, *, days: int = 30
+    opportunities: list[dict[str, Any]] | None = None,
+    *,
+    days: int = 30,
+    followups: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if opportunities is None:
         opportunities = decorate_opportunities(churn.rebooking_opportunities(limit=50))
+    if followups is None:
+        followups = follow_up_queue()
     activity = _recent_activity(days)
     sent = [row for row in activity if row["action"] == ACTION_SENT]
     drafts = [row for row in activity if row["action"] == ACTION_DRAFT]
@@ -128,7 +207,12 @@ def performance_snapshot(
     at_risk_paid_cents = sum(int(o.get("paid_cents") or 0) for o in opportunities)
     sent_count = len(sent)
     converted_count = len(converted_by_client)
-    if ready_count:
+    follow_up_count = len(followups)
+    if follow_up_count:
+        next_action = (
+            f"Follow up with {follow_up_count} nudged agent{'s' if follow_up_count != 1 else ''}."
+        )
+    elif ready_count:
         next_action = (
             f"Nudge {ready_count} agent{'s' if ready_count != 1 else ''} ready for outreach."
         )
@@ -153,6 +237,7 @@ def performance_snapshot(
         "draft_recent": len(drafts),
         "failed_recent": len(failures),
         "converted_recent": converted_count,
+        "follow_up_count": follow_up_count,
         "conversion_rate_pct": conversion_rate,
         "converted_listings": list(converted_by_client.values()),
         "next_action": next_action,
@@ -179,6 +264,7 @@ def client_history(client_id: int, *, days: int = 90) -> dict[str, Any]:
     )
     latest_sent = next((row["created_at"] for row in rows if row["action"] == ACTION_SENT), None)
     conversion = None
+    days_since_sent = _days_since_timestamp(latest_sent)
     if latest_sent:
         conversion = db.one(
             """SELECT id, title, created_at FROM listings
@@ -189,8 +275,16 @@ def client_history(client_id: int, *, days: int = 90) -> dict[str, Any]:
     return {
         "events": rows,
         "latest_sent_at": latest_sent,
+        "days_since_sent": days_since_sent,
         "draft_count": sum(1 for row in rows if row["action"] == ACTION_DRAFT),
         "failed_count": sum(1 for row in rows if row["action"] == ACTION_FAILED),
+        "follow_up_due": bool(
+            latest_sent
+            and not conversion
+            and days_since_sent is not None
+            and days_since_sent >= FOLLOW_UP_DAYS
+        ),
+        "can_send_again": bool(latest_sent and not recent_sent_at(client_id)),
         "converted_listing": {
             "id": conversion["id"],
             "title": conversion["title"],

@@ -52,6 +52,10 @@
         <span class="pipeline-count">{{ rebooking_summary.converted_recent }}</span>
         <span class="pipeline-label">Converted</span>
       </div>
+      <div class="pipeline-card {% if rebooking_summary.follow_up_count %}has-items{% endif %}">
+        <span class="pipeline-count">{{ rebooking_summary.follow_up_count }}</span>
+        <span class="pipeline-label">Follow-ups</span>
+      </div>
       <div class="pipeline-card {% if rebooking_summary.at_risk_paid_cents %}has-items{% endif %}">
         <span class="pipeline-count">{{ rebooking_summary.at_risk_paid_display }}</span>
         <span class="pipeline-label">Prior value</span>
@@ -63,6 +67,25 @@
       {% for c in rebooking_summary.converted_listings[:3] %}
       <li><a href="{{ c.listing_href }}">{{ c.listing_title }}</a>
         <span class="muted">booked after outreach to {{ c.client_name }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if rebooking_followups %}
+    <ul class="due-list rebooking-list">
+      {% for f in rebooking_followups %}
+      <li>
+        <a href="{{ f.client_href }}"><strong>{{ f.name }}</strong></a>
+        {% if f.company %}<span class="muted"> · {{ f.company }}</span>{% endif %}
+        <span class="badge badge-{{ f.priority_key }}">{{ f.next_action }}</span>
+        <span class="muted">{{ f.reason_line }}</span>
+        <a href="{{ f.client_href }}" class="rebooking-action">Open client</a>
+        {% if f.can_send_again and f.email %}
+        <form method="post" action="/admin/rebooking/{{ f.id }}/send" class="inline-form rebooking-inline">
+          <input type="hidden" name="redirect" value="/admin">
+          <button type="submit" class="link">{{ "Send second touch" if rebooking_mailer_on else "Draft second touch" }}</button>
+        </form>
+        {% endif %}
+      </li>
       {% endfor %}
     </ul>
     {% endif %}

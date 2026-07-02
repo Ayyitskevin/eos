@@ -38,6 +38,17 @@ def _paid_invoice(listing_id: int, client_id: int, amount_cents: int) -> int:
     return invoice_id
 
 
+def _age_rebooking_sent(client_id: int, days: int) -> None:
+    db.run(
+        "UPDATE audit_log SET created_at=datetime('now', ?) WHERE action=? AND detail LIKE ?",
+        (f"-{days} days", rebooking.ACTION_SENT, f"client_id={client_id};%"),
+    )
+    db.run(
+        "UPDATE emails_log SET sent_at=datetime('now', ?) WHERE doc_kind='rebooking' AND doc_id=? AND studio_id=?",
+        (f"-{days} days", client_id, "default"),
+    )
+
+
 def test_rebooking_opportunities_rank_value_and_scope_by_studio(app_env):
     tenant.set_studio("default")
     warm_id = clients.create_client("Warm Agent", email="warm@example.com", client_type="agent")
@@ -201,6 +212,64 @@ def test_rebooking_client_history_surfaces_conversion(app_env, monkeypatch):
     assert history["converted_listing"]["title"] == "History new listing"
 
 
+def test_rebooking_follow_up_queue_lists_unconverted_old_sends(app_env, monkeypatch):
+    tenant.set_studio("default")
+    due_id = clients.create_client("Due Agent", email="due@example.com", client_type="agent")
+    converted_id = clients.create_client(
+        "Converted Followup", email="converted-followup@example.com", client_type="agent"
+    )
+    fresh_id = clients.create_client("Fresh Agent", email="fresh@example.com", client_type="agent")
+    for client_id, title in (
+        (due_id, "Due old listing"),
+        (converted_id, "Converted followup old listing"),
+        (fresh_id, "Fresh old listing"),
+    ):
+        _delivered_listing(client_id, title)
+
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    for client_id in (due_id, converted_id, fresh_id):
+        assert rebooking.send_email(client_id)["status"] == "sent"
+    _age_rebooking_sent(due_id, 8)
+    _age_rebooking_sent(converted_id, 8)
+    _age_rebooking_sent(fresh_id, 3)
+    listings.create_listing("Converted followup new", client_id=converted_id, seed_defaults=False)
+
+    db.run("INSERT INTO studio (id, name, slug) VALUES ('other', 'Other', 'other')")
+    other_id = db.run(
+        """INSERT INTO clients (studio_id, client_type, name, email)
+           VALUES ('other', 'agent', 'Other Followup', 'other-followup@example.com')"""
+    )
+    db.run(
+        """INSERT INTO audit_log (studio_id, actor, action, detail, created_at)
+           VALUES ('other', 'admin', ?, ?, datetime('now', '-12 days'))""",
+        (rebooking.ACTION_SENT, f"client_id={other_id}; email=other-followup@example.com;"),
+    )
+
+    queue = rebooking.follow_up_queue()
+
+    assert [item["id"] for item in queue] == [due_id]
+    assert queue[0]["days_waiting"] >= 7
+    assert queue[0]["can_send_again"] is False
+    assert queue[0]["next_action"] == "Manual check-in"
+
+
+def test_rebooking_follow_up_queue_allows_second_touch_after_cooldown(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Second Touch Agent", email="second@example.com")
+    _delivered_listing(agent_id, "Second old listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    rebooking.send_email(agent_id)
+    _age_rebooking_sent(agent_id, 16)
+
+    queue = rebooking.follow_up_queue()
+
+    assert queue[0]["id"] == agent_id
+    assert queue[0]["can_send_again"] is True
+    assert queue[0]["next_action"] == "Send second touch"
+
+
 @pytest.mark.asyncio
 async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
     tenant.set_studio("default")
@@ -228,6 +297,31 @@ async def test_dashboard_rebooking_cockpit_and_listing_preselect(app_env):
         )
         assert form.status_code == 200
         assert f'<option value="{agent_id}" selected>' in form.text
+
+
+@pytest.mark.asyncio
+async def test_dashboard_shows_rebooking_follow_up_queue(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Followup Agent", email="followup@example.com")
+    _delivered_listing(agent_id, "Followup old listing")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    rebooking.send_email(agent_id)
+    _age_rebooking_sent(agent_id, 8)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+
+        dashboard = await client.get("/admin", headers={"cookie": cookie})
+
+    assert dashboard.status_code == 200
+    assert "Follow-ups" in dashboard.text
+    assert "Manual check-in" in dashboard.text
+    assert "Followup Agent" in dashboard.text
 
 
 @pytest.mark.asyncio
@@ -321,3 +415,27 @@ async def test_client_detail_shows_rebooking_conversion(app_env, monkeypatch):
     assert page.status_code == 200
     assert "Rebooking outreach" in page.text
     assert "Converted detail new" in page.text
+
+
+@pytest.mark.asyncio
+async def test_client_detail_shows_rebooking_follow_up_due(app_env, monkeypatch):
+    tenant.set_studio("default")
+    agent_id = clients.create_client("Due Detail Agent", email="due-detail@example.com")
+    _delivered_listing(agent_id, "Due detail old")
+    monkeypatch.setattr(rebooking.mailer, "configured", lambda: True)
+    monkeypatch.setattr(rebooking.mailer, "send_for_studio", lambda to, subject, body: None)
+    rebooking.send_email(agent_id)
+    _age_rebooking_sent(agent_id, 8)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+
+        page = await client.get(f"/admin/clients/{agent_id}", headers={"cookie": cookie})
+
+    assert page.status_code == 200
+    assert "Follow-up due" in page.text
+    assert "days ago with no new listing yet" in page.text
