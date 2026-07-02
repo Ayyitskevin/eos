@@ -695,6 +695,57 @@ def test_acquisition_intro_email_drafts_and_requires_current_studio_agent(app_en
         acquisition.build_intro_email(other_id)
 
 
+def test_acquisition_queue_filters_and_bulk_send_reuse_cooldown(app_env, monkeypatch):
+    _seed_acquisition_report()
+    sent: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: True)
+    monkeypatch.setattr(
+        acquisition.mailer,
+        "send_for_studio",
+        lambda to, subject, body: sent.append((to, subject, body)),
+    )
+
+    data = acquisition.dashboard()
+    filter_counts = {row["key"]: row["count"] for row in data["queue_filters"]}
+    assert filter_counts == {
+        "all": 2,
+        "needs_code": 1,
+        "needs_intro": 1,
+        "ready": 2,
+        "cooldown": 0,
+    }
+    assert [
+        row["name"] for row in acquisition.dashboard(queue_filter="needs_code")["intro_asks"]
+    ] == ["No Code Agent"]
+    assert [
+        row["name"] for row in acquisition.dashboard(queue_filter="needs_intro")["intro_asks"]
+    ] == ["Zero Use Agent"]
+
+    result = acquisition.bulk_send_intro_emails(queue_filter="ready")
+    second = acquisition.bulk_send_intro_emails(queue_filter="all")
+
+    assert result["sent"] == 2
+    assert result["draft"] == 0
+    assert result["skipped"] == 0
+    assert len(sent) == 2
+    assert second["cooldown"] == 2
+    assert second["sent"] == 0
+    assert acquisition.dashboard(queue_filter="ready")["intro_asks"] == []
+    assert {
+        row["name"] for row in acquisition.dashboard(queue_filter="cooldown")["intro_asks"]
+    } == {
+        "No Code Agent",
+        "Zero Use Agent",
+    }
+    assert (
+        db.one(
+            "SELECT COUNT(*) AS n FROM emails_log WHERE studio_id=? AND doc_kind='acquisition_intro'",
+            ("default",),
+        )["n"]
+        == 2
+    )
+
+
 @pytest.mark.asyncio
 async def test_acquisition_dashboard_and_csv_routes(app_env):
     _seed_acquisition_report()
@@ -714,6 +765,9 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "REF25" in r.text
         assert "$300" in r.text
         assert "Draft intro ask" in r.text
+        assert "Needs code (1)" in r.text
+        assert "Needs intro (1)" in r.text
+        assert "Ready (2)" in r.text
 
         export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
         assert export.status_code == 200
@@ -722,6 +776,42 @@ async def test_acquisition_dashboard_and_csv_routes(app_env):
         assert "Referral codes" in export.text
         assert "REF25,Referrer Agent,Good Realty,referrer@example.com,1" in export.text
         assert "Agent referral summary" in export.text
+
+
+@pytest.mark.asyncio
+async def test_acquisition_bulk_route_drafts_visible_queue(app_env, monkeypatch):
+    _seed_acquisition_report()
+    monkeypatch.setattr(acquisition.mailer, "configured", lambda: False)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
+        )
+        cookie = login.headers["set-cookie"]
+        bulk = await client.post(
+            "/admin/reports/acquisition/bulk-send",
+            data={"queue_filter": "ready"},
+            headers={"cookie": cookie},
+            follow_redirects=False,
+        )
+        assert bulk.status_code == 303
+        assert "acquisition=bulk" in bulk.headers["location"]
+        assert "draft=2" in bulk.headers["location"]
+
+        page = await client.get(bulk.headers["location"], headers={"cookie": cookie})
+
+    assert page.status_code == 200
+    assert "Bulk intro ask complete" in page.text
+    assert "2 drafted" in page.text
+    assert db.one("SELECT 1 FROM emails_log WHERE doc_kind='acquisition_intro'") is None
+    assert (
+        db.one(
+            "SELECT COUNT(*) AS n FROM audit_log WHERE studio_id=? AND action=?",
+            ("default", acquisition.ACTION_DRAFT),
+        )["n"]
+        == 2
+    )
 
 
 @pytest.mark.asyncio

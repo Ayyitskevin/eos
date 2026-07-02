@@ -18,7 +18,7 @@ Studios get `{slug}.yourdomain.com`, branded booking and delivery, agent portals
 - **Signup & subdomain** — 14-day trial, Starter/Pro plans, billing enforcement
 - **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow
 - **Pipeline** — listing tasks, Kanban, calendar, photographer assignment
-- **Retention** — agent rebooking cockpit, brokerage portfolio dashboard/portal, revenue optimizer, acquisition tracking with intro emails and per-agent referral summaries, follow-up queue, and repeat-agent reports
+- **Retention** — agent rebooking cockpit, brokerage portfolio dashboard/portal, revenue optimizer, filtered acquisition tracking with intro emails and per-agent referral summaries, follow-up queue, and repeat-agent reports
 - **Delivery** — PIN galleries, property sites, agent portal, MLS/Zillow crops
 - **Payments** — Connect onboarding at `/admin/stripe/connect`
 - **Integrations** — Google Calendar, Dropbox ingest, API v1, webhooks

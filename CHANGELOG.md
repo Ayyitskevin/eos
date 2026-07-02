@@ -15,6 +15,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Agent acquisition report tracks referral code performance, referred listing value, and high-value agents ready for an intro ask.
 - Acquisition queue adds one-click referral introduction emails with draft fallback and cooldown tracking.
 - Studio settings now summarize per-agent referral performance and acquisition CSV exports include referrer/contact outreach fields.
+- Acquisition queue filters and bulk intro-send/draft actions help studios work high-value referral asks faster.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)

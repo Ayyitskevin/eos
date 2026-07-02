@@ -27,6 +27,11 @@ def _with_acquisition_notice(path: str, *, status: str, client_id: int) -> str:
     return f"{path}{sep}{urlencode({'acquisition': status, 'client_id': client_id})}"
 
 
+def _query_int(request: Request, key: str) -> int:
+    raw = request.query_params.get(key, "0")
+    return int(raw) if raw.isdigit() else 0
+
+
 @router.get("/reports", response_class=HTMLResponse)
 async def reports_dashboard(request: Request):
     return templates.TemplateResponse(
@@ -113,7 +118,8 @@ async def revenue_optimizer_csv(_: None = Depends(security.require_admin)):
 
 @router.get("/reports/acquisition", response_class=HTMLResponse)
 async def acquisition_dashboard(request: Request):
-    data = acquisition.dashboard()
+    queue_filter = acquisition.normalize_queue_filter(request.query_params.get("queue"))
+    data = acquisition.dashboard(queue_filter=queue_filter)
     notice = request.query_params.get("acquisition")
     draft = None
     raw_client_id = request.query_params.get("client_id", "")
@@ -127,6 +133,15 @@ async def acquisition_dashboard(request: Request):
             "acquisition_notice": notice,
             "acquisition_draft": draft,
             "acquisition_mailer_on": mailer.configured(),
+            "acquisition_bulk": {
+                "sent": _query_int(request, "sent"),
+                "draft": _query_int(request, "draft"),
+                "cooldown": _query_int(request, "cooldown"),
+                "skipped": _query_int(request, "skipped"),
+                "failed": _query_int(request, "failed"),
+            }
+            if notice == "bulk"
+            else None,
         }
     )
     return templates.TemplateResponse(
@@ -145,6 +160,26 @@ async def acquisition_intro_send(
     target = _safe_admin_redirect(redirect)
     return RedirectResponse(
         _with_acquisition_notice(target, status=result["status"], client_id=client_id),
+        status_code=303,
+    )
+
+
+@router.post("/reports/acquisition/bulk-send")
+async def acquisition_intro_bulk_send(queue_filter: str = Form("ready")):
+    result = acquisition.bulk_send_intro_emails(queue_filter=queue_filter)
+    return RedirectResponse(
+        "/admin/reports/acquisition?"
+        + urlencode(
+            {
+                "queue": str(result["queue_filter"]),
+                "acquisition": "bulk",
+                "sent": str(result["sent"]),
+                "draft": str(result["draft"]),
+                "cooldown": str(result["cooldown"]),
+                "skipped": str(result["skipped"]),
+                "failed": str(result["failed"]),
+            }
+        ),
         status_code=303,
     )
 

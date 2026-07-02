@@ -14,6 +14,13 @@ COOLDOWN_DAYS = 14
 ACTION_SENT = "acquisition.intro.sent"
 ACTION_DRAFT = "acquisition.intro.draft"
 ACTION_FAILED = "acquisition.intro.failed"
+QUEUE_FILTERS = {
+    "all": "All",
+    "needs_code": "Needs code",
+    "needs_intro": "Needs intro",
+    "ready": "Ready",
+    "cooldown": "Cooldown",
+}
 
 
 def _money(cents: int) -> str:
@@ -287,6 +294,37 @@ def intro_ask_queue(limit: int = 12) -> list[dict]:
     return out
 
 
+def normalize_queue_filter(queue_filter: str | None) -> str:
+    value = (queue_filter or "all").strip().lower()
+    return value if value in QUEUE_FILTERS else "all"
+
+
+def filter_intro_asks(asks: list[dict], queue_filter: str | None) -> list[dict]:
+    selected = normalize_queue_filter(queue_filter)
+    if selected == "needs_code":
+        return [row for row in asks if row["n_active_codes"] == 0]
+    if selected == "needs_intro":
+        return [row for row in asks if row["n_active_codes"] > 0 and row["referral_uses"] == 0]
+    if selected == "ready":
+        return [row for row in asks if row["can_email_intro"]]
+    if selected == "cooldown":
+        return [row for row in asks if row["cooldown_active"]]
+    return asks
+
+
+def queue_filter_options(asks: list[dict], selected: str | None) -> list[dict[str, Any]]:
+    current = normalize_queue_filter(selected)
+    return [
+        {
+            "key": key,
+            "label": label,
+            "count": len(filter_intro_asks(asks, key)),
+            "active": key == current,
+        }
+        for key, label in QUEUE_FILTERS.items()
+    ]
+
+
 def _suggested_code(name: str) -> str:
     letters = "".join(ch for ch in name.upper() if ch.isalnum())
     return f"{letters[:8] or 'AGENT'}25"
@@ -377,6 +415,34 @@ def send_intro_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> d
     )
     db.audit("admin", ACTION_SENT, _detail(client_id, str(draft["to"]), str(draft["subject"])))
     return {"status": "sent", "draft": draft}
+
+
+def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> dict[str, int | str]:
+    selected = normalize_queue_filter(queue_filter)
+    candidates = filter_intro_asks(intro_ask_queue(limit=limit), selected)
+    result: dict[str, int | str] = {
+        "queue_filter": selected,
+        "candidates": len(candidates),
+        "sent": 0,
+        "draft": 0,
+        "cooldown": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+    for row in candidates:
+        if not row["email"]:
+            result["skipped"] += 1
+            continue
+        try:
+            status = send_intro_email(row["id"])["status"]
+        except HTTPException:
+            result["failed"] += 1
+            continue
+        if status in {"sent", "draft", "cooldown"}:
+            result[status] += 1
+        else:
+            result["skipped"] += 1
+    return result
 
 
 def _intro_status(client_id: int, email: str | None) -> dict[str, Any]:
@@ -482,13 +548,18 @@ def summary(referrals: list[dict] | None = None, asks: list[dict] | None = None)
     }
 
 
-def dashboard() -> dict:
+def dashboard(*, queue_filter: str = "all") -> dict:
     referrals = referral_performance()
-    asks = intro_ask_queue()
+    all_asks = intro_ask_queue()
+    selected = normalize_queue_filter(queue_filter)
+    asks = filter_intro_asks(all_asks, selected)
     return {
-        "summary": summary(referrals, asks),
+        "summary": summary(referrals, all_asks),
         "referrals": referrals,
         "intro_asks": asks,
+        "all_intro_asks": all_asks,
+        "queue_filter": selected,
+        "queue_filters": queue_filter_options(all_asks, selected),
         "agent_referrals": agent_referral_summary(referrals),
     }
 
