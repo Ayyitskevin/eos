@@ -1,12 +1,12 @@
-"""Serve gallery derivatives — admin (open) and public (PIN cookie)."""
+"""Serve gallery derivatives — admin (authenticated) and public (PIN cookie)."""
 
 import mimetypes
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 
-from .. import db, imaging, paywall, security
+from .. import db, galleries, imaging, paywall, security
 from ..galleries import get_gallery_by_slug
 
 router = APIRouter()
@@ -28,7 +28,13 @@ def _asset_path(gallery_id: int, asset, variant: str) -> Path:
 
 
 @router.get("/admin/galleries/{gallery_id}/media/{variant}/{asset_id}")
-async def admin_media(gallery_id: int, variant: str, asset_id: int):
+async def admin_media(
+    gallery_id: int,
+    variant: str,
+    asset_id: int,
+    _: None = Depends(security.require_admin),
+):
+    galleries.get_gallery(gallery_id)
     if variant not in VARIANTS - {"export"}:
         raise HTTPException(status_code=404)
     a = db.one(
@@ -51,10 +57,10 @@ async def public_media(request: Request, slug: str, variant: str, asset_id: int)
     if variant not in ("thumb", "web", "original"):
         raise HTTPException(status_code=404)
     g = get_gallery_by_slug(slug)
-    if not g["published"]:
-        raise HTTPException(status_code=404)
-    if not security.gallery_unlocked(request, g["id"]):
-        raise HTTPException(status_code=403)
+    galleries.require_public_access(request, g)
+    payment_locked = paywall.payment_required(g["listing_id"])
+    if variant == "original" and payment_locked:
+        raise HTTPException(status_code=402, detail="payment required")
     a = db.one(
         "SELECT * FROM assets WHERE id=? AND gallery_id=? AND status='ready'",
         (asset_id, g["id"]),
@@ -74,7 +80,7 @@ async def public_media(request: Request, slug: str, variant: str, asset_id: int)
     path = _asset_path(g["id"], a, variant)
     if not path.is_file():
         raise HTTPException(status_code=404)
-    if paywall.payment_required(g["listing_id"]) and paywall.watermark_previews():
+    if payment_locked and paywall.watermark_previews():
         data = imaging.apply_preview_watermark(path)
         return Response(
             content=data, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"}

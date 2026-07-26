@@ -11,13 +11,15 @@
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if referral_context %}
   <p class="alert-banner ok">
-    Referral code <strong>{{ referral_context.code }}</strong> applied{% if referral_context.referrer_name %} from {{ referral_context.referrer_name }}{% endif %}.
+    Referral code <strong>{{ referral_context.code }}</strong> applied.
     {{ referral_context.credit_display }} credit will be applied at checkout.
   </p>
   {% endif %}
   {% if not slots %}<p class="muted">Online scheduling is temporarily unavailable — contact us directly.</p>{% endif %}
 
   <form method="post" action="/book" class="form-grid card">
+    <input type="hidden" name="request_key" value="{{ request_key }}">
+    <input type="hidden" name="returning_token" value="{{ returning_token }}">
     <h2>Package</h2>
     {% for p in packages %}
     <label class="radio-card">
@@ -37,9 +39,9 @@
     {% endif %}
 
     <h2>Property &amp; contact</h2>
-    <label>Name <input name="name" required></label>
-    <label>Email <input name="email" type="email" required></label>
-    <label>Phone <input name="phone" type="tel"></label>
+    <label>Name <input name="name" value="{{ returning_client.name if returning_client else '' }}" required></label>
+    <label>Email <input name="email" type="email" value="{{ returning_client.email if returning_client else '' }}" required></label>
+    <label>Phone <input name="phone" type="tel" value="{{ returning_client.phone if returning_client else '' }}"></label>
     <label>Property address <input name="property_address" required placeholder="123 Oak St, Austin TX"></label>
     <label>Square feet <input name="sqft" type="number" min="0" placeholder="Optional"></label>
     <label>Promo code <input name="promo_code" value="{{ promo_code }}" placeholder="Optional"></label>
@@ -72,7 +74,7 @@
 
     <h2>Agreement</h2>
     <p class="muted small">{{ terms }}</p>
-    <label>Type your full name to sign <input name="signer_name" required placeholder="Jane Agent"></label>
+    <label>Type your full name to sign <input name="signer_name" value="{{ returning_client.name if returning_client else '' }}" required placeholder="Jane Agent"></label>
 
     <button type="submit" class="btn btn-accent" {% if not slots %}disabled{% endif %}>
       {% if payments_on %}Book &amp; pay deposit{% else %}Confirm booking{% endif %}

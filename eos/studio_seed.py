@@ -28,6 +28,11 @@ def seed_studio(studio_id: str) -> None:
         ),
     ]
     for name, desc, price, deposit, hours, pos in packages:
+        if db.one(
+            "SELECT 1 AS x FROM service_packages WHERE studio_id=? AND name=?",
+            (studio_id, name),
+        ):
+            continue
         db.run(
             """INSERT INTO service_packages
                (studio_id, name, description, price_cents, deposit_cents, turnaround_hours, position)
@@ -42,7 +47,7 @@ def seed_studio(studio_id: str) -> None:
     ]
     for slug, name, price, pos in addons:
         db.run(
-            """INSERT INTO service_addons (studio_id, slug, name, price_cents, position)
+            """INSERT OR IGNORE INTO service_addons (studio_id, slug, name, price_cents, position)
                VALUES (?,?,?,?,?)""",
             (studio_id, slug, name, price, pos),
         )
@@ -53,7 +58,7 @@ def seed_studio(studio_id: str) -> None:
     ]
     for slug, name, ratio, w, h, channel, sort in presets:
         db.run(
-            """INSERT INTO crop_presets
+            """INSERT OR IGNORE INTO crop_presets
                (studio_id, slug, name, ratio_label, width, height, target_channel, sort)
                VALUES (?,?,?,?,?,?,?,?)""",
             (studio_id, slug, name, ratio, w, h, channel, sort),
@@ -90,6 +95,12 @@ PIN: {gallery_pin}
 
 Let me know if you need any MLS sizing tweaks.
 
+Ready for the next listing? Book here:
+{rebook_link}
+
+Know an agent who needs photos? Share your referral link:
+{referral_link}
+
 Thank you!
 {site_name}""",
             20,
@@ -114,7 +125,7 @@ Happy to adjust the package if needed.
     ]
     for slug, name, trigger, delay, subject, body, pos in sequences:
         db.run(
-            """INSERT INTO email_sequences
+            """INSERT OR IGNORE INTO email_sequences
                (studio_id, slug, name, trigger_event, delay_hours, subject, body_template, position)
                VALUES (?,?,?,?,?,?,?,?)""",
             (studio_id, slug, name, trigger, delay, subject, body, pos),

@@ -58,6 +58,7 @@ async def test_contract_sign_flow(app_env):
         page = await client.get(f"/c/{slug}")
         assert page.status_code == 200
         assert "Sign agreement" in page.text
+        assert page.headers["cache-control"] == "private, no-store"
 
         sign = await client.post(
             f"/c/{slug}/sign", data={"signer_name": "Jane Agent"}, follow_redirects=False

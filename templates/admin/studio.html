@@ -142,10 +142,61 @@
   </section>
   {% endif %}
 
+  <section class="card" id="operations">
+    <h2>Operator recovery</h2>
+    {% if request.query_params.get("expired_holds") is not none %}
+    <p class="alert-banner">Released {{ request.query_params.get("expired_holds") }} expired payment hold(s).</p>
+    {% endif %}
+
+    <h3>Pending payment holds</h3>
+    {% if pending_payment_holds %}
+    <table class="list compact">
+      <tr><th>Client</th><th>Property</th><th>Shoot</th><th>Payment expires</th><th>Reconciliation</th></tr>
+      {% for hold in pending_payment_holds %}
+      <tr>
+        <td>{{ hold.name }}</td>
+        <td>{{ hold.property_address or "—" }}</td>
+        <td>{{ hold.scheduled_at[:16] if hold.scheduled_at else "—" }}</td>
+        <td>{{ hold.payment_expires_at[:16] if hold.payment_expires_at else "Not set" }}</td>
+        <td>Attempts: {{ hold.payment_reconcile_attempts }}{% if hold.payment_reconcile_error %}<br><span class="error">{{ hold.payment_reconcile_error[:100] }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <form method="post" action="/admin/studio/pending-bookings/expire" class="inline-form">
+      <button type="submit">Release expired holds</button>
+    </form>
+    <p class="muted small">Only unpaid holds past their recorded expiry are released.</p>
+    {% else %}
+    <p class="muted">No pending payment holds.</p>
+    {% endif %}
+
+    <h3>Failed background jobs</h3>
+    {% if failed_jobs %}
+    <table class="list compact">
+      <tr><th>When</th><th>Job</th><th>Attempts</th><th>Error</th><th></th></tr>
+      {% for job in failed_jobs %}
+      <tr>
+        <td>{{ (job.updated_at or job.created_at)[:16] }}</td>
+        <td><code>{{ job.kind }}</code></td>
+        <td>{{ job.attempts }}</td>
+        <td class="error">{{ (job.error or "Unknown failure")[:100] }}</td>
+        <td>
+          <form method="post" action="/admin/studio/jobs/{{ job.id }}/retry" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No failed background jobs for this studio.</p>
+    {% endif %}
+  </section>
+
   <section class="card" id="integrations">
     <h2>Integrations &amp; growth</h2>
-    {% if request.query_params.get('token') %}
-    <p class="alert-banner">New API token (copy now — shown once): <code>{{ request.query_params.get('token') }}</code></p>
+    {% if new_api_token %}
+    <p class="alert-banner">New API token (copy now — shown once): <code>{{ new_api_token }}</code></p>
     {% endif %}
     <h3>API tokens</h3>
     <p class="muted small">Bearer auth for <code>/api/v1/*</code> — use with Zapier or custom scripts.</p>
@@ -166,6 +217,9 @@
     </form>
 
     <h3>Webhooks</h3>
+    {% if new_webhook_secret %}
+    <p class="alert-banner">New webhook signing secret (copy now — shown once): <code>{{ new_webhook_secret }}</code></p>
+    {% endif %}
     {% if webhooks %}
     <ul class="pkg-list">
       {% for w in webhooks %}
@@ -182,6 +236,102 @@
       <label>HTTPS URL <input name="url" required placeholder="https://hooks.zapier.com/…"></label>
       <button type="submit">Add webhook</button>
     </form>
+
+    {% if webhook_deliveries %}
+    <h4>Recent webhook deliveries</h4>
+    <table class="list compact">
+      <tr><th>When</th><th>Webhook</th><th>Event</th><th>Status</th><th>Attempts</th><th></th></tr>
+      {% for d in webhook_deliveries %}
+      <tr>
+        <td>{{ d.created_at[:16] }}</td>
+        <td>{{ d.subscription_label or "Removed webhook" }}</td>
+        <td><code>{{ d.event }}</code></td>
+        <td>{% if d.status == 'failed' %}<span class="error">failed{% if d.error %}: {{ d.error[:80] }}{% endif %}</span>{% else %}{{ d.status }}{% endif %}</td>
+        <td>{{ d.attempts }}</td>
+        <td>{% if d.status == 'failed' %}
+          {% if d.reconcile_ready %}
+          <form method="post" action="/admin/studio/webhook-deliveries/{{ d.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="delivered">
+            <button type="submit" class="link">Endpoint confirms delivered</button>
+          </form>
+          <form method="post" action="/admin/studio/webhook-deliveries/{{ d.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="not_delivered">
+            <button type="submit" class="link">Endpoint confirms not delivered</button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/studio/webhook-deliveries/{{ d.id }}/retry" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>
+          {% endif %}
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if delivery_notifications %}
+    <h4>Gallery delivery notifications</h4>
+    <table class="list compact">
+      <tr><th>When</th><th>Gallery</th><th>To</th><th>Status</th><th>Attempts</th><th></th></tr>
+      {% for n in delivery_notifications %}
+      <tr>
+        <td>{{ n.created_at[:16] }}</td>
+        <td>{{ n.gallery_title or n.listing_title or "Gallery" }}</td>
+        <td>{{ n.to_email or "—" }}</td>
+        <td>{% if n.status == 'failed' %}<span class="error">failed{% if n.error %}: {{ n.error[:80] }}{% endif %}</span>{% else %}{{ n.status }}{% endif %}</td>
+        <td>{{ n.attempts }}</td>
+        <td>{% if n.status == 'failed' %}
+          {% if n.reconcile_ready %}
+          <form method="post" action="/admin/studio/delivery-notifications/{{ n.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="delivered">
+            <button type="submit" class="link">Provider confirms delivered</button>
+          </form>
+          <form method="post" action="/admin/studio/delivery-notifications/{{ n.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="not_delivered">
+            <button type="submit" class="link">Provider confirms not delivered</button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/studio/delivery-notifications/{{ n.id }}/retry" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>
+          {% endif %}
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if sms_reminders %}
+    <h4>Shoot-day SMS reminders</h4>
+    <p class="muted small">Failed or interrupted sends require a Twilio check before retrying.</p>
+    <table class="list compact">
+      <tr><th>When</th><th>Shoot</th><th>Client</th><th>Status</th><th></th></tr>
+      {% for r in sms_reminders %}
+      <tr>
+        <td>{{ r.reminder_date }}</td>
+        <td>{{ r.title }}</td>
+        <td>{{ r.client_name or r.phone or "—" }}</td>
+        <td>{{ r.status }}{% if r.error %}: {{ r.error[:80] }}{% endif %}</td>
+        <td>{% if r.status == "failed" %}
+          {% if r.reconcile_ready %}
+          <form method="post" action="/admin/studio/sms-reminders/{{ r.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="delivered">
+            <button type="submit" class="link">Twilio confirms delivered</button>
+          </form>
+          <form method="post" action="/admin/studio/sms-reminders/{{ r.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="not_delivered">
+            <button type="submit" class="link">Twilio confirms not delivered</button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/studio/sms-reminders/{{ r.id }}/retry" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>
+          {% endif %}
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
 
     <h3>Referral codes</h3>
     {% if referrals %}
@@ -227,7 +377,7 @@
     <p class="muted small">SaaS signup is on — new studios at <code>https://{{ base_domain }}/signup</code></p>
     {% endif %}
 
-    <h3>Google Calendar</h3>
+    <h3 id="google-calendar">Google Calendar</h3>
     {% if request.query_params.get('oauth_error') == 'google' %}
     <p class="alert-banner">Google connection failed — try again.</p>
     {% endif %}
@@ -248,6 +398,35 @@
     {% else %}
     <p class="muted small">2-way sync — Eos appointments push to Google; external events block booking slots.</p>
     <a href="/admin/integrations/google/connect" class="btn">Connect Google Calendar</a>
+    {% endif %}
+
+    {% if google_sync_intents %}
+    <h4>Google sync operations</h4>
+    <p class="muted small">Recovery controls never contact Google. Check the provider event ID in Google Calendar first, then record the result here. Fresh claims remain locked to avoid racing an active sync.</p>
+    <table class="list compact">
+      <tr><th>Appointment</th><th>Provider event</th><th>Operation</th><th>Rev</th><th>Status</th><th>Attempts</th><th>Error</th><th>Recovery</th></tr>
+      {% for intent in google_sync_intents %}
+      <tr>
+        <td>{{ intent.appointment_title }} <span class="muted">#{{ intent.appointment_id }}{% if intent.starts_at %} · {{ intent.starts_at[:16] }}{% endif %}</span></td>
+        <td><code>{{ intent.event_id }}</code></td>
+        <td>{{ intent.desired_action }}</td>
+        <td>{{ intent.revision }}</td>
+        <td>{{ intent.status }}</td>
+        <td>{{ intent.attempts }}</td>
+        <td>{% if intent.last_error %}<span class="error">{{ intent.last_error[:120] }}</span>{% else %}—{% endif %}</td>
+        <td>
+          {% if intent.status == 'unknown' and intent.reconcile_ready %}
+          <form method="post" action="/admin/studio/google-intents/{{ intent.appointment_id }}/reconcile" class="inline-form">
+            <button type="submit" class="link" name="outcome" value="applied">Provider shows applied</button>
+            <button type="submit" class="link" name="outcome" value="not_applied">Provider shows not applied</button>
+          </form>
+          {% elif intent.status == 'unknown' %}
+          <span class="muted small">Active claim window</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
     {% endif %}
 
     <h3>Dropbox ingest</h3>
@@ -272,14 +451,24 @@
     <form method="post" action="/admin/integrations/dropbox/disconnect" class="inline-form">
       <button type="submit" class="link">Disconnect Dropbox</button>
     </form>
+    {% else %}
+    <p class="muted small">Watch a Dropbox folder — drop RAWs/JPEGs and they appear in the matching listing gallery.</p>
+    <a href="/admin/integrations/dropbox/connect" class="btn">Connect Dropbox</a>
+    {% endif %}
+
     {% if dropbox_log %}
+    <h4>Dropbox ingest operations</h4>
     <table class="list compact">
-      <tr><th>When</th><th>Path</th><th>Status</th><th></th></tr>
+      <tr><th>When</th><th>Path</th><th>File ID</th><th>Revision</th><th>Status</th><th>Attempts</th><th>Error</th><th></th></tr>
       {% for row in dropbox_log %}
       <tr>
         <td>{{ row.created_at[:16] }}</td>
         <td class="muted">{{ row.dropbox_path }}</td>
-        <td>{{ row.status }}{% if row.error %} — {{ row.error }}{% endif %}</td>
+        <td>{% if row.provider_file_id %}<code>{{ row.provider_file_id }}</code>{% else %}—{% endif %}</td>
+        <td>{% if row.provider_revision %}<code>{{ row.provider_revision }}</code>{% else %}—{% endif %}</td>
+        <td>{{ row.status }}</td>
+        <td>{{ row.attempts }}</td>
+        <td>{% if row.error %}<span class="error">{{ row.error[:120] }}</span>{% else %}—{% endif %}</td>
         <td>{% if row.status == 'failed' %}
           <form method="post" action="/admin/integrations/dropbox/retry/{{ row.id }}" class="inline-form">
             <button type="submit" class="link">Retry</button>
@@ -287,10 +476,6 @@
       </tr>
       {% endfor %}
     </table>
-    {% endif %}
-    {% else %}
-    <p class="muted small">Watch a Dropbox folder — drop RAWs/JPEGs and they appear in the matching listing gallery.</p>
-    <a href="/admin/integrations/dropbox/connect" class="btn">Connect Dropbox</a>
     {% endif %}
 
     {% if integration_events %}

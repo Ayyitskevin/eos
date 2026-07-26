@@ -52,13 +52,11 @@ def test_drive_time_haversine():
 
 
 def test_quickbooks_export_empty(app_env):
-    tenant.set_studio("default")
     csv_body = reports_export.quickbooks_csv()
     assert "Date,Name,Memo,Amount" in csv_body
 
 
 def test_ai_cull_job(app_env):
-    tenant.set_studio("default")
     lid = db.run("INSERT INTO listings (studio_id, title) VALUES ('default', 'Cull')")
     gid = db.run(
         "INSERT INTO galleries (studio_id, listing_id, slug, title, pin, delivery_token) VALUES ('default', ?, 'cull-g', 'G', '1111', 'dt-cull')",
@@ -81,8 +79,14 @@ def test_ai_cull_job(app_env):
 
 @pytest.mark.asyncio
 async def test_homeowner_booking_page(app_env):
+    tenant.set_studio("default")
+    db.run(
+        "INSERT OR IGNORE INTO studio_profiles (studio_id, published, booking_enabled) VALUES ('default',1,1)"
+    )
+    db.run("UPDATE studio SET active=1, signup_verified=1 WHERE id='default'")
+    db.run("UPDATE studio_profiles SET published=1, booking_enabled=1 WHERE studio_id='default'")
     transport = ASGITransport(app=app_env)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         r = await client.get("/book/homeowner")
     assert r.status_code == 200
     assert "your home" in r.text.lower()
@@ -91,7 +95,7 @@ async def test_homeowner_booking_page(app_env):
 @pytest.mark.asyncio
 async def test_demo_landing(app_env):
     transport = ASGITransport(app=app_env)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         r = await client.get("/demo")
     assert r.status_code == 200
     assert "demo" in r.text.lower()
@@ -100,11 +104,11 @@ async def test_demo_landing(app_env):
 def test_monitoring_health(app_env):
     details = monitoring.health_details()
     assert "disk_free_gb" in details
+    assert details["jobs_failed"] == 0
     assert details["version"] == "1.9.0"
 
 
 def test_platform_admin_email_check(app_env):
-    tenant.set_studio("default")
     uid = db.run(
         "INSERT INTO users (studio_id, email, password_hash, name, role) VALUES ('default', 'admin@test.com', 'x', 'A', 'owner')",
     )

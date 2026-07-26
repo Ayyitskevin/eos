@@ -23,11 +23,12 @@ def upcoming_for_client(client_id: int) -> list:
     )
 
 
+@db.transactional(immediate=True)
 def create_hold(*, appointment_id: int, client_id: int, starts_at: str) -> str:
     appt = appointments.get_appointment(appointment_id)
     if appt["client_id"] != client_id:
         raise HTTPException(status_code=403)
-    if appt.get("external_source") == "google":
+    if appt["external_source"] == "google":
         raise HTTPException(status_code=400, detail="Contact studio to reschedule this shoot.")
     open_vals = {s["value"] for s in scheduling.reschedule_slots()}
     if starts_at not in open_vals:
@@ -49,6 +50,7 @@ def create_hold(*, appointment_id: int, client_id: int, starts_at: str) -> str:
     return token
 
 
+@db.transactional(immediate=True)
 def confirm_hold(token: str, *, client_id: int) -> int:
     row = db.one(
         """SELECT * FROM appointment_holds

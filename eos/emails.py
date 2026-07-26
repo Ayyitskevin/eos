@@ -1,6 +1,6 @@
 """RE email templates — gallery delivery, MLS ready, proposals, invoices."""
 
-from . import config
+from . import tenant
 
 KINDS = ("gallery", "proposal", "contract", "invoice")
 
@@ -10,7 +10,14 @@ def _first(name: str) -> str:
 
 
 def gallery_delivery(
-    *, client_name: str, title: str, link: str, pin: str, expires: str | None
+    *,
+    client_name: str,
+    title: str,
+    link: str,
+    pin: str,
+    expires: str | None,
+    rebook_link: str = "",
+    referral_link: str = "",
 ) -> tuple[str, str]:
     subject = f"Your listing photos are ready — {title}"
     body = f"""Hi {_first(client_name)},
@@ -22,7 +29,11 @@ PIN: {pin}
 """
     if expires:
         body += f"Available until {expires}\n"
-    body += f"\nThank you!\n{config.SITE_NAME}"
+    if rebook_link:
+        body += f"\nReady for the next listing? Book here: {rebook_link}\n"
+    if referral_link:
+        body += f"\nKnow an agent who could use us? Share your link: {referral_link}\n"
+    body += f"\nThank you!\n{tenant.get_site_name()}"
     return subject, body
 
 
@@ -38,7 +49,7 @@ PIN: {pin}
 Download individual photos or the full ZIP from the gallery page.
 
 Thank you!
-{config.SITE_NAME}"""
+{tenant.get_site_name()}"""
     return subject, body
 
 
@@ -53,7 +64,7 @@ Here's your photography proposal for review:
 You can accept or decline directly on that page. Reply to this email with any questions.
 
 Thank you!
-{config.SITE_NAME}"""
+{tenant.get_site_name()}"""
     return subject, body
 
 
@@ -68,7 +79,7 @@ Please review and sign the photography services agreement:
 Type your full name on the page to sign electronically.
 
 Thank you!
-{config.SITE_NAME}"""
+{tenant.get_site_name()}"""
     return subject, body
 
 
@@ -81,7 +92,7 @@ Invoice for {amount}:
 {link}
 
 Thank you!
-{config.SITE_NAME}"""
+{tenant.get_site_name()}"""
     return subject, body
 
 

@@ -5,7 +5,7 @@ from datetime import date
 
 from fastapi import HTTPException
 
-from . import config, db, listings, security
+from . import db, listings, security, tenant
 from .vocab import STUDIO_ID
 
 DEFAULT_TEMPLATE = """\
@@ -76,7 +76,7 @@ def render_template(listing_id: int) -> str:
     addr = listings.format_address(listing)
     address_clause = f" at {addr}" if addr else ""
     return DEFAULT_TEMPLATE.format(
-        site_name=config.SITE_NAME,
+        site_name=tenant.get_site_name(),
         client_name=client_name,
         company_clause=company_clause,
         date=date.today().isoformat(),
@@ -103,28 +103,37 @@ def create_contract(listing_id: int) -> int:
     return cid
 
 
+@db.transactional(immediate=True)
 def update_contract(contract_id: int, *, title: str, body: str) -> None:
     d = get_contract(contract_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="sent contracts are locked")
     if not body.strip():
         raise HTTPException(status_code=400, detail="body required")
-    db.run(
-        "UPDATE contracts SET title=?, body=? WHERE id=? AND studio_id=?",
-        (title.strip() or d["title"], body, contract_id, STUDIO_ID),
-    )
+    with db.tx() as con:
+        updated = con.execute(
+            """UPDATE contracts SET title=?, body=?
+               WHERE id=? AND studio_id=? AND status='draft'""",
+            (title.strip() or d["title"], body, contract_id, STUDIO_ID),
+        )
+    if updated.rowcount != 1:
+        raise HTTPException(status_code=409, detail="contract was sent while being edited")
 
 
+@db.transactional(immediate=True)
 def mark_sent(contract_id: int) -> None:
     d = get_contract(contract_id)
     if d["status"] != "draft":
         raise HTTPException(status_code=400, detail="already sent")
     sha = hashlib.sha256(d["body"].encode()).hexdigest()
-    db.run(
-        """UPDATE contracts SET status='sent', body_sha256=?, sent_at=datetime('now')
-           WHERE id=? AND studio_id=?""",
-        (sha, contract_id, STUDIO_ID),
-    )
+    with db.tx() as con:
+        sent = con.execute(
+            """UPDATE contracts SET status='sent', body_sha256=?, sent_at=datetime('now')
+               WHERE id=? AND studio_id=? AND status='draft' AND body=?""",
+            (sha, contract_id, STUDIO_ID, d["body"]),
+        )
+    if sent.rowcount != 1:
+        raise HTTPException(status_code=409, detail="contract changed while being sent")
 
 
 def mark_viewed(contract_id: int) -> None:
@@ -136,16 +145,22 @@ def mark_viewed(contract_id: int) -> None:
     )
 
 
+@db.transactional(immediate=True)
 def sign_by_slug(slug: str, signer_name: str, signer_ip: str) -> None:
     d = get_contract_by_slug(slug)
     if d["status"] not in ("sent", "viewed"):
-        raise HTTPException(status_code=400, detail="contract is not open for signing")
+        raise HTTPException(status_code=409, detail="contract is not open for signing")
     if not signer_name.strip():
         raise HTTPException(status_code=400, detail="typed name required")
     if hashlib.sha256(d["body"].encode()).hexdigest() != d["body_sha256"]:
         raise HTTPException(status_code=409, detail="contract integrity check failed")
-    db.run(
-        """UPDATE contracts SET status='signed', signer_name=?, signer_ip=?,
-           signed_at=datetime('now') WHERE id=? AND studio_id=?""",
-        (signer_name.strip(), signer_ip, d["id"], STUDIO_ID),
-    )
+    with db.tx() as con:
+        claimed = con.execute(
+            """UPDATE contracts SET status='signed', signer_name=?, signer_ip=?,
+               signed_at=datetime('now')
+               WHERE id=? AND studio_id=? AND status IN ('sent','viewed')
+                 AND body_sha256=?""",
+            (signer_name.strip(), signer_ip, d["id"], STUDIO_ID, d["body_sha256"]),
+        )
+    if claimed.rowcount != 1:
+        raise HTTPException(status_code=409, detail="contract is no longer open")

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Completing sign-in</title>
+</head>
+<body>
+  <main>
+    <h1>Completing sign-in…</h1>
+    <p id="status" role="status">Securely returning you to your studio.</p>
+  </main>
+  <script nonce="{{ script_nonce }}">
+    (() => {
+      const status = document.getElementById("status");
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+      const handoff = fragment.get("handoff");
+      window.history.replaceState(null, "", window.location.pathname);
+      if (!handoff) {
+        status.textContent = "This sign-in link is invalid or has expired.";
+        return;
+      }
+      fetch(window.location.pathname, {
+        method: "POST",
+        credentials: "same-origin",
+        referrerPolicy: "no-referrer",
+        headers: {"Accept": "application/json", "Content-Type": "application/json"},
+        body: JSON.stringify({handoff}),
+      }).then(async (response) => {
+        if (!response.ok) throw new Error("handoff rejected");
+        const result = await response.json();
+        window.location.replace(result.redirect);
+      }).catch(() => {
+        status.textContent = "This sign-in link is invalid or has expired.";
+      });
+    })();
+  </script>
+</body>
+</html>

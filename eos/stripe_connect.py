@@ -44,25 +44,41 @@ def payments_ready(*, studio_id: str | None = None) -> bool:
 def ensure_account(*, email: str | None = None, country: str = "US") -> str:
     if not is_configured():
         raise HTTPException(status_code=503, detail="Stripe Connect is not configured")
-    row = db.one("SELECT * FROM studio WHERE id=?", (STUDIO_ID,))
-    if row["stripe_connect_account_id"]:
-        return row["stripe_connect_account_id"]
-    studio_row = row
+    studio_row = db.one("SELECT * FROM studio WHERE id=?", (STUDIO_ID,))
+    if not studio_row:
+        raise HTTPException(status_code=404, detail="Studio not found")
+    if studio_row["stripe_connect_account_id"]:
+        return studio_row["stripe_connect_account_id"]
     acct = stripe.Account.create(
         api_key=platform_api_key(),
         type="express",
         country=country,
         email=email or studio_row["contact_email"] or None,
         capabilities={"card_payments": {"requested": True}, "transfers": {"requested": True}},
-        metadata={"studio_id": STUDIO_ID, "slug": studio_row["slug"]},
+        metadata={"studio_id": str(STUDIO_ID), "slug": studio_row["slug"]},
         business_profile={"name": studio_row["name"]},
+        idempotency_key=f"eos-connect-account:{STUDIO_ID}",
     )
-    db.run(
-        "UPDATE studio SET stripe_connect_account_id=? WHERE id=?",
-        (acct.id, STUDIO_ID),
-    )
-    log.info("connect account %s for studio %s", acct.id, STUDIO_ID)
-    return acct.id
+    with db.tx(immediate=True) as con:
+        updated = con.execute(
+            """UPDATE studio SET stripe_connect_account_id=?
+               WHERE id=? AND COALESCE(stripe_connect_account_id, ?) = ?""",
+            (acct.id, STUDIO_ID, "", ""),
+        )
+        winner = (
+            acct.id
+            if updated.rowcount == 1
+            else con.execute(
+                "SELECT stripe_connect_account_id FROM studio WHERE id=?", (STUDIO_ID,)
+            ).fetchone()["stripe_connect_account_id"]
+        )
+    if not winner:
+        raise RuntimeError("Stripe Connect account persistence failed")
+    if winner != acct.id:
+        log.warning("studio %s already bound to Connect account %s", STUDIO_ID, winner)
+    else:
+        log.info("connect account %s for studio %s", acct.id, STUDIO_ID)
+    return winner
 
 
 def onboarding_url(*, refresh_url: str, return_url: str) -> str:

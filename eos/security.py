@@ -1,5 +1,8 @@
 """Cookies, PIN lockout, slugs, client IP resolution."""
 
+import hashlib
+import hmac
+import ipaddress
 import logging
 import secrets
 import string
@@ -47,11 +50,33 @@ def unsign(token: str) -> str | None:
         return None
 
 
+CLIENT_IP_HEADER = "x-eos-client-ip"
+
+
+def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        parsed = ipaddress.ip_address(value.strip())
+    except ValueError:
+        return None
+    if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped:
+        return parsed.ipv4_mapped
+    return parsed
+
+
+def _is_trusted_proxy_peer(peer: str) -> bool:
+    parsed = _parse_ip(peer)
+    return parsed is not None and parsed.is_loopback
+
+
 def client_ip(request: Request) -> str:
+    """Return the socket peer, or the proxy-overwritten client IP from loopback."""
     peer = request.client.host if request.client else "?"
-    if peer in ("127.0.0.1", "::1"):
-        return request.headers.get("cf-connecting-ip", peer)
-    return peer
+    parsed_peer = _parse_ip(peer)
+    if _is_trusted_proxy_peer(peer):
+        forwarded = _parse_ip(request.headers.get(CLIENT_IP_HEADER, ""))
+        if forwarded is not None:
+            return str(forwarded)
+    return str(parsed_peer) if parsed_peer is not None else peer
 
 
 def pin_locked(ip: str, gallery_id: int) -> bool:
@@ -83,13 +108,20 @@ def gallery_cookie_name(gallery_id: int) -> str:
     return f"{GALLERY_COOKIE_PREFIX}{gallery_id}"
 
 
-def gallery_unlocked(request: Request, gallery_id: int) -> bool:
-    raw = request.cookies.get(gallery_cookie_name(gallery_id))
-    return bool(raw) and unsign(raw) == str(gallery_id)
+def _gallery_access_claim(gallery) -> str:
+    payload = f"{gallery['id']}:{gallery['pin']}:{gallery['delivery_token']}".encode()
+    return hmac.new(config.SECRET_KEY.encode(), payload, hashlib.sha256).hexdigest()
 
 
-def set_gallery_cookie(gallery_id: int) -> tuple[str, str]:
-    return gallery_cookie_name(gallery_id), sign(str(gallery_id))
+def gallery_unlocked(request: Request, gallery) -> bool:
+    raw = request.cookies.get(gallery_cookie_name(gallery["id"]))
+    claim = unsign(raw) if raw else None
+    expected = _gallery_access_claim(gallery)
+    return bool(claim) and secrets.compare_digest(claim, expected)
+
+
+def set_gallery_cookie(gallery) -> tuple[str, str]:
+    return gallery_cookie_name(gallery["id"]), sign(_gallery_access_claim(gallery))
 
 
 ADMIN_COOKIE = "eos_admin"
@@ -216,22 +248,27 @@ async def validate_csrf(request: Request) -> PlainTextResponse | None:
 SIGNUP_BUCKET = -5
 
 
-def signup_throttled(ip: str) -> bool:
-    from . import config
-
-    cutoff = time.time() - config.SIGNUP_RATE_WINDOW_SEC
-    row = db.one(
-        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
-        (ip, SIGNUP_BUCKET, cutoff),
-    )
-    return row["n"] >= config.SIGNUP_RATE_LIMIT
-
-
-def signup_record(ip: str) -> None:
-    db.run(
-        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
-        (ip, SIGNUP_BUCKET, time.time()),
-    )
+def claim_signup_attempt(ip: str) -> bool:
+    """Atomically consume one signup slot, or reject without recording."""
+    now = time.time()
+    cutoff = now - config.SIGNUP_RATE_WINDOW_SEC
+    with db.tx(immediate=True) as con:
+        con.execute(
+            "DELETE FROM pin_attempts WHERE gallery_id=? AND ts<=?",
+            (SIGNUP_BUCKET, cutoff),
+        )
+        row = con.execute(
+            """SELECT COUNT(*) AS n FROM pin_attempts
+               WHERE ip=? AND gallery_id=? AND ts>?""",
+            (ip, SIGNUP_BUCKET, cutoff),
+        ).fetchone()
+        if row["n"] >= config.SIGNUP_RATE_LIMIT:
+            return False
+        con.execute(
+            "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+            (ip, SIGNUP_BUCKET, now),
+        )
+    return True
 
 
 def check_admin_password(password: str) -> bool:

@@ -68,15 +68,40 @@ def _seed_invoice(studio_id: str, *, kind: str = "full") -> int:
     )
 
 
+def _paid_event(studio_id: str, invoice_id: int, session_id: str, event_id: str) -> dict:
+    db.run(
+        """UPDATE invoices
+           SET stripe_session_id=?, stripe_destination_account='acct_test', currency='usd'
+           WHERE id=? AND studio_id=?""",
+        (session_id, invoice_id, studio_id),
+    )
+    return {
+        "id": event_id,
+        "type": "checkout.session.completed",
+        "created": 1_800_000_000,
+        "data": {
+            "object": {
+                "id": session_id,
+                "mode": "payment",
+                "payment_status": "paid",
+                "amount_total": 50000,
+                "currency": "usd",
+                "metadata": {
+                    "invoice_id": str(invoice_id),
+                    "studio_id": studio_id,
+                    "payment_rail": "connect",
+                    "stripe_destination_account": "acct_test",
+                    "currency": "usd",
+                },
+            }
+        },
+    }
+
+
 def test_connect_client_payment_webhook_marks_invoice_paid(saas_env):
     _seed_studio("pay-webhook")
     iid = _seed_invoice("pay-webhook")
-    session = {
-        "id": "cs_test_1",
-        "mode": "payment",
-        "metadata": {"invoice_id": str(iid)},
-    }
-    event = {"type": "checkout.session.completed", "data": {"object": session}}
+    event = _paid_event("pay-webhook", iid, "cs_test_1", "evt_test_1")
 
     tenant.set_studio("default")
     platform_billing.handle_webhook_event(event)
@@ -90,16 +115,20 @@ def test_connect_client_payment_binds_invoice_studio_for_automations(saas_env):
     _seed_studio("pay-bind")
     iid = _seed_invoice("pay-bind")
     listing_id = db.one("SELECT listing_id FROM invoices WHERE id=?", (iid,))["listing_id"]
-    session = {"id": "cs_test_bind", "mode": "payment", "metadata": {"invoice_id": str(iid)}}
+    event = _paid_event("pay-bind", iid, "cs_test_bind", "evt_test_bind")
     seen_studios: list[str] = []
 
-    def capture_invoice_paid(_listing_id: int) -> None:
+    def capture_invoice_paid(_listing_id: int, *, invoice_id: int | None = None) -> None:
         assert _listing_id == listing_id
+        assert invoice_id == iid
         seen_studios.append(tenant.get_studio_id())
 
     tenant.set_studio("default")
-    with patch("eos.stripe_webhooks.automations.on_invoice_paid", side_effect=capture_invoice_paid):
-        assert stripe_webhooks.handle_invoice_checkout_completed(session) is True
+    with patch(
+        "eos.stripe_webhooks.automations.on_invoice_paid",
+        side_effect=capture_invoice_paid,
+    ):
+        assert stripe_webhooks.handle_invoice_checkout_event(event) is True
 
     row = db.one("SELECT status FROM invoices WHERE id=?", (iid,))
     assert row["status"] == "paid"
@@ -110,10 +139,10 @@ def test_connect_client_payment_binds_invoice_studio_for_automations(saas_env):
 def test_connect_client_payment_idempotent(saas_env):
     _seed_studio("pay-idem")
     iid = _seed_invoice("pay-idem")
-    session = {"id": "cs_test_2", "mode": "payment", "metadata": {"invoice_id": str(iid)}}
+    event = _paid_event("pay-idem", iid, "cs_test_2", "evt_test_2")
     tenant.set_studio("default")
-    stripe_webhooks.handle_invoice_checkout_completed(session)
-    stripe_webhooks.handle_invoice_checkout_completed(session)
+    assert stripe_webhooks.handle_invoice_checkout_event(event) is True
+    assert stripe_webhooks.handle_invoice_checkout_event(event) is False
     row = db.one("SELECT status FROM invoices WHERE id=?", (iid,))
     assert row["status"] == "paid"
     assert tenant.get_studio_id() == "default"
@@ -121,12 +150,22 @@ def test_connect_client_payment_idempotent(saas_env):
 
 def test_subscription_webhook_still_works(saas_env):
     _seed_studio("sub-webhook")
-    db.run("UPDATE studio SET stripe_customer_id='cus_test' WHERE id=?", ("sub-webhook",))
+    db.run(
+        """UPDATE studio SET stripe_customer_id='cus_test',
+                   platform_checkout_session_id='cs_sub_123',
+                   platform_checkout_plan='starter',
+                   platform_checkout_url='https://checkout.test/cs_sub_123'
+           WHERE id='sub-webhook'"""
+    )
     event = {
+        "id": "evt_sub_123",
         "type": "checkout.session.completed",
+        "created": 1_800_000_000,
         "data": {
             "object": {
+                "id": "cs_sub_123",
                 "mode": "subscription",
+                "customer": "cus_test",
                 "subscription": "sub_123",
                 "metadata": {"studio_id": "sub-webhook", "plan_tier": "starter"},
             }

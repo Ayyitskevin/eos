@@ -31,15 +31,23 @@ async def upsell_confirm(request: Request, token: str):
 
 
 @router.post("/g/{slug}/upsell")
-async def gallery_upsell(slug: str, addon_ids: list[int] = Form(default=[])):
+async def gallery_upsell(
+    request: Request,
+    slug: str,
+    request_key: str = Form(...),
+    addon_ids: list[int] = Form(default=[]),
+):
     from .. import galleries
 
     g = galleries.get_gallery_by_slug(slug)
+    galleries.require_public_access(request, g)
     if not g["listing_id"]:
         raise HTTPException(status_code=400, detail="no listing linked")
     if not addon_ids:
         raise HTTPException(status_code=400, detail="select add-ons")
-    result = upsell.create_order(listing_id=g["listing_id"], addon_ids=addon_ids)
+    result = upsell.create_order(
+        listing_id=g["listing_id"], addon_ids=addon_ids, request_key=request_key
+    )
     url = upsell.checkout_url(result["token"])
     return RedirectResponse(url, status_code=303)
 

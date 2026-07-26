@@ -2,7 +2,7 @@
 
 from fastapi import HTTPException
 
-from . import clients, config, db, galleries, listing_media, listings, security, studio
+from . import clients, db, galleries, listing_media, listings, security, studio, tenant
 from .vocab import STUDIO_ID
 
 
@@ -30,7 +30,7 @@ def get_published_by_slug(slug: str):
 
 def site_url(listing_id: int) -> str:
     slug = ensure_site_slug(listing_id)
-    return f"{config.BASE_URL}/l/{slug}"
+    return f"{tenant.get_base_url()}/l/{slug}"
 
 
 def update_site(
@@ -111,5 +111,5 @@ def site_context(listing_row) -> dict:
         "client": client,
         "studio": studio_row,
         "cover_url": cover_url,
-        "site_url": f"{config.BASE_URL}/l/{listing_row['site_slug']}",
+        "site_url": f"{tenant.get_base_url()}/l/{listing_row['site_slug']}",
     }

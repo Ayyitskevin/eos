@@ -2,7 +2,7 @@
 
 from fastapi import HTTPException
 
-from . import config, db, security
+from . import db, security, tenant
 from .vocab import STUDIO_ID
 
 
@@ -51,8 +51,22 @@ def deliveries(client_id: int) -> list:
 
 
 def portal_url(client_id: int) -> str:
-    return f"{config.BASE_URL}/portal/{ensure_token(client_id)}"
+    return f"{tenant.get_base_url()}/portal/{ensure_token(client_id)}"
 
 
 def brokerage_portal_url(client_id: int) -> str:
-    return f"{config.BASE_URL}/portal/brokerage/{ensure_token(client_id)}"
+    return f"{tenant.get_base_url()}/portal/brokerage/{ensure_token(client_id)}"
+
+
+def repeat_links(client_id: int, *, portal_token: str | None = None) -> dict:
+    from urllib.parse import quote
+
+    from . import referrals
+
+    token = portal_token or ensure_token(client_id)
+    referral = referrals.code_for_client(client_id)
+    base = tenant.get_base_url()
+    return {
+        "rebook_url": f"{base}/book?returning={quote(token)}",
+        "referral_url": f"{base}/r/{quote(referral['code'])}" if referral else None,
+    }

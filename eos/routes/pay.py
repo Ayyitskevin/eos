@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, invoices, stripe_checkout, stripe_webhooks
+from .. import commerce, config, db, invoices, stripe_checkout, stripe_webhooks
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -17,7 +17,8 @@ router = APIRouter()
 
 @router.get("/i/{slug}", response_class=HTMLResponse)
 async def view_invoice(request: Request, slug: str):
-    inv = invoices.get_invoice_by_slug(slug)
+    commerce.expire_pending_bookings()
+    inv = dict(invoices.get_invoice_by_slug(slug))
     client = None
     if inv["client_id"]:
         client = db.one(
@@ -46,9 +47,12 @@ async def view_invoice(request: Request, slug: str):
 
 @router.post("/i/{slug}/pay")
 async def pay_invoice(slug: str):
-    inv = invoices.get_invoice_by_slug(slug)
+    commerce.expire_pending_bookings()
+    inv = dict(invoices.get_invoice_by_slug(slug))
     if inv["status"] == "paid":
         raise HTTPException(status_code=400, detail="already paid")
+    if inv["status"] != "sent":
+        raise HTTPException(status_code=409, detail="invoice is not payable")
     from .. import tenant
 
     client = (
@@ -65,20 +69,22 @@ async def pay_invoice(slug: str):
             "SELECT order_token FROM inquiries WHERE id=? AND studio_id=?",
             (inv["inquiry_id"], STUDIO_ID),
         )
-        if inq and inq.get("order_token"):
+        if inq and inq["order_token"]:
             success = f"{base}/booking/{inq['order_token']}?thanks=1"
+    currency = inv.get("currency") or "usd"
     session = stripe_checkout.create_payment_session(
         amount_cents=inv["amount_cents"],
         title=inv["title"],
         customer_email=client["email"] if client and client["email"] else None,
-        metadata={"invoice_id": str(inv["id"])},
+        metadata={
+            "invoice_id": str(inv["id"]),
+            "studio_id": str(inv["studio_id"]),
+            "currency": currency,
+        },
         success_url=success,
         cancel_url=f"{base}/i/{slug}",
         existing_session_id=inv.get("stripe_session_id"),
-    )
-    db.run(
-        "UPDATE invoices SET stripe_session_id=? WHERE id=? AND studio_id=?",
-        (session.id, inv["id"], STUDIO_ID),
+        currency=currency,
     )
     log.info("invoice %s checkout %s", inv["id"], session.id)
     return RedirectResponse(session.url, status_code=303)
@@ -90,10 +96,12 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=503)
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
+    if not sig:
+        raise HTTPException(status_code=400)
     try:
         event = stripe.Webhook.construct_event(payload, sig, config.STRIPE_WEBHOOK_SECRET)
-    except Exception:
-        raise HTTPException(status_code=400)
+    except Exception as exc:
+        raise HTTPException(status_code=400) from exc
     if event["type"] == "checkout.session.completed":
-        stripe_webhooks.handle_invoice_checkout_completed(event["data"]["object"])
+        stripe_webhooks.handle_invoice_checkout_event(event)
     return {"ok": True}

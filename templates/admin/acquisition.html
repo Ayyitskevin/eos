@@ -24,14 +24,48 @@
   <p class="alert-banner">That agent already received a referral introduction email recently.</p>
   {% elif acquisition_notice == 'draft' %}
   <p class="alert-banner">Email is not configured yet. Use the draft below.</p>
+  {% elif acquisition_notice == 'review' %}
+  <p class="alert-banner">That email has an unresolved delivery claim. Check the provider before recording the outcome below.</p>
+  {% elif acquisition_notice == 'reconciled-sent' %}
+  <p class="alert-banner ok">Provider delivery confirmed and recorded.</p>
+  {% elif acquisition_notice == 'retry-ready' %}
+  <p class="alert-banner ok">Provider non-delivery recorded. One deliberate retry is now available.</p>
   {% elif acquisition_notice == 'bulk' and acquisition_bulk %}
   <p class="alert-banner ok">Bulk intro ask complete:
     {{ acquisition_bulk.sent }} sent,
     {{ acquisition_bulk.draft }} drafted,
     {{ acquisition_bulk.cooldown }} on cooldown,
+    {{ acquisition_bulk.review }} needing provider review,
     {{ acquisition_bulk.skipped }} skipped,
     {{ acquisition_bulk.failed }} failed.
   </p>
+  {% endif %}
+
+  {% if delivery_reviews %}
+  <section class="card">
+    <h2>Email delivery review</h2>
+    <p class="muted">These sends remain closed to replay until the provider outcome is checked.</p>
+    <table class="list compact">
+      <tr><th>Agent</th><th>Message</th><th>Status</th><th>Provider check</th></tr>
+      {% for r in delivery_reviews %}
+      <tr>
+        <td><a href="/admin/clients/{{ r.client_id }}">{{ r.client_name }}</a><br><span class="muted small">{{ r.to_email }}</span></td>
+        <td>{{ "Referral follow-up" if r.email_kind == "follow_up" else "Referral introduction" }}<br><span class="muted small">{{ r.subject }}</span></td>
+        <td>{{ r.status }} · attempt {{ r.attempts }}<br><span class="muted small">claimed {{ r.claimed_at }} · {{ r.error or "Send still in progress" }}</span></td>
+        <td>
+          {% if r.reconcilable %}
+          <form method="post" action="/admin/reports/acquisition/{{ r.client_id }}/intents/{{ r.id }}/reconcile" class="inline-form">
+            <button type="submit" name="outcome" value="delivered" class="link">Delivered</button>
+            <button type="submit" name="outcome" value="not-delivered" class="link">Not delivered</button>
+          </form>
+          {% else %}
+          <span class="muted small">Wait for the active attempt before reconciling.</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
   {% endif %}
 
   <section class="pipeline-strip">

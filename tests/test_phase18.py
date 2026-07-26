@@ -75,7 +75,7 @@ async def test_signup_with_invite_code(mock_send, saas_env, monkeypatch):
     importlib.reload(invites_mod)
     _seed_invite("BETA2026")
     transport = ASGITransport(app=saas_env)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
         r = await client.post(
             "/signup",
             data={

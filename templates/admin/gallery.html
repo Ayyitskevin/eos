@@ -15,6 +15,22 @@
   <div class="detail-grid">
     <section class="card">
       <h2>Delivery settings</h2>
+      {% if delivery_error %}<p class="error">{{ delivery_error }}</p>{% endif %}
+      {% if not g.published %}
+        {% if delivery_readiness.ready %}
+        <p class="alert-banner ok">Ready to publish and deliver.</p>
+        {% elif delivery_readiness.reason == 'listing_required' %}
+        <p class="warn">Link a listing before delivery.</p>
+        {% elif delivery_readiness.reason == 'listing_not_ready' %}
+        <p class="warn">Move the listing out of Lead/Archived before delivery.</p>
+        {% elif delivery_readiness.reason == 'shoot_not_complete' %}
+        <p class="warn">Complete or cancel the linked shoot before delivery.</p>
+        {% elif delivery_readiness.reason == 'assets_required' %}
+        <p class="warn">Upload at least one photo before delivery.</p>
+        {% else %}
+        <p class="warn">Finish processing all assets ({{ delivery_readiness.pending_assets }} pending, {{ delivery_readiness.failed_assets }} failed).</p>
+        {% endif %}
+      {% endif %}
       <form method="post" action="/admin/galleries/{{ g.id }}/settings" class="form-grid compact">
         <label>Title <input name="title" value="{{ g.title }}" required></label>
         <label>Client name <input name="client_name" value="{{ g.client_name or '' }}"></label>
@@ -28,7 +44,7 @@
             {% endfor %}
           </select>
         </label>
-        <label class="checkbox"><input type="checkbox" name="published" value="true" {% if g.published %}checked{% endif %}> Published</label>
+        <label class="checkbox"><input type="checkbox" name="published" value="true" {% if g.published %}checked{% endif %} {% if not g.published and not delivery_readiness.ready %}disabled{% endif %}> Published</label>
         <button type="submit">Save</button>
       </form>
     </section>

@@ -204,7 +204,9 @@
       {% if media_embeds %}
       <ul class="pkg-list">
         {% for e in media_embeds %}
-        <li>{{ e.label or e.kind }} — <a href="{{ e.embed_url }}" target="_blank">link</a>
+        <li>{{ e.label or e.kind }} —
+          {% if e.render_url %}<a href="{{ e.render_url }}" target="_blank" rel="noopener noreferrer">link</a>
+          {% else %}<span class="muted">invalid stored URL</span>{% endif %}
           <form method="post" action="/admin/listings/{{ l.id }}/media/{{ e.id }}/delete" class="inline-form">
             <button type="submit" class="link">Remove</button>
           </form>

@@ -58,6 +58,16 @@
   <p class="muted">No listings yet — book your next shoot at <a href="/book">/book</a>.</p>
   {% endif %}
 
+  <section class="card" style="margin-top:1.5rem">
+    <h2>Keep the momentum going</h2>
+    <p><a class="btn btn-accent" href="{{ repeat.rebook_url }}">Book your next listing</a></p>
+    {% if repeat.referral_url %}
+    <p class="muted">Know another agent who needs great listing media?
+      Share your referral link:
+      <a href="{{ repeat.referral_url }}">{{ repeat.referral_url }}</a>
+    </p>
+    {% endif %}
+  </section>
   {% if upsell %}
   <section class="card upsell-banner" style="margin-top:1.5rem">
     <h2>{{ upsell.title }}</h2>

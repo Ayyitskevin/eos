@@ -150,6 +150,7 @@ async def acquisition_dashboard(request: Request):
                 "cooldown": _query_int(request, "cooldown"),
                 "skipped": _query_int(request, "skipped"),
                 "failed": _query_int(request, "failed"),
+                "review": _query_int(request, "review"),
             }
             if notice == "bulk"
             else None,
@@ -193,6 +194,30 @@ async def acquisition_follow_up_send(
     )
 
 
+@router.post("/reports/acquisition/{client_id}/intents/{intent_id}/reconcile")
+async def acquisition_email_reconcile(
+    client_id: int,
+    intent_id: int,
+    outcome: str = Form(...),
+):
+    if outcome not in {"delivered", "not-delivered"}:
+        raise HTTPException(status_code=400, detail="invalid reconciliation outcome")
+    acquisition.reconcile_email_intent(
+        intent_id,
+        client_id=client_id,
+        delivered=outcome == "delivered",
+    )
+    notice = "reconciled-sent" if outcome == "delivered" else "retry-ready"
+    return RedirectResponse(
+        _with_acquisition_notice(
+            "/admin/reports/acquisition",
+            status=notice,
+            client_id=client_id,
+        ),
+        status_code=303,
+    )
+
+
 @router.post("/reports/acquisition/bulk-send")
 async def acquisition_intro_bulk_send(queue_filter: str = Form("ready")):
     result = acquisition.bulk_send_intro_emails(queue_filter=queue_filter)
@@ -207,6 +232,7 @@ async def acquisition_intro_bulk_send(queue_filter: str = Form("ready")):
                 "cooldown": str(result["cooldown"]),
                 "skipped": str(result["skipped"]),
                 "failed": str(result["failed"]),
+                "review": str(result["review"]),
             }
         ),
         status_code=303,

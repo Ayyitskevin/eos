@@ -99,7 +99,10 @@ def test_agent_favorite_toggle(env):
 def test_revision_round(env):
     tenant.set_studio("default")
     lid = listings.create_listing("Rev test")
-    listings.update_listing(lid, status="delivered")
+    db.run(
+        "UPDATE listings SET status='delivered', delivered_at=datetime('now') WHERE id=?",
+        (lid,),
+    )
     listings.request_revision(lid, notes="Fix sky")
     row = listings.get_listing(lid)
     assert row["revision_round"] == 1
@@ -123,7 +126,7 @@ def test_usage_bump(env):
 
 
 @pytest.mark.asyncio
-async def test_inbound_api_event(env):
+async def test_inbound_delivery_requires_ready_published_gallery(env):
     tenant.set_studio("default")
     lid = listings.create_listing("Inbound")
     _tid, raw = api_tokens.create_token()
@@ -134,5 +137,6 @@ async def test_inbound_api_event(env):
             headers={"authorization": f"Bearer {raw}"},
             json={"listing_id": lid},
         )
-    assert r.status_code == 200
-    assert listings.get_listing(lid)["status"] == "delivered"
+    assert r.status_code == 409
+    assert "Publish a ready gallery" in r.text
+    assert listings.get_listing(lid)["status"] == "lead"

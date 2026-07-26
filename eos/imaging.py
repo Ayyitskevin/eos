@@ -111,6 +111,7 @@ def _save_jpeg_with_metadata(
 def listing_export_metadata(listing_row, *, site_name: str = "") -> dict | None:
     if not listing_row:
         return None
+    listing_row = dict(listing_row)
     from .listings import format_address
 
     address = format_address(listing_row)

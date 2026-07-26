@@ -1,9 +1,59 @@
 """Smart booking slots — weekly hours, buffers, appointment conflicts."""
 
 import datetime as dt
+import logging
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import db, studio
+from . import config, db, studio
 from .vocab import STUDIO_ID
+
+log = logging.getLogger("eos.scheduling")
+
+
+class AvailabilityUnavailable(RuntimeError):
+    """An external availability source could not be verified."""
+
+
+def _zone_from_name(name: str | None) -> ZoneInfo:
+    """Resolve a deterministic zone, falling back to the operator default then UTC."""
+    candidates = (name, config.TIMEZONE, "UTC")
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            return ZoneInfo(str(candidate))
+        except (ZoneInfoNotFoundError, TypeError, ValueError):
+            continue
+    return ZoneInfo("UTC")
+
+
+def _studio_zone() -> ZoneInfo:
+    row = studio.get_studio()
+    configured = row["timezone"] if row else None
+    zone = _zone_from_name(configured)
+    if configured and zone.key != configured:
+        log.error(
+            "invalid timezone %r for studio=%s; using %s",
+            configured,
+            STUDIO_ID,
+            zone.key,
+        )
+    return zone
+
+
+def _now(zone: ZoneInfo) -> dt.datetime:
+    return dt.datetime.now(zone)
+
+
+def _localize_wall_time(value: dt.datetime, zone: ZoneInfo) -> dt.datetime | None:
+    """Return one unambiguous instant for a local wall time, else fail closed."""
+    matches: list[dt.datetime] = []
+    for fold in (0, 1):
+        candidate = value.replace(tzinfo=zone, fold=fold)
+        round_trip = candidate.astimezone(dt.UTC).astimezone(zone)
+        if round_trip.replace(tzinfo=None) == value and round_trip.fold == fold:
+            matches.append(candidate)
+    return matches[0] if len(matches) == 1 else None
 
 
 def _parse_weekdays(raw: str) -> set[int]:
@@ -15,7 +65,11 @@ def _parse_weekdays(raw: str) -> set[int]:
     return out or {0, 1, 2, 3, 4, 5}
 
 
-def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
+def _busy_ranges(
+    buffer_min: int,
+    *,
+    today: dt.date,
+) -> list[tuple[dt.datetime, dt.datetime]]:
     profile = studio.get_profile()
     drive_buf = int(profile["drive_buffer_min"] or 30) if profile["drive_time_enabled"] else 0
     rows = db.all_(
@@ -38,12 +92,11 @@ def _busy_ranges(buffer_min: int) -> list[tuple[dt.datetime, dt.datetime]]:
         from .integrations import google_calendar
 
         ranges.extend(google_calendar.busy_ranges())
-    except Exception:
-        pass
+    except google_calendar.GoogleAvailabilityUnavailable as exc:
+        raise AvailabilityUnavailable(str(exc)) from exc
     if drive_buf:
         from . import drive_time
 
-        today = dt.date.today()
         for offset in range(14):
             day = today + dt.timedelta(days=offset)
             ranges.extend(drive_time.travel_ranges_for_day(day, drive_buf))
@@ -70,22 +123,38 @@ def _slot_list(
     label_prefix: str = "",
 ) -> list[dict]:
     profile = studio.get_profile()
+    zone = _studio_zone()
     notice = dt.timedelta(hours=int(profile["min_notice_hours"] or 24))
-    now = dt.datetime.now()
-    earliest = now + notice
-    busy = _busy_ranges(buffer_min)
+    now = _now(zone)
+    earliest = (now.astimezone(dt.UTC) + notice).astimezone(zone)
+    try:
+        busy = _busy_ranges(buffer_min, today=now.date())
+    except AvailabilityUnavailable:
+        log.exception("public booking availability closed for studio=%s", STUDIO_ID)
+        return []
     slots: list[dict] = []
     for offset in range(days):
-        day = (now + dt.timedelta(days=offset)).date()
+        day = now.date() + dt.timedelta(days=offset)
         if day.weekday() not in weekdays:
             continue
         minute = day_start
         while minute + slot_min <= day_end:
-            start = dt.datetime.combine(day, dt.time(hour=minute // 60, minute=minute % 60))
-            end = start + dt.timedelta(minutes=slot_min)
-            if start >= earliest and not _conflicts(start, end, busy):
-                value = start.strftime("%Y-%m-%d %H:%M:%S")
-                label = start.strftime("%a %b %d · %I:%M %p").replace(" 0", " ")
+            start_wall = dt.datetime.combine(
+                day,
+                dt.time(hour=minute // 60, minute=minute % 60),
+            )
+            end_wall = start_wall + dt.timedelta(minutes=slot_min)
+            start = _localize_wall_time(start_wall, zone)
+            end = _localize_wall_time(end_wall, zone)
+            expected_duration = dt.timedelta(minutes=slot_min)
+            stable_duration = (
+                start is not None
+                and end is not None
+                and end.astimezone(dt.UTC) - start.astimezone(dt.UTC) == expected_duration
+            )
+            if stable_duration and start >= earliest and not _conflicts(start_wall, end_wall, busy):
+                value = start_wall.strftime("%Y-%m-%d %H:%M:%S")
+                label = start_wall.strftime("%a %b %d · %I:%M %p").replace(" 0", " ")
                 if label_prefix:
                     label = f"{label_prefix}{label}"
                 slots.append({"value": value, "label": label})

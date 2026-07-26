@@ -9,6 +9,21 @@
 
   <section class="card">
     <p class="muted">Setup progress: <strong>{{ status.progress_pct }}%</strong></p>
+    {% if status.provisioning_status != 'ready' %}
+    <p class="alert-banner">Setup needs attention: {{ status.provisioning_error }}</p>
+    <form method="post" action="/admin/onboarding/retry-provisioning" class="inline-form">
+      <button type="submit">Retry setup</button>
+    </form>
+    {% endif %}
+    <p class="muted small">Payments: <strong>{{ status.payments_mode }}</strong>. Offline mode accepts zero-deposit bookings; deposit-required requests stay pending with an invoice for operator follow-up.</p>
+    {% if not status.done %}
+    <form method="post" action="/admin/onboarding/quick-launch" class="form-grid compact">
+      <h2>Quick launch</h2>
+      <label>Public headline <input name="headline" required placeholder="Bright, MLS-ready photos in 24 hours"></label>
+      <label>Service area <input name="service_area" required placeholder="Austin and surrounding counties"></label>
+      <button type="submit" class="btn btn-accent">Save branding &amp; open booking</button>
+    </form>
+    {% endif %}
     <ul class="checklist">
       {% for s in status.steps %}
       <li class="{% if s.complete %}done-row{% endif %}">
@@ -26,9 +41,8 @@
     {% endif %}
     <form method="post" action="/admin/onboarding" class="inline-form" style="margin-top:1rem">
       <button type="submit" name="action" value="next" class="btn btn-accent">Refresh progress</button>
-      <button type="submit" name="action" value="skip" class="btn link">Mark setup complete</button>
     </form>
-    {% if status.progress_pct >= 100 %}
+    {% if status.done %}
     <form method="post" action="/admin/onboarding/done">
       <button type="submit" class="btn btn-accent">Go to pipeline</button>
     </form>

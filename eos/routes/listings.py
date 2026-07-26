@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import (
     clients,
-    config,
     contracts,
     galleries,
     invoices,
@@ -14,6 +13,7 @@ from .. import (
     proposals,
     questionnaires,
     security,
+    tenant,
     users,
 )
 from ..render import templates
@@ -104,7 +104,7 @@ async def listing_detail(request: Request, listing_id: int):
             "contracts": contracts.list_for_listing(listing_id),
             "proposal_presets": proposals.package_presets(),
             "questionnaires": questionnaires.list_for_listing(listing_id),
-            "base_url": config.BASE_URL,
+            "base_url": tenant.get_base_url(),
             "media_embeds": listing_media.list_for_listing(listing_id),
             "media_kinds": listing_media.KINDS,
             "site_slug": row["site_slug"] or microsites.ensure_site_slug(listing_id),
@@ -226,8 +226,7 @@ async def listing_revision(listing_id: int, notes: str = Form("")):
 
 @router.post("/listings/{listing_id}/revision/complete")
 async def listing_revision_complete(listing_id: int):
-    listings.complete_revision(listing_id)
-    listings.update_listing(listing_id, status="delivered")
+    galleries.redeliver_listing(listing_id)
     return RedirectResponse(f"/admin/listings/{listing_id}#revision", status_code=303)
 
 

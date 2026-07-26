@@ -1,7 +1,17 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, brokerage, clients, config, invoices, listings, security
+from .. import (
+    automations,
+    brokerage,
+    clients,
+    config,
+    db,
+    invoices,
+    listings,
+    security,
+    stripe_checkout,
+)
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -64,7 +74,39 @@ async def send_invoice(invoice_id: int):
 
 @router.post("/invoices/{invoice_id}/paid")
 async def mark_paid(invoice_id: int):
-    inv = invoices.get_invoice(invoice_id)
-    invoices.mark_paid(invoice_id)
-    automations.on_invoice_paid(inv["listing_id"])
+    provider_state, expected_session_id = stripe_checkout.prepare_manual_payment(invoice_id)
+    if provider_state == "paid":
+        return RedirectResponse(f"/admin/invoices/{invoice_id}", status_code=303)
+    with db.tx(immediate=True) as con:
+        inv = invoices.get_invoice(invoice_id)
+        if inv["status"] == "paid":
+            return RedirectResponse(f"/admin/invoices/{invoice_id}", status_code=303)
+        if inv["status"] != "sent":
+            raise HTTPException(status_code=409, detail="invoice is not payable")
+        if inv["stripe_checkout_claimed_at"] or (
+            (inv["stripe_session_id"] or None) != expected_session_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Checkout state changed; no manual payment was recorded.",
+            )
+        if expected_session_id is None and inv["invoice_kind"] == "deposit" and inv["inquiry_id"]:
+            expired_hold = con.execute(
+                """SELECT id FROM inquiries
+                   WHERE id=? AND studio_id=? AND status='pending_payment'
+                     AND payment_expires_at IS NOT NULL
+                     AND payment_expires_at <= datetime('now')""",
+                (inv["inquiry_id"], inv["studio_id"]),
+            ).fetchone()
+            if expired_hold:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Booking payment hold expired; no manual payment was recorded.",
+                )
+        invoices.mark_paid(invoice_id)
+        if inv["invoice_kind"] == "deposit" and inv["inquiry_id"]:
+            if not automations.on_deposit_paid(inv["inquiry_id"], inv["listing_id"]):
+                raise HTTPException(status_code=409, detail="booking is no longer payable")
+        else:
+            automations.on_invoice_paid(inv["listing_id"], invoice_id=invoice_id)
     return RedirectResponse(f"/admin/invoices/{invoice_id}", status_code=303)

@@ -15,6 +15,7 @@ async def agent_portal(request: Request, token: str):
     client = portal.get_client_by_token(token)
     rows = portal.deliveries(client["id"])
     upcoming = reschedule.upcoming_for_client(client["id"])
+    repeat = portal.repeat_links(client["id"], portal_token=token)
     return templates.TemplateResponse(
         request,
         "public/portal.html",
@@ -26,6 +27,7 @@ async def agent_portal(request: Request, token: str):
             "base_url": tenant.get_base_url(),
             "payments_on": stripe_checkout.payments_configured(),
             "upsell": studio.delivery_upsell(),
+            "repeat": repeat,
             "rescheduled": request.query_params.get("rescheduled"),
         },
     )

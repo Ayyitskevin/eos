@@ -5,8 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 
-from .. import db, jobs, paywall, security
-from ..galleries import get_gallery_by_slug
+from .. import db, galleries, jobs, paywall
 from ..jobs import zip_path
 from ..render import templates
 
@@ -15,11 +14,8 @@ router = APIRouter(prefix="/g")
 
 
 def _gate(request: Request, slug: str, *, require_paid: bool = True):
-    g = get_gallery_by_slug(slug)
-    if not g["published"]:
-        raise HTTPException(status_code=404)
-    if not security.gallery_unlocked(request, g["id"]):
-        raise HTTPException(status_code=403, detail="gallery access required")
+    g = galleries.get_gallery_by_slug(slug)
+    galleries.require_public_access(request, g)
     if require_paid and paywall.payment_required(g["listing_id"]):
         slug_inv = paywall.unpaid_invoice_slug(g["listing_id"])
         raise HTTPException(

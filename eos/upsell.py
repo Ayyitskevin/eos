@@ -40,35 +40,64 @@ def _order_by_token(order_token: str):
     return row
 
 
+@db.transactional(immediate=True)
 def create_order(
     *,
     listing_id: int,
     addon_ids: list[int],
+    request_key: str,
     client_id: int | None = None,
 ) -> dict:
     from . import listings
 
     listing = listings.get_listing(listing_id)
-    order_client_id = client_id or listing["client_id"]
+    request_key = request_key.strip()
+    if len(request_key) < 8 or len(request_key) > 128:
+        raise HTTPException(status_code=400, detail="invalid upsell request key")
+    canonical_addon_ids = sorted({int(addon_id) for addon_id in addon_ids})
+    order_client_id = client_id if client_id is not None else listing["client_id"]
     if order_client_id is not None:
         clients.get_client(order_client_id)
-    addons = _addon_rows(addon_ids)
-    if not addons:
-        raise HTTPException(status_code=400, detail="Select at least one add-on.")
+    existing = db.one(
+        """SELECT * FROM listing_upsell_orders
+           WHERE studio_id=? AND listing_id=? AND request_key=?""",
+        (STUDIO_ID, listing_id, request_key),
+    )
+    if existing:
+        try:
+            stored_addon_ids = sorted({int(value) for value in json.loads(existing["addon_ids"])})
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("replayed upsell order has invalid payload identity") from exc
+        if stored_addon_ids != canonical_addon_ids or existing["client_id"] != order_client_id:
+            raise HTTPException(
+                status_code=409, detail="upsell request key was reused with different input"
+            )
+        if not existing["invoice_id"]:
+            raise RuntimeError("replayed upsell order is incomplete")
+        return {
+            "order_id": existing["id"],
+            "token": existing["token"],
+            "invoice": invoices.get_invoice(existing["invoice_id"]),
+            "total_cents": existing["amount_cents"],
+        }
+    addons = sorted(_addon_rows(canonical_addon_ids), key=lambda row: row["id"])
+    if not canonical_addon_ids or len(addons) != len(canonical_addon_ids):
+        raise HTTPException(status_code=400, detail="invalid add-on selection")
     items = [{"label": a["name"], "qty": 1, "unit_cents": a["price_cents"]} for a in addons]
     total = sum(a["price_cents"] for a in addons)
     token = security.new_token()
     oid = db.run(
         """INSERT INTO listing_upsell_orders
-           (studio_id, listing_id, client_id, addon_ids, amount_cents, token)
-           VALUES (?,?,?,?,?,?)""",
+           (studio_id, listing_id, client_id, addon_ids, amount_cents, token, request_key)
+           VALUES (?,?,?,?,?,?,?)""",
         (
             STUDIO_ID,
             listing_id,
             order_client_id,
-            json.dumps(addon_ids),
+            json.dumps(canonical_addon_ids),
             total,
             token,
+            request_key,
         ),
     )
     title = f"Add-ons — {listing['title']}"
@@ -81,6 +110,7 @@ def create_order(
         notes="Delivery upsell",
         invoice_kind="balance",
     )
+    invoices.mark_sent(iid)
     inv = invoices.get_invoice(iid)
     db.run(
         "UPDATE listing_upsell_orders SET invoice_id=? WHERE id=? AND studio_id=?",
@@ -94,10 +124,12 @@ def checkout_url(order_token: str) -> str:
     row = _order_by_token(order_token)
     if not row["invoice_id"]:
         raise HTTPException(status_code=400, detail="invoice missing")
-    inv = invoices.get_invoice(row["invoice_id"])
+    inv = dict(invoices.get_invoice(row["invoice_id"]))
     base = tenant.get_base_url()
     if inv["status"] == "paid":
         return f"{base}/i/{inv['slug']}?thanks=1"
+    if inv["status"] != "sent":
+        raise HTTPException(status_code=409, detail="upsell invoice is not payable")
     if not stripe_checkout.payments_configured():
         return f"{base}/i/{inv['slug']}"
     client = None
@@ -115,14 +147,14 @@ def checkout_url(order_token: str) -> str:
         cancel_url=f"{base}/upsell/{order_token}",
         existing_session_id=inv.get("stripe_session_id"),
     )
-    db.run(
-        "UPDATE invoices SET stripe_session_id=? WHERE id=? AND studio_id=?",
-        (session.id, inv["id"], STUDIO_ID),
-    )
-    db.run(
-        "UPDATE listing_upsell_orders SET stripe_session_id=? WHERE id=? AND studio_id=?",
-        (session.id, row["id"], STUDIO_ID),
-    )
+    with db.tx(immediate=True) as con:
+        updated = con.execute(
+            """UPDATE listing_upsell_orders SET stripe_session_id=?
+               WHERE id=? AND studio_id=? AND invoice_id=? AND status='pending'""",
+            (session.id, row["id"], STUDIO_ID, inv["id"]),
+        )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="upsell order is no longer payable")
     return session.url
 
 

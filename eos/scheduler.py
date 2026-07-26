@@ -1,9 +1,10 @@
-"""In-process scheduler — drains due email sequence runs."""
+"""In-process scheduler — drains durable outbound work."""
 
 import logging
 import threading
+import time
 
-from . import config, sequences
+from . import commerce, config, delivery_notify, sequences, webhooks
 
 log = logging.getLogger("eos.scheduler")
 
@@ -17,19 +18,30 @@ _tick = 0
 def _loop() -> None:
     global _tick
     while not _stop.wait(config.SEQUENCE_TICK_SECONDS):
-        try:
-            n = sequences.process_due()
-            if n:
-                log.info("sequence scheduler sent %d emails", n)
-        except Exception:
-            log.exception("sequence sweep failed")
+        for label, drain in (
+            ("sequence", sequences.process_due),
+            ("webhook", webhooks.process_pending),
+            ("delivery notification", delivery_notify.process_pending),
+            ("booking payment reconciliation", commerce.expire_all_pending_bookings),
+        ):
+            try:
+                n = drain()
+                if n:
+                    log.info("%s scheduler completed %d deliveries", label, n)
+            except Exception:
+                log.exception("%s sweep failed", label)
         _tick += 1
         if _tick * config.SEQUENCE_TICK_SECONDS >= config.INTEGRATION_TICK_SECONDS:
             _tick = 0
             try:
                 from . import jobs, sms
 
-                jobs.enqueue("integration_sweep", {})
+                bucket = int(time.time() // max(config.INTEGRATION_TICK_SECONDS, 1))
+                jobs.enqueue(
+                    "integration_sweep",
+                    {},
+                    idempotency_key=f"integration_sweep:{bucket}",
+                )
                 sms.shoot_day_reminders()
             except Exception:
                 log.exception("integration sweep enqueue failed")

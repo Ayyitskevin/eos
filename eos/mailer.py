@@ -13,6 +13,10 @@ from . import config, studio
 log = logging.getLogger("eos.mailer")
 
 
+class DeliveryOutcomeUnknown(RuntimeError):
+    """A provider call may have been accepted; automatic replay is unsafe."""
+
+
 def configured() -> bool:
     if config.EMAIL_PROVIDER == "postmark":
         return bool(config.POSTMARK_API_KEY and config.POSTMARK_FROM_EMAIL)
@@ -112,9 +116,18 @@ def _send_smtp(
     if reply_to:
         msg["Reply-To"] = reply_to
     msg.set_content(body)
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as s:
-        s.login(config.GMAIL_USER, config.GMAIL_APP_PASSWORD)
-        s.send_message(msg)
+    dispatch_started = False
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as smtp:
+            smtp.login(config.GMAIL_USER, config.GMAIL_APP_PASSWORD)
+            dispatch_started = True
+            smtp.send_message(msg)
+    except Exception as exc:
+        if dispatch_started:
+            raise DeliveryOutcomeUnknown(
+                "Email outcome unknown after SMTP dispatch; verify the provider before retrying."
+            ) from exc
+        raise
 
 
 def _send_postmark(
@@ -134,16 +147,21 @@ def _send_postmark(
     }
     if reply_to:
         payload["ReplyTo"] = reply_to
-    resp = httpx.post(
-        "https://api.postmarkapp.com/email",
-        headers={
-            "X-Postmark-Server-Token": config.POSTMARK_API_KEY,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=20.0,
-    )
-    if resp.status_code >= 400:
+    try:
+        resp = httpx.post(
+            "https://api.postmarkapp.com/email",
+            headers={
+                "X-Postmark-Server-Token": config.POSTMARK_API_KEY,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20.0,
+        )
+    except Exception as exc:
+        raise DeliveryOutcomeUnknown(
+            "Email outcome unknown after Postmark dispatch; verify the provider before retrying."
+        ) from exc
+    if not 200 <= resp.status_code < 300:
         log.error("postmark error %s: %s", resp.status_code, resp.text[:300])
         raise RuntimeError(f"Postmark send failed ({resp.status_code})")

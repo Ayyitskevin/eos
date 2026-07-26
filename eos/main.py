@@ -144,17 +144,35 @@ async def request_id(request: Request, call_next):
 
 @app.middleware("http")
 async def tenant_context(request: Request, call_next):
-    tenant.bind_request(request)
+    try:
+        tenant.bind_request(request)
+    except StarletteHTTPException as exc:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    if (
+        config.SIGNUP_ENABLED
+        and request.method == "POST"
+        and request.url.path == "/signup"
+        and not security.claim_signup_attempt(security.client_ip(request))
+    ):
+        return templates.TemplateResponse(
+            request,
+            "site/signup.html",
+            signup_routes.signup_context(
+                error="Too many signups from this network. Try again later."
+            ),
+            status_code=429,
+        )
     blocked = billing_gate.check_access(request)
     if blocked:
         return blocked
     if request.url.path.startswith("/admin"):
         from . import rbac
 
-        rbac.check_route(request)
+        try:
+            rbac.check_route(request)
+        except StarletteHTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         if request.method == "POST" and demo_sandbox.is_read_only():
-            from fastapi.responses import JSONResponse
-
             return JSONResponse({"detail": "Demo studio is read-only"}, status_code=403)
     csrf_blocked = await security.validate_csrf(request)
     if csrf_blocked:
@@ -168,11 +186,35 @@ async def common_headers(request: Request, call_next):
     if request.url.path.startswith("/admin") and not request.cookies.get(security.CSRF_COOKIE):
         security.set_csrf_cookie(resp)
     p = request.url.path
+    if (
+        p.startswith("/admin")
+        or p in ("/book", "/signup")
+        or p.startswith(
+            (
+                "/api/",
+                "/book/",
+                "/booking/",
+                "/c/",
+                "/g/",
+                "/i/",
+                "/media/",
+                "/oauth/",
+                "/p/",
+                "/portal/",
+                "/q/",
+                "/upsell/",
+                "/verify/",
+            )
+        )
+    ):
+        resp.headers["Cache-Control"] = "private, no-store"
     if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/", "/api/", "/oauth/"))):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
-    resp.headers["Referrer-Policy"] = "same-origin"
+    resp.headers["Referrer-Policy"] = (
+        "no-referrer" if p == "/oauth/google/admin/complete" else "same-origin"
+    )
     return resp
 
 

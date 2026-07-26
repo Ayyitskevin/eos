@@ -4,6 +4,7 @@ import csv
 import datetime as dt
 import io
 import re
+import secrets
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -17,9 +18,11 @@ FOLLOW_UP_DAYS = 7
 ACTION_SENT = "acquisition.intro.sent"
 ACTION_DRAFT = "acquisition.intro.draft"
 ACTION_FAILED = "acquisition.intro.failed"
+ACTION_UNKNOWN = "acquisition.intro.unknown"
 ACTION_FOLLOW_UP_SENT = "acquisition.follow_up.sent"
 ACTION_FOLLOW_UP_DRAFT = "acquisition.follow_up.draft"
 ACTION_FOLLOW_UP_FAILED = "acquisition.follow_up.failed"
+ACTION_FOLLOW_UP_UNKNOWN = "acquisition.follow_up.unknown"
 FOLLOW_UP_DOC_KIND = "acquisition_follow_up"
 _CLIENT_RE = re.compile(r"\bclient_id=(\d+)\b")
 QUEUE_FILTERS = {
@@ -28,6 +31,21 @@ QUEUE_FILTERS = {
     "needs_intro": "Needs intro",
     "ready": "Ready",
     "cooldown": "Cooldown",
+}
+_CLAIM_STALE_MINUTES = 10
+_EMAIL_KINDS = {
+    "intro": {
+        "sent": ACTION_SENT,
+        "failed": ACTION_FAILED,
+        "unknown": ACTION_UNKNOWN,
+        "doc_kind": "acquisition_intro",
+    },
+    "follow_up": {
+        "sent": ACTION_FOLLOW_UP_SENT,
+        "failed": ACTION_FOLLOW_UP_FAILED,
+        "unknown": ACTION_FOLLOW_UP_UNKNOWN,
+        "doc_kind": FOLLOW_UP_DOC_KIND,
+    },
 }
 
 
@@ -87,6 +105,296 @@ def recent_follow_up_sent_at(client_id: int, *, days: int = COOLDOWN_DAYS) -> st
         (STUDIO_ID, ACTION_FOLLOW_UP_SENT, f"client_id={client_id};%", f"-{days} days"),
     )
     return row["created_at"] if row else None
+
+
+def unresolved_email_intents(*, limit: int = 20) -> list[dict[str, Any]]:
+    rows = db.all_(
+        """SELECT i.id, i.client_id, i.email_kind, i.to_email, i.subject,
+                  i.status, i.attempts, i.claimed_at, i.error, c.name AS client_name,
+                  CASE
+                    WHEN i.status='unknown'
+                      OR i.claimed_at <= datetime('now', ?)
+                    THEN 1 ELSE 0
+                  END AS reconcilable
+           FROM acquisition_email_intents i
+           JOIN clients c ON c.id=i.client_id AND c.studio_id=i.studio_id
+           WHERE i.studio_id=? AND i.status IN ('claimed','unknown')
+           ORDER BY i.claimed_at ASC, i.id ASC LIMIT ?""",
+        (f"-{_CLAIM_STALE_MINUTES} minutes", STUDIO_ID, limit),
+    )
+    return [dict(row) for row in rows]
+
+
+def _unresolved_email_intent(client_id: int, email_kind: str) -> dict[str, Any] | None:
+    row = db.one(
+        """SELECT id, status, to_email, subject, claimed_at, error,
+                  CASE
+                    WHEN status='unknown'
+                      OR claimed_at <= datetime('now', ?)
+                    THEN 1 ELSE 0
+                  END AS reconcilable
+           FROM acquisition_email_intents
+           WHERE studio_id=? AND client_id=? AND email_kind=?
+             AND status IN ('claimed','unknown')
+           ORDER BY id DESC LIMIT 1""",
+        (f"-{_CLAIM_STALE_MINUTES} minutes", STUDIO_ID, client_id, email_kind),
+    )
+    return dict(row) if row else None
+
+
+def _recent_sent_at(client_id: int, email_kind: str, *, days: int) -> str | None:
+    if email_kind == "intro":
+        return recent_intro_sent_at(client_id, days=days)
+    if email_kind == "follow_up":
+        return recent_follow_up_sent_at(client_id, days=days)
+    raise ValueError("invalid acquisition email kind")
+
+
+@db.transactional(immediate=True)
+def _claim_email_intent(
+    draft: dict[str, str | int | None], *, email_kind: str, cooldown_days: int
+) -> dict[str, Any]:
+    if email_kind not in _EMAIL_KINDS:
+        raise ValueError("invalid acquisition email kind")
+    client_id = int(draft["client_id"] or 0)
+    recent = _recent_sent_at(client_id, email_kind, days=cooldown_days)
+    if recent:
+        return {"status": "cooldown", "last_sent_at": recent}
+
+    unresolved = _unresolved_email_intent(client_id, email_kind)
+    if unresolved:
+        return {"status": "review", "intent": unresolved}
+
+    latest_sent = db.one(
+        """SELECT id FROM acquisition_email_intents
+           WHERE studio_id=? AND client_id=? AND email_kind=? AND status='sent'
+           ORDER BY id DESC LIMIT 1""",
+        (STUDIO_ID, client_id, email_kind),
+    )
+    predecessor = str(latest_sent["id"]) if latest_sent else "first"
+    event_key = f"acquisition:{email_kind}:{client_id}:after:{predecessor}"
+    claim_token = secrets.token_urlsafe(24)
+    existing = db.one(
+        """SELECT id, status, sent_at FROM acquisition_email_intents
+           WHERE studio_id=? AND event_key=?""",
+        (STUDIO_ID, event_key),
+    )
+    if existing and existing["status"] == "sent":
+        return {"status": "cooldown", "last_sent_at": existing["sent_at"]}
+    if existing:
+        db.run(
+            """UPDATE acquisition_email_intents
+               SET status='claimed', attempts=attempts+1,
+                   to_email=?, subject=?, claimed_at=datetime('now'), error=NULL,
+                   claim_token=?, updated_at=datetime('now')
+               WHERE id=? AND studio_id=? AND status='failed'""",
+            (
+                str(draft["to"]),
+                str(draft["subject"]),
+                claim_token,
+                existing["id"],
+                STUDIO_ID,
+            ),
+        )
+        return {
+            "status": "claimed",
+            "intent_id": existing["id"],
+            "claim_token": claim_token,
+        }
+
+    intent_id = db.run(
+        """INSERT INTO acquisition_email_intents
+           (studio_id, client_id, email_kind, event_key, to_email, subject, claim_token)
+           VALUES (?,?,?,?,?,?,?)""",
+        (
+            STUDIO_ID,
+            client_id,
+            email_kind,
+            event_key,
+            str(draft["to"]),
+            str(draft["subject"]),
+            claim_token,
+        ),
+    )
+    return {"status": "claimed", "intent_id": intent_id, "claim_token": claim_token}
+
+
+@db.transactional(immediate=True)
+def _mark_email_intent_failed(
+    intent_id: int,
+    claim_token: str,
+    exc: Exception,
+    *,
+    outcome_unknown: bool,
+) -> None:
+    row = db.one(
+        """SELECT client_id, email_kind, to_email, subject
+           FROM acquisition_email_intents
+           WHERE id=? AND studio_id=? AND status='claimed' AND claim_token=?""",
+        (intent_id, STUDIO_ID, claim_token),
+    )
+    if not row:
+        return
+    config = _EMAIL_KINDS[row["email_kind"]]
+    status = "unknown" if outcome_unknown else "failed"
+    action = config["unknown"] if outcome_unknown else config["failed"]
+    message = str(exc)[:300]
+    db.run(
+        """UPDATE acquisition_email_intents
+           SET status=?, error=?, claim_token='', updated_at=datetime('now')
+           WHERE id=? AND studio_id=? AND status='claimed' AND claim_token=?""",
+        (status, message, intent_id, STUDIO_ID, claim_token),
+    )
+    db.audit(
+        "admin",
+        action,
+        f"{_detail(row['client_id'], row['to_email'], row['subject'])}; "
+        f"intent_id={intent_id}; error={message[:120]}",
+    )
+
+
+@db.transactional(immediate=True)
+def _mark_email_intent_sent(intent_id: int, claim_token: str) -> None:
+    row = db.one(
+        """SELECT client_id, email_kind, to_email, subject
+           FROM acquisition_email_intents
+           WHERE id=? AND studio_id=? AND status='claimed' AND claim_token=?""",
+        (intent_id, STUDIO_ID, claim_token),
+    )
+    if not row:
+        raise RuntimeError("acquisition delivery claim is no longer active")
+    config = _EMAIL_KINDS[row["email_kind"]]
+    db.run(
+        """UPDATE acquisition_email_intents
+           SET status='sent', sent_at=datetime('now'), error=NULL,
+               claim_token='', updated_at=datetime('now')
+           WHERE id=? AND studio_id=? AND status='claimed' AND claim_token=?""",
+        (intent_id, STUDIO_ID, claim_token),
+    )
+    db.run(
+        """INSERT INTO emails_log
+           (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
+           VALUES (?,?,?,?,?,?)""",
+        (
+            STUDIO_ID,
+            None,
+            config["doc_kind"],
+            row["client_id"],
+            row["to_email"],
+            row["subject"],
+        ),
+    )
+    db.audit(
+        "admin",
+        config["sent"],
+        f"{_detail(row['client_id'], row['to_email'], row['subject'])}; intent_id={intent_id}",
+    )
+
+
+@db.transactional(immediate=True)
+def reconcile_email_intent(intent_id: int, *, client_id: int, delivered: bool) -> None:
+    row = db.one(
+        """SELECT * FROM acquisition_email_intents
+           WHERE id=? AND studio_id=? AND client_id=?
+             AND status IN ('claimed','unknown')""",
+        (intent_id, STUDIO_ID, client_id),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="acquisition delivery intent not found")
+    stale_claim = row["claimed_at"] <= (
+        dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(minutes=_CLAIM_STALE_MINUTES)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+    if row["status"] == "claimed" and not stale_claim:
+        raise HTTPException(status_code=409, detail="delivery is still in progress")
+
+    config = _EMAIL_KINDS[row["email_kind"]]
+    if not delivered:
+        db.run(
+            """UPDATE acquisition_email_intents
+               SET status='failed', error='Operator confirmed provider did not deliver',
+                   claim_token='', updated_at=datetime('now')
+               WHERE id=? AND studio_id=?""",
+            (intent_id, STUDIO_ID),
+        )
+        db.audit(
+            "admin",
+            config["failed"],
+            f"{_detail(client_id, row['to_email'], row['subject'])}; "
+            f"intent_id={intent_id}; reconciled=not-delivered",
+        )
+        return
+
+    db.run(
+        """UPDATE acquisition_email_intents
+           SET status='sent', sent_at=COALESCE(sent_at, datetime('now')),
+               error=NULL, claim_token='', updated_at=datetime('now')
+           WHERE id=? AND studio_id=?""",
+        (intent_id, STUDIO_ID),
+    )
+    db.run(
+        """INSERT INTO emails_log
+           (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
+           SELECT ?, NULL, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+               SELECT 1 FROM audit_log
+               WHERE studio_id=? AND action=? AND detail LIKE ?
+           )""",
+        (
+            STUDIO_ID,
+            config["doc_kind"],
+            client_id,
+            row["to_email"],
+            row["subject"],
+            STUDIO_ID,
+            config["sent"],
+            f"%; intent_id={intent_id};%",
+        ),
+    )
+    db.audit(
+        "admin",
+        config["sent"],
+        f"{_detail(client_id, row['to_email'], row['subject'])}; "
+        f"intent_id={intent_id}; reconciled=delivered",
+    )
+
+
+def _send_email_intent(
+    draft: dict[str, str | int | None], *, email_kind: str, cooldown_days: int
+) -> dict[str, Any]:
+    claim = _claim_email_intent(
+        draft,
+        email_kind=email_kind,
+        cooldown_days=cooldown_days,
+    )
+    if claim["status"] != "claimed":
+        return {**claim, "draft": draft}
+    intent_id = int(claim["intent_id"])
+    claim_token = str(claim["claim_token"])
+    label = "acquisition follow-up" if email_kind == "follow_up" else "acquisition"
+    try:
+        mailer.send_for_studio(str(draft["to"]), str(draft["subject"]), str(draft["body"]))
+    except mailer.DeliveryOutcomeUnknown as exc:
+        _mark_email_intent_failed(intent_id, claim_token, exc, outcome_unknown=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"{label} email outcome is unknown; verify the provider before retrying",
+        ) from exc
+    except Exception as exc:
+        _mark_email_intent_failed(intent_id, claim_token, exc, outcome_unknown=False)
+        raise HTTPException(status_code=502, detail=f"{label} email failed") from exc
+
+    try:
+        _mark_email_intent_sent(intent_id, claim_token)
+    except Exception as exc:
+        try:
+            _mark_email_intent_failed(intent_id, claim_token, exc, outcome_unknown=True)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=502,
+            detail=f"{label} email was accepted but local confirmation failed; verify the provider",
+        ) from exc
+    return {"status": "sent", "draft": draft}
 
 
 def _active_referral_code(client_id: int) -> dict[str, Any] | None:
@@ -433,28 +741,14 @@ def send_intro_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) -> d
     recent = recent_intro_sent_at(client_id, days=cooldown_days)
     if recent:
         return {"status": "cooldown", "last_sent_at": recent, "draft": draft}
-
     if not mailer.configured():
         db.audit("admin", ACTION_DRAFT, _detail(client_id, str(draft["to"]), str(draft["subject"])))
         return {"status": "draft", "draft": draft}
-
-    try:
-        mailer.send_for_studio(str(draft["to"]), str(draft["subject"]), str(draft["body"]))
-    except Exception as exc:
-        db.audit(
-            "admin",
-            ACTION_FAILED,
-            f"{_detail(client_id, str(draft['to']), str(draft['subject']))}; error={str(exc)[:120]}",
-        )
-        raise HTTPException(status_code=502, detail="acquisition email failed") from exc
-
-    db.run(
-        """INSERT INTO emails_log (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
-           VALUES (?,?,?,?,?,?)""",
-        (STUDIO_ID, None, "acquisition_intro", client_id, draft["to"], draft["subject"]),
+    return _send_email_intent(
+        draft,
+        email_kind="intro",
+        cooldown_days=cooldown_days,
     )
-    db.audit("admin", ACTION_SENT, _detail(client_id, str(draft["to"]), str(draft["subject"])))
-    return {"status": "sent", "draft": draft}
 
 
 def _latest_intro_sent_rows(*, days: int = 90) -> list[Any]:
@@ -478,13 +772,17 @@ def _latest_intro_sent_rows(*, days: int = 90) -> list[Any]:
 def _attributed_booking_after(client_id: int, sent_at: str) -> dict[str, Any] | None:
     row = db.one(
         """SELECT q.id, q.name, q.property_address, q.created_at, q.listing_id,
-                  r.code AS referral_code
+                  COALESCE(rr.referral_code, r.code) AS referral_code
              FROM inquiries q
-             JOIN referral_codes r
-               ON r.studio_id=q.studio_id
+             LEFT JOIN referral_redemptions rr
+               ON rr.studio_id=q.studio_id AND rr.inquiry_id=q.id
+             LEFT JOIN referral_codes r
+               ON rr.id IS NULL
+              AND r.studio_id=q.studio_id
               AND upper(r.code)=upper(q.promo_code)
             WHERE q.studio_id=?
-              AND r.referrer_client_id=?
+              AND COALESCE(rr.referrer_client_id, r.referrer_client_id)=?
+              AND q.status='confirmed'
               AND q.created_at >= ?
             ORDER BY q.created_at ASC LIMIT 1""",
         (STUDIO_ID, client_id, sent_at),
@@ -588,7 +886,6 @@ def send_follow_up_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) 
     recent = recent_follow_up_sent_at(client_id, days=cooldown_days)
     if recent:
         return {"status": "cooldown", "last_sent_at": recent, "draft": draft}
-
     if not mailer.configured():
         db.audit(
             "admin",
@@ -596,28 +893,11 @@ def send_follow_up_email(client_id: int, *, cooldown_days: int = COOLDOWN_DAYS) 
             _detail(client_id, str(draft["to"]), str(draft["subject"])),
         )
         return {"status": "draft", "draft": draft}
-
-    try:
-        mailer.send_for_studio(str(draft["to"]), str(draft["subject"]), str(draft["body"]))
-    except Exception as exc:
-        db.audit(
-            "admin",
-            ACTION_FOLLOW_UP_FAILED,
-            f"{_detail(client_id, str(draft['to']), str(draft['subject']))}; error={str(exc)[:120]}",
-        )
-        raise HTTPException(status_code=502, detail="acquisition follow-up email failed") from exc
-
-    db.run(
-        """INSERT INTO emails_log (studio_id, listing_id, doc_kind, doc_id, to_email, subject)
-           VALUES (?,?,?,?,?,?)""",
-        (STUDIO_ID, None, FOLLOW_UP_DOC_KIND, client_id, draft["to"], draft["subject"]),
+    return _send_email_intent(
+        draft,
+        email_kind="follow_up",
+        cooldown_days=cooldown_days,
     )
-    db.audit(
-        "admin",
-        ACTION_FOLLOW_UP_SENT,
-        _detail(client_id, str(draft["to"]), str(draft["subject"])),
-    )
-    return {"status": "sent", "draft": draft}
 
 
 def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> dict[str, int | str]:
@@ -630,6 +910,7 @@ def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> d
         "draft": 0,
         "cooldown": 0,
         "failed": 0,
+        "review": 0,
         "skipped": 0,
     }
     for row in candidates:
@@ -639,9 +920,12 @@ def bulk_send_intro_emails(*, queue_filter: str = "ready", limit: int = 50) -> d
         try:
             status = send_intro_email(row["id"])["status"]
         except HTTPException:
-            result["failed"] += 1
+            if _unresolved_email_intent(row["id"], "intro"):
+                result["review"] += 1
+            else:
+                result["failed"] += 1
             continue
-        if status in {"sent", "draft", "cooldown"}:
+        if status in {"sent", "draft", "cooldown", "review"}:
             result[status] += 1
         else:
             result["skipped"] += 1
@@ -654,9 +938,9 @@ def attributed_bookings(limit: int = 50) -> list[dict[str, Any]]:
                   q.created_at, q.scheduled_at, q.promo_code, q.total_cents,
                   q.deposit_cents, q.listing_id,
                   l.title AS listing_title,
-                  r.id AS referral_id,
-                  r.code AS referral_code,
-                  r.referrer_client_id,
+                  COALESCE(rr.referral_id, r.id) AS referral_id,
+                  COALESCE(rr.referral_code, r.code) AS referral_code,
+                  COALESCE(rr.referrer_client_id, r.referrer_client_id) AS referrer_client_id,
                   ref.name AS referrer_name,
                   ref.company AS referrer_company,
                   ref.email AS referrer_email,
@@ -672,11 +956,15 @@ def attributed_bookings(limit: int = 50) -> list[dict[str, Any]]:
                       AND i.listing_id=q.listing_id
                       AND i.status='sent'), 0) AS open_cents
            FROM inquiries q
+           LEFT JOIN referral_redemptions rr
+             ON rr.studio_id=q.studio_id
+            AND rr.inquiry_id=q.id
            LEFT JOIN referral_codes r
-             ON r.studio_id=q.studio_id
+             ON rr.id IS NULL
+            AND r.studio_id=q.studio_id
             AND upper(r.code)=upper(q.promo_code)
            LEFT JOIN clients ref
-             ON ref.id=r.referrer_client_id
+             ON ref.id=COALESCE(rr.referrer_client_id, r.referrer_client_id)
             AND ref.studio_id=q.studio_id
            LEFT JOIN clients parent
              ON parent.id=ref.parent_id
@@ -1000,6 +1288,7 @@ def dashboard(*, queue_filter: str = "all") -> dict:
         "queue_filter": selected,
         "queue_filters": queue_filter_options(all_asks, selected),
         "agent_referrals": agent_referral_summary(referrals),
+        "delivery_reviews": unresolved_email_intents(),
     }
 
 

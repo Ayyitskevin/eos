@@ -1,6 +1,6 @@
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse
 
 from .. import rebooking, security
@@ -25,5 +25,21 @@ async def rebooking_send(client_id: int, redirect: str = Form("")):
     target = _safe_redirect(redirect, client_id)
     return RedirectResponse(
         _with_notice(target, status=result["status"], client_id=client_id),
+        status_code=303,
+    )
+
+
+@router.post("/rebooking/{client_id}/intents/{intent_id}/reconcile")
+async def rebooking_reconcile(client_id: int, intent_id: int, outcome: str = Form(...)):
+    if outcome not in {"delivered", "not-delivered"}:
+        raise HTTPException(status_code=400, detail="invalid rebooking reconciliation outcome")
+    rebooking.reconcile_intent(
+        intent_id,
+        client_id=client_id,
+        delivered=outcome == "delivered",
+    )
+    notice = "reconciled-sent" if outcome == "delivered" else "retry-ready"
+    return RedirectResponse(
+        _with_notice(f"/admin/clients/{client_id}", status=notice, client_id=client_id),
         status_code=303,
     )

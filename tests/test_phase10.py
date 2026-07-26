@@ -10,6 +10,7 @@ import eos.main as main
 import eos.onboarding as onboarding
 import eos.referrals as referrals
 import eos.sequences as sequences
+import eos.signup_verify as signup_verify
 import eos.tenant as tenant
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -34,7 +35,7 @@ def app_env(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_signup_creates_isolated_studio(app_env):
     transport = ASGITransport(app=app_env)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
         r = await client.post(
             "/signup",
             data={
@@ -63,6 +64,7 @@ async def test_subdomain_resolves_tenant(app_env):
         owner_email="g@gamma.test",
         owner_password="secret-pass-2",
     )
+    signup_verify.mark_verified("gamma")
     db.run(
         "INSERT INTO listings (studio_id, title, status) VALUES ('gamma', 'Gamma Only', 'lead')",
     )
@@ -71,7 +73,7 @@ async def test_subdomain_resolves_tenant(app_env):
     )
 
     transport = ASGITransport(app=app_env)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
         login = await client.post(
             "/admin/login",
             data={"email": "g@gamma.test", "password": "secret-pass-2"},
@@ -94,7 +96,7 @@ async def test_api_token_lists_tenant_listings(app_env):
     _tid, raw = api_tokens.create_token(label="test")
 
     transport = ASGITransport(app=app_env)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
         r = await client.get("/api/v1/listings", headers={"authorization": f"Bearer {raw}"})
         assert r.status_code == 200
         data = r.json()

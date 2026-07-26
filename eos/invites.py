@@ -39,11 +39,15 @@ def redeem(code: str) -> None:
     if not invite_required():
         return
     raw = normalize(code)
-    validate(raw)
-    db.run(
-        "UPDATE invite_codes SET uses=uses+1 WHERE upper(code)=?",
-        (raw,),
-    )
+    with db.tx() as con:
+        cur = con.execute(
+            """UPDATE invite_codes SET uses=uses+1
+               WHERE upper(code)=? AND active=1
+                 AND (max_uses IS NULL OR uses < max_uses)""",
+            (raw,),
+        )
+        if cur.rowcount != 1:
+            raise HTTPException(status_code=400, detail="Invalid or fully used invite code.")
 
 
 def create_code(*, code: str, label: str = "", max_uses: int | None = None) -> str:

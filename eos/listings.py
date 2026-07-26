@@ -147,18 +147,37 @@ def create_listing(
             )
     usage.bump("listings_created")
     db.audit("admin", "listing.create", f"id={lid} title={title.strip()}")
-    try:
-        from . import drive_time
+    if studio.get_profile()["drive_time_enabled"]:
+        from . import jobs
 
-        if studio.get_profile()["drive_time_enabled"]:
-            drive_time.geocode_listing(lid)
-    except Exception:
-        pass
+        jobs.enqueue(
+            "geocode_listing",
+            {"listing_id": lid},
+            idempotency_key=f"listing:{lid}:geocode",
+        )
     return lid
 
 
+@db.transactional(immediate=True)
 def update_listing(listing_id: int, **fields) -> None:
     old = get_listing(listing_id)
+    requested_status = fields.get("status")
+    opening_revision = (
+        old["status"] == "delivered"
+        and requested_status == "editing"
+        and "revision_round" in fields
+    )
+    if requested_status == "delivered" and old["status"] != "delivered":
+        raise HTTPException(
+            status_code=409,
+            detail="Publish a ready gallery before marking this listing delivered.",
+        )
+    if (
+        old["status"] == "delivered"
+        and requested_status not in (None, "delivered", "archived")
+        and not opening_revision
+    ):
+        raise HTTPException(status_code=409, detail="Delivered listings cannot move backward.")
     if "client_id" in fields:
         _validate_client_id(fields["client_id"])
     if "assigned_user_id" in fields:
@@ -196,6 +215,8 @@ def update_listing(listing_id: int, **fields) -> None:
             params.append(v.strip())
         else:
             params.append(v)
+    if requested_status == "delivered":
+        parts.append("delivered_at=COALESCE(delivered_at, datetime('now'))")
     params.extend([listing_id, STUDIO_ID])
     db.run(f"UPDATE listings SET {', '.join(parts)} WHERE id=? AND studio_id=?", tuple(params))
     db.audit("admin", "listing.update", f"id={listing_id}")
@@ -206,7 +227,7 @@ def update_listing(listing_id: int, **fields) -> None:
         if new_status == "booked":
             automations.on_listing_booked(listing_id)
         elif new_status == "delivered":
-            automations._trigger("listing.delivered", listing_id)
+            automations.on_listing_delivered(listing_id)
 
 
 def listing_shots(listing_id: int):

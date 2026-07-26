@@ -13,18 +13,24 @@ router = APIRouter(prefix="/admin")
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request):
     has_users = bool(db.one("SELECT 1 AS x FROM users WHERE active=1 LIMIT 1"))
-    return templates.TemplateResponse(
+    google_login = admin_oauth.can_start_login(
+        studio_id=tenant.get_studio_id(),
+        host=request.headers.get("host", ""),
+        scheme=request.url.scheme,
+    )
+    response = templates.TemplateResponse(
         request,
         "admin/login.html",
         {
-            "error": None,
-            "saas_mode": config.SAAS_MODE or has_users,
-            "google_login": admin_oauth.is_configured(),
-            "google_login_url": admin_oauth.login_url(studio_id=tenant.get_studio_id())
-            if admin_oauth.is_configured()
+            "error": "Google sign-in could not be completed."
+            if request.query_params.get("oauth_error")
             else None,
+            "saas_mode": config.SAAS_MODE or has_users,
+            "google_login": google_login,
+            "google_login_url": "/oauth/google/admin/start" if google_login else None,
         },
     )
+    return response
 
 
 def _saas_login(request: Request) -> bool:

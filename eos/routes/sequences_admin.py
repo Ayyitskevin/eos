@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, mailer, security, sequences
@@ -30,6 +30,29 @@ async def toggle_sequence(seq_id: int, active: bool = Form(False)):
 @router.post("/sequences/runs/{run_id}/cancel")
 async def cancel_run(run_id: int):
     sequences.cancel_run(run_id)
+    return RedirectResponse("/admin/sequences", status_code=303)
+
+
+@router.post("/sequences/runs/{run_id}/retry")
+async def retry_run(run_id: int):
+    if not sequences.retry_run(run_id):
+        raise HTTPException(
+            status_code=409,
+            detail="only definite failed sequence runs can be retried; reconcile unknown outcomes first",
+        )
+    return RedirectResponse("/admin/sequences", status_code=303)
+
+
+@router.post("/sequences/runs/{run_id}/reconcile")
+async def reconcile_run(run_id: int, outcome: str = Form(...)):
+    if outcome not in {"delivered", "not_delivered"}:
+        raise HTTPException(status_code=400, detail="invalid email reconciliation outcome")
+    try:
+        sequences.reconcile_run(run_id, delivered=outcome == "delivered")
+    except sequences.SequenceRunNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except sequences.SequenceRunReconciliationConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return RedirectResponse("/admin/sequences", status_code=303)
 
 

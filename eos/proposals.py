@@ -136,15 +136,19 @@ def mark_viewed(proposal_id: int) -> None:
     )
 
 
+@db.transactional(immediate=True)
 def accept_by_slug(slug: str) -> None:
     row = get_proposal_by_slug(slug)
     if row["status"] != "sent":
-        raise HTTPException(status_code=400, detail="proposal is not open for acceptance")
-    db.run(
-        """UPDATE proposals SET status='accepted', accepted_at=datetime('now')
-           WHERE id=? AND studio_id=?""",
-        (row["id"], STUDIO_ID),
-    )
+        raise HTTPException(status_code=409, detail="proposal is not open for acceptance")
+    with db.tx() as con:
+        claimed = con.execute(
+            """UPDATE proposals SET status='accepted', accepted_at=datetime('now')
+               WHERE id=? AND studio_id=? AND status='sent'""",
+            (row["id"], STUDIO_ID),
+        )
+    if claimed.rowcount != 1:
+        raise HTTPException(status_code=409, detail="proposal is no longer open")
     db.run(
         """UPDATE listings SET status='booked'
            WHERE id=? AND studio_id=? AND status IN ('lead','booked')""",
@@ -155,11 +159,16 @@ def accept_by_slug(slug: str) -> None:
     automations.on_listing_booked(row["listing_id"])
 
 
+@db.transactional(immediate=True)
 def decline_by_slug(slug: str) -> None:
     row = get_proposal_by_slug(slug)
     if row["status"] != "sent":
-        raise HTTPException(status_code=400, detail="proposal is not open")
-    db.run(
-        "UPDATE proposals SET status='declined' WHERE id=? AND studio_id=?",
-        (row["id"], STUDIO_ID),
-    )
+        raise HTTPException(status_code=409, detail="proposal is not open")
+    with db.tx() as con:
+        claimed = con.execute(
+            """UPDATE proposals SET status='declined'
+               WHERE id=? AND studio_id=? AND status='sent'""",
+            (row["id"], STUDIO_ID),
+        )
+    if claimed.rowcount != 1:
+        raise HTTPException(status_code=409, detail="proposal is no longer open")

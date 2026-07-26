@@ -107,9 +107,10 @@ def list_for_calendar(
     )
 
 
+@db.transactional(immediate=True)
 def reschedule_appointment(appt_id: int, *, starts_at: str) -> None:
     row = get_appointment(appt_id)
-    if row.get("external_source") == "google":
+    if row["external_source"] == "google":
         raise HTTPException(
             status_code=400, detail="Google Calendar events cannot be rescheduled here."
         )

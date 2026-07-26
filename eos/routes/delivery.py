@@ -1,5 +1,3 @@
-import datetime as dt
-
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -10,18 +8,11 @@ from ..vocab import STUDIO_ID
 router = APIRouter()
 
 
-def _check_expiry(g) -> None:
-    if g["expires_at"] and g["expires_at"] < dt.date.today().isoformat():
-        raise HTTPException(status_code=410)
-
-
 @router.get("/g/{slug}", response_class=HTMLResponse)
 async def gallery_gate(request: Request, slug: str):
     g = galleries.get_gallery_by_slug(slug)
-    if not g["published"]:
-        raise HTTPException(status_code=404)
-    _check_expiry(g)
-    if security.gallery_unlocked(request, g["id"]):
+    galleries.require_public_gallery(g)
+    if security.gallery_unlocked(request, g):
         return await gallery_view(request, slug)
     return templates.TemplateResponse(
         request,
@@ -33,7 +24,7 @@ async def gallery_gate(request: Request, slug: str):
 @router.post("/g/{slug}/pin")
 async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
     g = galleries.get_gallery_by_slug(slug)
-    _check_expiry(g)
+    galleries.require_public_gallery(g)
     ip = security.client_ip(request)
     if security.pin_locked(ip, g["id"]):
         return templates.TemplateResponse(
@@ -52,7 +43,7 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
         )
     security.pin_clear(ip, g["id"])
     resp = RedirectResponse(f"/g/{slug}", status_code=303)
-    name, value = security.set_gallery_cookie(g["id"])
+    name, value = security.set_gallery_cookie(g)
     resp.set_cookie(
         name,
         value,
@@ -69,6 +60,7 @@ async def gallery_view(request: Request, slug: str):
     from .. import upsell as upsell_mod
 
     g = galleries.get_gallery_by_slug(slug)
+    galleries.require_public_gallery(g)
     sections, by_section, unsectioned = galleries.assets_by_section(g["id"])
     locked = paywall.payment_required(g["listing_id"])
     inv_slug = paywall.unpaid_invoice_slug(g["listing_id"]) if locked else None
@@ -98,6 +90,7 @@ async def gallery_view(request: Request, slug: str):
             "embeds": embeds,
             "upsell": upsell_banner,
             "upsell_addons": upsell_addons,
+            "upsell_request_key": security.new_token(),
             "favorites": galleries.agent_favorites(g["id"]),
         },
     )
@@ -106,7 +99,8 @@ async def gallery_view(request: Request, slug: str):
 @router.post("/g/{slug}/favorite/{asset_id}")
 async def gallery_favorite(request: Request, slug: str, asset_id: int):
     g = galleries.get_gallery_by_slug(slug)
-    if not security.gallery_unlocked(request, g["id"]):
+    galleries.require_public_gallery(g)
+    if not security.gallery_unlocked(request, g):
         raise HTTPException(status_code=403)
     galleries.toggle_agent_favorite(asset_id, gallery_id=g["id"])
     return RedirectResponse(f"/g/{slug}", status_code=303)

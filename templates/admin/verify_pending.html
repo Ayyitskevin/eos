@@ -4,8 +4,36 @@
 <main class="center-card wide">
   <p class="brand-mark">Eos</p>
   <h1>Check your email</h1>
+  {% if verification_delivery and verification_delivery.status == 'sent' %}
   <p>We sent a verification link to activate your studio. Click the link in your inbox, then sign in here.</p>
+  {% elif verification_delivery and verification_delivery.status == 'failed' %}
+  <p>The last delivery failed before the provider accepted it. You can safely resend the verification email.</p>
+  {% elif verification_delivery and verification_delivery.status == 'claimed' and not verification_delivery.reconcilable %}
+  <p>The verification email is still being sent. Refresh this page in a moment.</p>
+  {% elif verification_delivery and verification_delivery.reconcilable %}
+  <p class="alert-banner">The delivery outcome is unknown. Check the email provider before choosing an outcome; automatic resend is paused to prevent duplicates.</p>
+  {% else %}
+  <p class="alert-banner">Verification delivery is not ready. Ask the platform operator to configure transactional email.</p>
+  {% endif %}
   {% if contact_email %}<p class="muted small">Sent to {{ contact_email }}</p>{% endif %}
+  {% if request.query_params.get('resent') %}<p class="alert-banner ok">Verification email resent.</p>{% endif %}
+  {% if request.query_params.get('reconciled') == 'delivered' %}<p class="alert-banner ok">Provider delivery confirmed. The existing verification link remains valid.</p>{% endif %}
+  {% if request.query_params.get('reconciled') == 'not-delivered' %}<p class="alert-banner ok">Provider confirmed no delivery. It is now safe to resend.</p>{% endif %}
+  {% if verification_delivery and verification_delivery.reconcilable %}
+  <div class="card compact">
+    <p><strong>Provider reconciliation</strong></p>
+    <p class="muted small">Only choose an outcome after checking Postmark or Gmail for this recipient.</p>
+    <form method="post" action="/admin/verify-pending/reconcile">
+      <button type="submit" name="outcome" value="delivered" class="btn secondary">Provider shows delivered</button>
+      <button type="submit" name="outcome" value="not-delivered" class="btn secondary">Provider shows not delivered</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if verification_delivery and verification_delivery.status in ('sent', 'failed') %}
+  <form method="post" action="/admin/verify-pending/resend">
+    <button type="submit" class="btn secondary">Resend verification email</button>
+  </form>
+  {% endif %}
   <p><a href="/admin/login">Back to login</a></p>
 </main>
 {% endblock %}

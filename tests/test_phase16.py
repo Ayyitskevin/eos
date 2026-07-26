@@ -145,5 +145,5 @@ async def test_platform_suspend_blocks_subdomain(saas_env):
     transport = ASGITransport(app=saas_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         r = await client.get("/book", headers={"host": "suspend-me.eos.test"})
-        assert r.status_code == 403
-        assert "unavailable" in r.text
+        assert r.status_code == 404
+        assert "unavailable" not in r.text.lower()

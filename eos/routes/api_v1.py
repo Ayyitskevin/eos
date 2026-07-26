@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .. import api_tokens, commerce, db, inquiries, listings, scheduling, tenant
+from .. import api_tokens, commerce, db, galleries, inquiries, listings, tenant
 from ..vocab import STUDIO_ID
 
 router = APIRouter(prefix="/api/v1")
@@ -48,6 +48,7 @@ class BookingCreate(BaseModel):
     email: str
     phone: str = ""
     property_address: str
+    request_key: str = Field(min_length=8, max_length=128)
     package_id: int
     scheduled_at: str
     addon_ids: list[int] = Field(default_factory=list)
@@ -136,8 +137,6 @@ async def api_bookings(
 
 @router.post("/bookings", status_code=201)
 async def api_create_booking(body: BookingCreate, _: str = Depends(_api_tenant)):
-    if not scheduling.slot_is_open(body.scheduled_at):
-        raise HTTPException(status_code=409, detail="slot not available")
     signer = body.signer_name.strip() or body.name.strip()
     result = commerce.create_booking(
         name=body.name,
@@ -149,6 +148,7 @@ async def api_create_booking(body: BookingCreate, _: str = Depends(_api_tenant))
         addon_ids=body.addon_ids,
         message=body.message,
         signer_name=signer,
+        request_key=body.request_key,
     )
     return result
 
@@ -175,7 +175,7 @@ async def api_inbound_event(event_name: str, request: Request, _: str = Depends(
         lid = payload.get("listing_id")
         if not lid:
             raise HTTPException(status_code=400, detail="listing_id required")
-        listings.update_listing(int(lid), status="delivered")
+        galleries.redeliver_listing(int(lid))
         return {"ok": True, "listing_id": int(lid), "status": "delivered"}
     if event_name == "listing.booked":
         lid = payload.get("listing_id")

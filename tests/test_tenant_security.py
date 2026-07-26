@@ -1,8 +1,10 @@
 """Tenant isolation and auth hardening tests."""
 
 import importlib
+import socket
 from unittest.mock import patch
 
+import eos.api_tokens as api_tokens
 import eos.config as config
 import eos.db as db
 import eos.delivery_notify as delivery_notify
@@ -28,10 +30,12 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EOS_SECRET_KEY", "test-secret-key-32chars-minimum!!")
     monkeypatch.setenv("EOS_ADMIN_PASSWORD", "test-admin-pass")
     monkeypatch.setenv("EOS_SIGNUP_ENABLED", "true")
+    monkeypatch.setenv("EOS_SIGNUP_AUTO_VERIFY_LOCAL", "true")
     monkeypatch.setenv("EOS_BASE_DOMAIN", "eos.test")
     monkeypatch.setenv("EOS_SAAS_MODE", "true")
     for mod in (
         config,
+        api_tokens,
         db,
         delivery_notify,
         drive_time,
@@ -91,9 +95,50 @@ async def test_legacy_admin_disabled_multi_studio(app_env):
         r = await client.post(
             "/admin/login",
             data={"password": "test-admin-pass"},
+            headers={"host": "eos.test"},
             follow_redirects=False,
         )
         assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("billing_status", "trial_ends_at"),
+    [
+        ("none", None),
+        ("trialing", None),
+        ("trialing", "not-a-trial-date"),
+    ],
+)
+async def test_api_reads_and_mutations_fail_closed_for_invalid_billing_state(
+    app_env, billing_status, trial_ends_at
+):
+    tenant.set_studio("alpha")
+    _token_id, raw_token = api_tokens.create_token(label="billing-boundary")
+    db.run(
+        """UPDATE studio SET billing_status=?, trial_ends_at=?
+           WHERE id='alpha'""",
+        (billing_status, trial_ends_at),
+    )
+    headers = {
+        "host": "alpha.eos.test",
+        "authorization": f"Bearer {raw_token}",
+    }
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
+        read = await client.get("/api/v1/listings", headers=headers)
+        mutation = await client.post(
+            "/api/v1/listings",
+            headers=headers,
+            json={"title": "Blocked API mutation"},
+        )
+
+    assert read.status_code == 403
+    assert mutation.status_code == 403
+    assert not db.one(
+        """SELECT id FROM listings
+           WHERE studio_id='alpha' AND title='Blocked API mutation'"""
+    )
 
 
 @pytest.mark.asyncio
@@ -102,8 +147,23 @@ async def test_upload_rejects_other_studio_gallery(app_env):
     gid = db.run(
         "INSERT INTO galleries (studio_id, slug, title, pin, delivery_token) VALUES ('alpha','s1','G','0000','tok')",
     )
+    from eos import media_paths
+
+    aid = db.run(
+        "INSERT INTO assets (gallery_id, kind, filename, stored, status) "
+        "VALUES (?, 'photo', 'private.jpg', 'private.jpg', 'ready')",
+        (gid,),
+    )
+    original = media_paths.gallery_subdir(gid, "original", studio_id="alpha") / "private.jpg"
+    original.write_bytes(b"alpha-private-original")
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        anonymous = await client.get(
+            f"/admin/galleries/{gid}/media/original/{aid}",
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert anonymous.status_code == 303
         login = await client.post(
             "/admin/login",
             data={"email": "b@beta.test", "password": "beta-pass-1"},
@@ -111,6 +171,12 @@ async def test_upload_rejects_other_studio_gallery(app_env):
             follow_redirects=False,
         )
         cookie = login.headers["set-cookie"]
+        cross_tenant_media = await client.get(
+            f"/admin/galleries/{gid}/media/original/{aid}",
+            headers={"host": "beta.eos.test", "cookie": cookie},
+            follow_redirects=False,
+        )
+        assert cross_tenant_media.status_code == 404
         r = await client.post(
             f"/admin/galleries/{gid}/upload",
             files={"files": ("x.jpg", b"fake", "image/jpeg")},
@@ -502,13 +568,15 @@ def test_asset_job_binds_asset_studio(app_env):
            VALUES (?, 'video', 'tour.mp4', 'tour.mp4', 'pending')""",
         (gallery_id,),
     )
+    with patch.object(jobs, "_pool", None):
+        job_id = jobs.enqueue("video_ready", {"asset_id": asset_id})
     tenant.set_studio("default")
 
-    jobs.HANDLERS["video_ready"]({"asset_id": asset_id})
+    jobs._execute(job_id)
 
     row = db.one("SELECT status FROM assets WHERE id=?", (asset_id,))
     assert row["status"] == "ready"
-    assert tenant.get_studio_id() == "beta"
+    assert tenant.get_studio_id() == "default"
 
 
 def test_portal_token_requires_current_studio_client(app_env):
@@ -608,7 +676,11 @@ def test_delivery_notify_binds_gallery_owner_studio(app_env):
     assert send.call_args.args[0] == "agent@beta.test"
     assert "beta.eos.test" in send.call_args.args[2]
     row = db.one(
-        "SELECT studio_id, listing_id FROM emails_log WHERE doc_kind='gallery' AND doc_id=?",
+        """SELECT e.studio_id, e.listing_id
+           FROM emails_log e
+           JOIN delivery_notifications n
+             ON n.id=e.doc_id AND n.studio_id=e.studio_id
+           WHERE e.doc_kind='gallery_delivery' AND n.gallery_id=?""",
         (gallery_id,),
     )
     assert row["studio_id"] == "beta"
@@ -620,14 +692,23 @@ def test_webhook_post_binds_and_restores_dispatch_studio(app_env):
     tenant.set_studio("default")
     seen_studios: list[str] = []
 
-    class Response:
-        status_code = 204
-
-    def capture_post(*_args, **_kwargs):
+    def capture_pinned(*_args, **_kwargs):
         seen_studios.append(tenant.get_studio_id())
-        return Response()
+        return 204
 
-    with patch("eos.webhooks.httpx.post", side_effect=capture_post):
+    answers = [
+        (
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("93.184.216.34", 443),
+        )
+    ]
+    with (
+        patch("eos.webhooks.socket.getaddrinfo", return_value=answers),
+        patch("eos.webhooks._post_pinned", side_effect=capture_pinned),
+    ):
         webhooks._post(
             42,
             "beta",

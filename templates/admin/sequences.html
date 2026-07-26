@@ -40,16 +40,32 @@
     <h2>Pending runs</h2>
     {% if pending %}
     <table class="list compact">
-      <tr><th>Due</th><th>Sequence</th><th>Listing</th><th>To</th><th>Status</th><th></th></tr>
+      <tr><th>Due</th><th>Sequence</th><th>Listing</th><th>To</th><th>Status</th><th>Attempts</th><th></th></tr>
       {% for r in pending %}
       <tr>
         <td class="muted">{{ r.scheduled_at[:16] }}</td>
         <td>{{ r.sequence_name }}</td>
         <td>{{ r.listing_title or "—" }}</td>
         <td>{{ r.to_email }}</td>
-        <td>{% if r.status == 'failed' %}<span class="error">{{ r.status }}{% if r.error %}: {{ r.error[:40] }}{% endif %}</span>{% else %}{{ r.status }}{% endif %}</td>
+        <td>{% if r.status == 'failed' %}<span class="error">{{ r.status }}{% if r.error %}: {{ r.error[:80] }}{% endif %}</span>{% else %}{{ r.status }}{% endif %}</td>
+        <td>{{ r.attempts }}</td>
         <td>
-          {% if r.status == 'scheduled' %}
+          {% if r.status == 'failed' %}
+          {% if r.reconcile_ready %}
+          <form method="post" action="/admin/sequences/runs/{{ r.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="delivered">
+            <button type="submit" class="link">Provider confirms delivered</button>
+          </form>
+          <form method="post" action="/admin/sequences/runs/{{ r.id }}/reconcile" class="inline-form">
+            <input type="hidden" name="outcome" value="not_delivered">
+            <button type="submit" class="link">Provider confirms not delivered</button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/sequences/runs/{{ r.id }}/retry" class="inline-form">
+            <button type="submit" class="link">Retry</button>
+          </form>
+          {% endif %}
+          {% elif r.status == 'scheduled' and not r.claimed_at %}
           <form method="post" action="/admin/sequences/runs/{{ r.id }}/cancel" class="inline-form">
             <button type="submit" class="link">Cancel</button>
           </form>

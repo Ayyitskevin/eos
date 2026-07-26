@@ -47,7 +47,7 @@ def get_invoice(invoice_id: int):
 
 def get_invoice_by_slug(slug: str):
     row = db.one("SELECT * FROM invoices WHERE slug=? AND studio_id=?", (slug, STUDIO_ID))
-    if not row or row["status"] == "draft":
+    if not row or row["status"] not in ("sent", "paid"):
         raise HTTPException(status_code=404)
     _ensure_invoice_refs(row)
     return row

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import automations, config, db, galleries, jobs, listings, microsites, security, studio
+from .. import db, galleries, jobs, listings, security, studio, tenant
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -12,7 +12,7 @@ async def galleries_index(request: Request):
     return templates.TemplateResponse(
         request,
         "admin/galleries.html",
-        {"galleries": galleries.list_galleries(), "base_url": config.BASE_URL},
+        {"galleries": galleries.list_galleries(), "base_url": tenant.get_base_url()},
     )
 
 
@@ -45,7 +45,9 @@ async def gallery_detail(request: Request, gallery_id: int):
             "listings": listings.list_listings(),
             "presets": studio.list_crop_presets(),
             "n_pending": n_pending,
-            "base_url": config.BASE_URL,
+            "delivery_readiness": galleries.delivery_readiness(gallery_id),
+            "delivery_error": request.query_params.get("delivery_error"),
+            "base_url": tenant.get_base_url(),
             "mailer_on": __import__("eos.mailer", fromlist=["configured"]).configured(),
         },
     )
@@ -76,7 +78,6 @@ async def gallery_settings(
     listing_id: str = Form(""),
 ):
     lid = int(listing_id) if listing_id.strip().isdigit() else None
-    old = galleries.get_gallery(gallery_id)
     galleries.update_gallery_settings(
         gallery_id,
         title=title,
@@ -86,17 +87,6 @@ async def gallery_settings(
         published=published,
         listing_id=lid,
     )
-    if published and not old["published"]:
-        listing_id = lid or old["listing_id"]
-        n = db.one(
-            "SELECT COUNT(*) AS n FROM assets WHERE gallery_id=? AND status='ready'", (gallery_id,)
-        )
-        automations.on_gallery_published(listing_id, n["n"] if n else 0)
-        automations.on_gallery_published_email(gallery_id)
-        if listing_id:
-            microsites.ensure_site_slug(listing_id)
-            microsites.maybe_auto_publish(listing_id)
-            jobs.enqueue("gallery_exports", {"gallery_id": gallery_id})
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

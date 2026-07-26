@@ -207,7 +207,6 @@ def seed(*, force: bool = False) -> dict:
         access_notes="Lockbox 4821 on side gate. Please remove shoes in primary suite.",
         notes=MARKER,
     )
-    listings.update_listing(listing_id, status="delivered")
     db.run("UPDATE listings SET site_slug=? WHERE id=?", (SITE_SLUG, listing_id))
     microsites.update_site(
         listing_id,
@@ -227,6 +226,7 @@ def seed(*, force: bool = False) -> dict:
         client_id=agent_id,
     )
     appointments.update_appointment(appt_id, status="completed", ends_at=ends_at)
+    db.run("UPDATE listings SET status='editing' WHERE id=?", (listing_id,))
 
     gallery_id = galleries.create_gallery(
         "1420 Maple Dr",
@@ -234,6 +234,7 @@ def seed(*, force: bool = False) -> dict:
         client_name="Sarah Chen",
     )
     galleries.get_gallery(gallery_id)
+    _seed_photos(gallery_id)
     galleries.update_gallery_settings(
         gallery_id,
         title="1420 Maple Dr",
@@ -243,7 +244,6 @@ def seed(*, force: bool = False) -> dict:
         published=True,
         listing_id=listing_id,
     )
-    _seed_photos(gallery_id)
 
     invoice_id = invoices.create_invoice(
         listing_id,

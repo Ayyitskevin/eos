@@ -81,6 +81,8 @@ def test_platform_billing_apply_subscription(env):
         subscription_id="sub_123",
         status="active",
         plan_tier="pro",
+        event_created=1_800_000_000,
+        event_id="evt_phase11_subscription",
     )
     row = db.one(
         "SELECT billing_status, plan_tier, stripe_subscription_id FROM studio WHERE id='default'"

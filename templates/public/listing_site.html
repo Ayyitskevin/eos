@@ -38,14 +38,19 @@
     <h2>Tours &amp; video</h2>
     <div class="gallery-embeds">
       {% for e in embeds %}
+      {% if e.render_url %}
       <div class="embed-card">
         <h3>{{ e.label or e.kind }}</h3>
-        {% if e.kind in ('youtube', 'vimeo', 'matterport') %}
-        <iframe src="{{ e.embed_url }}" title="{{ e.label }}" allowfullscreen loading="lazy"></iframe>
+        {% if e.iframe %}
+        <iframe src="{{ e.render_url }}" title="{{ e.label }}" loading="lazy"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>
         {% else %}
-        <p><a href="{{ e.embed_url }}" target="_blank" rel="noopener">{{ e.embed_url }}</a></p>
+        <p><a href="{{ e.render_url }}" target="_blank" rel="noopener noreferrer">{{ e.render_url }}</a></p>
         {% endif %}
       </div>
+      {% endif %}
       {% endfor %}
     </div>
   </section>

@@ -49,14 +49,41 @@ def authenticate_request(request: Request) -> str:
     raw = auth[7:].strip()
     if not raw:
         raise HTTPException(status_code=401, detail="missing bearer token")
-    row = db.one("SELECT studio_id FROM api_tokens WHERE token_hash=?", (_hash(raw),))
+    digest = _hash(raw)
+    row = db.one(
+        """SELECT t.studio_id, s.active, s.signup_verified, s.billing_status,
+                  s.trial_ends_at
+           FROM api_tokens t
+           JOIN studio s ON s.id=t.studio_id
+           WHERE t.token_hash=?""",
+        (digest,),
+    )
     if not row:
         raise HTTPException(status_code=401, detail="invalid token")
-    db.run(
-        "UPDATE api_tokens SET last_used_at=datetime('now') WHERE token_hash=?",
-        (_hash(raw),),
-    )
-    from . import usage
 
-    usage.bump("api_calls")
-    return row["studio_id"]
+    from . import billing_gate, config, tenant, usage
+
+    studio_id = row["studio_id"]
+    if tenant.get_studio_id() != studio_id:
+        raise HTTPException(status_code=403, detail="token does not match request host")
+    if (
+        not row["active"]
+        or (studio_id != "default" and not row["signup_verified"])
+        or (
+            config.BILLING_ENFORCE
+            and not billing_gate.has_billing_access(
+                row["billing_status"],
+                row["trial_ends_at"],
+            )
+        )
+    ):
+        raise HTTPException(status_code=403, detail="API access is unavailable")
+
+    tenant.set_studio(studio_id)
+    with db.tx(immediate=True):
+        db.run(
+            "UPDATE api_tokens SET last_used_at=datetime('now') WHERE token_hash=?",
+            (digest,),
+        )
+        usage.bump("api_calls")
+    return studio_id

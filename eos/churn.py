@@ -103,9 +103,10 @@ def _opportunity_rows(
     return db.all_(
         f"""SELECT * FROM (
                SELECT c.id, c.name, c.company, c.email,
-                      (SELECT MAX(l.created_at)
+                      (SELECT MAX(COALESCE(l.delivered_at, l.created_at))
                          FROM listings l
-                        WHERE l.studio_id=c.studio_id AND l.client_id=c.id) AS last_listing_at,
+                        WHERE l.studio_id=c.studio_id AND l.client_id=c.id
+                          AND l.status='delivered') AS last_listing_at,
                       (SELECT COUNT(*)
                          FROM listings l
                         WHERE l.studio_id=c.studio_id AND l.client_id=c.id) AS n_listings,

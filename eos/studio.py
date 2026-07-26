@@ -34,6 +34,7 @@ def update_studio(**fields) -> None:
 
 
 def update_profile(**fields) -> None:
+    get_profile()
     allowed = {
         "headline",
         "about",

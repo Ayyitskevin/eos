@@ -31,12 +31,14 @@ def init() -> None:
 def health_details() -> dict:
     free_gb = shutil.disk_usage(config.DATA_DIR).free / 1e9
     pending = jobs.pending_count()
-    ok = free_gb >= config.MIN_FREE_GB
+    failed = jobs.failed_count()
+    ok = free_gb >= config.MIN_FREE_GB and failed == 0
     details = {
         "ok": ok,
         "version": config.APP_VERSION,
         "disk_free_gb": round(free_gb, 2),
         "jobs_pending": pending,
+        "jobs_failed": failed,
     }
     try:
         db.one("SELECT 1 AS x")
