@@ -1,24 +1,29 @@
-# Eos — Caddy reverse proxy with automatic HTTPS (multi-tenant SaaS)
+# Eos — Caddy reverse proxy with apex + wildcard TLS (multi-tenant SaaS)
 # Copy to /etc/caddy/Caddyfile after deploy/install.sh
 #
 # 1. Replace eos.example.com with your apex (marketing + signup)
 # 2. Wildcard *.eos.example.com routes tenant subdomains
 # 3. Set EOS_BASE_DOMAIN=eos.example.com in /opt/eos/.env
 # 4. DNS: A/AAAA for apex AND *.eos.example.com → this server
+# 5. Before enabling, provision one DNS-01 certificate containing BOTH
+#    eos.example.com and *.eos.example.com at the paths below.
+#
+# Wildcard ACME issuance cannot use HTTP-01. If Caddy should issue the
+# certificate itself, install the matching caddy-dns provider module and
+# replace the file-based `tls` directive per:
+# https://caddyserver.com/docs/caddyfile/directives/tls
 
 {
 	email you@example.com
 }
 
-eos.example.com {
-	reverse_proxy 127.0.0.1:8410
-	request_body {
-		max_size 64MB
+eos.example.com, *.eos.example.com {
+	tls /etc/eos/tls/fullchain.pem /etc/eos/tls/privkey.pem
+	reverse_proxy 127.0.0.1:8410 {
+		# Eos trusts this dedicated header only from a loopback proxy peer.
+		# `header_up` overwrites any client-supplied value.
+		header_up X-Eos-Client-IP {client_ip}
 	}
-}
-
-*.eos.example.com {
-	reverse_proxy 127.0.0.1:8410
 	request_body {
 		max_size 64MB
 	}

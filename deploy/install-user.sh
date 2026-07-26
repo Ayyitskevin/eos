@@ -9,6 +9,7 @@ SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 echo "→ Installing Eos to $INSTALL_DIR"
 
 mkdir -p "$INSTALL_DIR" "$INSTALL_DIR/data" "$INSTALL_DIR/backups"
+chmod 700 "$INSTALL_DIR/data" "$INSTALL_DIR/backups"
 rsync -a --delete \
   --exclude '.venv' --exclude 'data' --exclude 'backups' --exclude '.git' \
   --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.coverage' \
@@ -31,6 +32,10 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   sed -i "s|EOS_DATA_DIR=/opt/eos/data|EOS_DATA_DIR=$INSTALL_DIR/data|" "$INSTALL_DIR/.env"
   echo "→ Wrote $INSTALL_DIR/.env (generated EOS_SECRET_KEY + EOS_ADMIN_PASSWORD)"
 fi
+chmod 600 "$INSTALL_DIR/.env"
+find "$INSTALL_DIR/backups" -maxdepth 1 -type f \
+  \( -name 'eos-*.db' -o -name 'eos-media-*.tar.gz' -o -name 'eos-*.sha256' \) \
+  -exec chmod 600 {} +
 
 mkdir -p "$SYSTEMD_DIR"
 sed "s|@INSTALL_DIR@|$INSTALL_DIR|g" "$INSTALL_DIR/deploy/eos-user.service" >"$SYSTEMD_DIR/eos.service"

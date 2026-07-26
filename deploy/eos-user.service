@@ -9,7 +9,7 @@ WorkingDirectory=@INSTALL_DIR@
 EnvironmentFile=@INSTALL_DIR@/.env
 Environment=EOS_CHECK_MODE=production
 ExecStartPre=@INSTALL_DIR@/.venv/bin/python @INSTALL_DIR@/scripts/check-env.py
-ExecStart=@INSTALL_DIR@/.venv/bin/uvicorn eos.main:app --host 0.0.0.0 --port 8410 --workers 2
+ExecStart=@INSTALL_DIR@/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 1
 Restart=on-failure
 RestartSec=5
 
