@@ -4,8 +4,18 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
 ## Unreleased
 
+- Hardened the beta journey with strict tenant Host/activation gates, atomic request-key booking,
+  pending offline deposits, and delivery publication gated on completed shoots and ready assets.
+- Signup verification, sequence, integration webhook, gallery-delivery, rebooking, acquisition,
+  and SMS work now uses durable replay-safe intents. Definite failures can be retried; ambiguous
+  outcomes stay blocked until a tenant-scoped provider reconciliation records the outcome.
+- Stripe invoice payments now require signed, exact session/amount/currency/studio/rail/destination
+  binding and durable event receipts for replay and failed-effect recovery; SaaS tenants cannot
+  fall back to the legacy payment key.
+- Delivered agent portals now lead into tenant-bound rebooking and attributed referral booking;
+  added a local test-mode beta runbook and focused `make beta-smoke` entry point.
 - Agent rebooking cockpit ranks inactive agents by prior listing value and links directly into a preselected new-listing flow.
-- Manual rebooking outreach sends or drafts cooldown-safe agent follow-up emails without adding a new table.
+- Manual rebooking outreach sends or drafts cooldown-safe agent follow-up emails through durable claims.
 - Rebooking performance snapshot shows ready nudges, recent outreach, converted listings, and prior client value.
 - Rebooking follow-up queue flags agents nudged 7+ days ago without a repeat listing.
 - Reports now include repeat-agent revenue with brokerage attribution and CSV export.
@@ -13,7 +23,8 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Brokerage portal now gives brokerages a self-serve account summary with invoice status, agent activity, property sites, and gallery links.
 - Revenue optimizer reports package performance, listing-type value, add-on attach rate, missed upsells, and CSV export.
 - Agent acquisition report tracks referral code performance, referred listing value, and high-value agents ready for an intro ask.
-- Acquisition queue adds one-click referral introduction emails with draft fallback and cooldown tracking.
+- Acquisition queue adds one-click referral introduction emails with draft fallback, cooldown tracking,
+  durable claims, and provider-outcome reconciliation.
 - Studio settings now summarize per-agent referral performance and acquisition CSV exports include referrer/contact outreach fields.
 - Acquisition queue filters and bulk intro-send/draft actions help studios work high-value referral asks faster.
 - Acquisition attribution now connects referral booking links to codes, referrers, brokerages, listings, and paid/open value.
@@ -22,6 +33,17 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Acquisition now surfaces stale referral intro asks for second-touch follow-up emails with cooldown tracking.
 - Public referral links now support `/r/CODE` short links and show applied referral credit on booking.
 - Added `docs/MICROSAAS_LOOP.md` so future Eos work stays focused on real-estate photography MicroSaaS value.
+- Updated Pillow to 12.3.0 to incorporate the current image-parser security fixes.
+- Contract acceptance now has one atomic first signer and snapshots the tenant studio identity;
+  equal-timestamp subscription updates deterministically keep the more restrictive status/tier.
+- Signup consumes rate-limit capacity before all validation and requires an authenticated tenant
+  owner for verification resend/reconciliation instead of exposing a reusable URL capability.
+- Proxy templates overwrite a dedicated trusted client-IP header, reject unknown-host redirects,
+  and bind the app to loopback; tenant scheduling, Google Calendar, and shoot-day SMS now use each
+  studio's timezone with conservative DST handling.
+- Google operator login now claims short-lived state on the apex before provider I/O, transfers a
+  single-use fragment capability back to the initiating tenant, and creates only host-only Secure
+  session cookies on that verified tenant Host.
 
 ## 1.9.0 — Phase 19 (Stripe test-mode dogfood)
 
@@ -54,7 +76,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 - Platform admin v2 — suspend/reactivate, plan override, usage stats, audit log
 - Per-tenant storage metering with plan caps; team seat limits
 - SaaS marketing landing on apex; signup copy updated for hosted platform
-- Inactive studio subdomain returns 403 on public routes
+- Inactive studio subdomain returns a privacy-preserving 404 on public routes
 
 ## 1.5.0 — Phase 15 (low priority + ops)
 

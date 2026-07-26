@@ -31,16 +31,49 @@ make install
 cp .env.example .env          # EOS_SECRET_KEY + EOS_ADMIN_PASSWORD
 make run                      # http://127.0.0.1:8410
 make smoke                    # fast boot/migration/core-route smoke
+make beta-smoke               # focused activation-to-retention journey
 make test
 ```
 
-**Try SaaS mode locally:**
+**Try SaaS mode locally:** edit these values in `.env` (the launcher intentionally reads that file):
 
 ```bash
-EOS_SAAS_MODE=true EOS_SIGNUP_ENABLED=true EOS_BASE_DOMAIN=localhost:8410 make run
+EOS_SAAS_MODE=true
+EOS_SIGNUP_ENABLED=true
+EOS_SIGNUP_AUTO_VERIFY_LOCAL=true  # local-only when no mail provider is configured
+EOS_BASE_URL=http://localhost:8410
+EOS_BASE_DOMAIN=localhost:8410
+EOS_BILLING_ENFORCE=true
 ```
 
-Open http://127.0.0.1:8410/signup
+Then run `make run` and open <http://localhost:8410/signup>. Tenant URLs use
+`http://{slug}.localhost:8410`; `127.0.0.1` is not an accepted SaaS Host.
+
+### Beta journey (test mode only)
+
+The current beta path is built around explicit, recoverable state transitions:
+
+- Tenant routing rejects malformed or unknown hosts; public booking stays closed until the
+  studio is active, verified, branded, published, and booking-enabled.
+- Booking creation is atomic and keyed against form/API replay. Deposit-required requests stay
+  `pending_payment` until a verified payment confirms them, including when online payments are
+  unavailable.
+- Gallery publication requires a linked, eligible listing, no open shoot/twilight appointment,
+  at least one asset, and every asset in `ready` state.
+- Automated email, SMS, and integration work is persisted before provider I/O. Definite failures
+  remain visible for retry; ambiguous outcomes stay closed until the tenant records a provider check.
+- Stripe webhooks remain signature-verified at their routes. Invoice payment additionally binds
+  the event ID, Checkout session, amount, currency, studio, payment rail, and Connect destination;
+  receipt replay cannot repeat a completed transition.
+- Delivered-agent portals expose tenant-bound rebooking and referral links. Signup verification
+  management requires the authenticated tenant owner, is cooldown-protected, and requires provider
+  reconciliation after an ambiguous outcome; no management bearer is placed in a URL.
+- Google operator sign-in uses the configured HTTPS apex callback only as a broker: it cannot set a
+  session there, and a short-lived, nonce-bound, single-use handoff completes on the verified tenant
+  Host with host-only cookies.
+
+Follow [the beta runbook](docs/BETA_RUNBOOK.md) for the local self-hosted flow and recovery checks.
+It uses synthetic data and Stripe test mode; it is not a production deployment or live-payments claim.
 
 ## Production (hosted platform)
 
@@ -53,7 +86,7 @@ sudo systemctl restart eos
 | Step | Detail |
 |------|--------|
 | DNS | `eos.yourdomain.com` + `*.eos.yourdomain.com` → server |
-| TLS | `deploy/Caddyfile` (wildcard) |
+| TLS | DNS-01 apex + wildcard certificate, then `deploy/Caddyfile` or nginx |
 | Stripe | Platform billing + Connect; webhook → `/stripe/platform/webhook` |
 | Media | `EOS_S3_*` for scale (recommended) |
 | Readiness | `/healthz` for liveness, `/readyz` for load balancers |
@@ -65,14 +98,19 @@ Guides: [docs/DEPLOY.md](docs/DEPLOY.md) · [docs/SCALE.md](docs/SCALE.md)
 ```bash
 EOS_SAAS_MODE=true
 EOS_SIGNUP_ENABLED=true
+EOS_SIGNUP_AUTO_VERIFY_LOCAL=false
 EOS_BASE_DOMAIN=eos.yourdomain.com
 EOS_BASE_URL=https://eos.yourdomain.com
 EOS_BILLING_ENFORCE=true
 EOS_COOKIE_SECURE=true
 EOS_STRIPE_PLATFORM_SECRET_KEY=sk_live_...
+EOS_STRIPE_PLATFORM_WEBHOOK_SECRET=whsec_...
 EOS_STRIPE_PRICE_STARTER=price_...
 EOS_STRIPE_PRICE_PRO=price_...
 EOS_PLATFORM_ADMIN_EMAILS=you@yourdomain.com
+EOS_EMAIL_PROVIDER=postmark
+EOS_POSTMARK_API_KEY=replace-with-server-token
+EOS_POSTMARK_FROM_EMAIL=notifications@yourdomain.com
 EOS_S3_BUCKET=your-bucket
 ```
 
@@ -103,7 +141,10 @@ Suspend tenants, override plans, view usage, impersonate (audit logged).
 ```bash
 make lint          # ruff
 make smoke         # fast boot/migration/core-route smoke
+make beta-smoke    # focused beta journey smoke
 make test          # full pytest suite
+make coverage      # full suite + enforced coverage floor
+make security      # Bandit + dependency vulnerability audit
 make check-stripe  # verify test keys in .env
 make dogfood       # seed 1420 Maple Dr
 make check-env     # validate .env
@@ -113,7 +154,9 @@ make check-env     # validate .env
 
 **Read [docs/AI_AGENTS.md](docs/AI_AGENTS.md) before changing code.** It documents tenant isolation rules, payment rails, migration patterns, and what not to break.
 
-Short pointer: [AGENTS.md](AGENTS.md) · MicroSaaS loop: [docs/MICROSAAS_LOOP.md](docs/MICROSAAS_LOOP.md)
+Short pointer: [AGENTS.md](AGENTS.md) ·
+[Beta runbook](docs/BETA_RUNBOOK.md) ·
+[MicroSaaS loop](docs/MICROSAAS_LOOP.md)
 
 ## Roadmap
 
@@ -131,4 +174,5 @@ Short pointer: [AGENTS.md](AGENTS.md) · MicroSaaS loop: [docs/MICROSAAS_LOOP.md
 | Repo | https://github.com/Ayyitskevin/eos |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Agent guide | [docs/AI_AGENTS.md](docs/AI_AGENTS.md) |
+| Beta runbook | [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md) |
 | Deploy | [docs/DEPLOY.md](docs/DEPLOY.md) |

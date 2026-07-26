@@ -1,13 +1,14 @@
 # Scaling Eos
 
-## Current architecture (v1.7)
+## Current architecture (v1.9)
 
 | Layer | Default | Scale path |
 |-------|---------|------------|
 | Database | SQLite WAL | `EOS_DATABASE_URL` → PostgreSQL (planned) |
 | Media | Local disk + optional S3/R2 sync | `EOS_S3_*` env vars |
-| App | Single uvicorn, 2 workers | Horizontal replicas + shared DB/S3 |
-| Jobs | In-process thread pool | Redis queue (planned) |
+| App | Single uvicorn worker | Horizontal replicas + shared DB/S3 |
+| Jobs | In-process thread pool (single app worker required) | Redis queue (planned) |
+Eos beta must run as one application worker: the embedded scheduler and job executor are process-local. Do not add uvicorn workers or replicas until they move to a leased external queue.
 
 ## S3 / R2 (shipped)
 
@@ -29,7 +30,7 @@ Uploads and image derivatives sync to `eos/media/{studio_id}/{gallery_id}/`. Usa
 SQLite handles early SaaS (under ~25 active studios). For larger scale:
 
 1. Set `EOS_DATABASE_URL=postgresql://...`
-2. Run schema export/migration tooling (Phase 18)
+2. Run the planned schema export/migration tooling
 3. Move to connection pooling (PgBouncer)
 4. Run multiple app instances behind load balancer
 

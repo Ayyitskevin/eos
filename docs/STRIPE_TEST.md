@@ -15,17 +15,28 @@ Use Stripe **test mode** keys in `.env` to exercise platform billing and Connect
 ```bash
 EOS_SAAS_MODE=true
 EOS_SIGNUP_ENABLED=true
+EOS_SIGNUP_AUTO_VERIFY_LOCAL=true
+EOS_SIGNUP_INVITE_ONLY=false
 EOS_BASE_DOMAIN=localhost:8410
-EOS_BASE_URL=http://127.0.0.1:8410
-EOS_BILLING_ENFORCE=false
+EOS_BASE_URL=http://localhost:8410
+EOS_BILLING_ENFORCE=true
+EOS_COOKIE_SECURE=false
 
 EOS_STRIPE_PLATFORM_SECRET_KEY=sk_test_...
 EOS_STRIPE_PLATFORM_WEBHOOK_SECRET=whsec_...   # from stripe listen (step 3)
 EOS_STRIPE_PRICE_STARTER=price_...
 EOS_STRIPE_PRICE_PRO=price_...
+
+# SaaS tenant client payments use Connect only.
+EOS_STRIPE_SECRET_KEY=
+EOS_STRIPE_WEBHOOK_SECRET=
 ```
 
-Legacy solo key (`EOS_STRIPE_SECRET_KEY`) is optional when Connect is active.
+SaaS mode enforces the billing gate regardless of `EOS_BILLING_ENFORCE`; keeping the value `true`
+makes that behavior explicit. Leave the legacy solo/client-payment key
+(`EOS_STRIPE_SECRET_KEY`) blank for non-default SaaS studios. It is not a fallback for a tenant
+whose Connect account is incomplete. `EOS_SIGNUP_AUTO_VERIFY_LOCAL=true` is only for this isolated
+test-mode run; production validation rejects it and requires transactional email.
 
 ## 3. Forward webhooks locally
 
@@ -70,10 +81,15 @@ After Connect onboarding, return URL auto-refreshes account status (`?thanks=1`)
 
 Use any future expiry, any CVC, any ZIP.
 
-## 6. Verify webhooks
+## 6. Verify bound webhooks
 
-```bash
-stripe trigger checkout.session.completed
-```
+Complete the real Eos-created platform subscription and invoice/deposit Checkouts from step 4.
+Those sessions contain the exact tenant, invoice, amount, currency, payment-rail, and Connect
+destination bindings that Eos verifies. Watch `make run` and the Stripe listener for the resulting
+signed `checkout.session.completed` events, then confirm the corresponding subscription/invoice
+changed once in Eos.
 
-Watch `make run` logs for `platform webhook` and `invoice … paid via stripe checkout`.
+Do not use a generic `stripe trigger checkout.session.completed` as proof of payment. Its synthetic
+session is not bound to an Eos invoice and should be rejected by the hardened handler. Replay the
+same captured signed test event through your controlled Stripe test endpoint to confirm the durable
+receipt prevents duplicate business effects.

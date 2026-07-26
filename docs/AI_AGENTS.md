@@ -2,7 +2,7 @@
 
 **Read this before changing code.** Eos is a multi-tenant RE photography SaaS (Aryeo-class). The goal is to **extend** what works, not refactor or break tenant isolation.
 
-**Version:** 1.8.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
+**Version:** 1.9.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
 
 ---
 
@@ -30,6 +30,8 @@ Breaking these causes data leaks or production outages. **Never:**
 5. **Commit secrets or data** — never `.env`, `data/`, or `backups/`.
 6. **Delete or renumber migrations** — only append `eos/migrations/00NN_*.sql`.
 7. **Drive-by refactors** — match existing module layout, naming, and Jinja/HTMX patterns.
+8. **Set tenant sessions on a shared OAuth callback Host** — operator OAuth must finish through the
+   nonce-bound, single-use tenant handoff; cookies stay host-only on the resolved tenant.
 
 ---
 
@@ -51,7 +53,7 @@ HTTP request
 5. Logged-in user's `users.studio_id`
 6. Fallback: `"default"` (solo / apex marketing)
 
-Inactive studios: subdomain still resolves; `billing_gate` returns 403 on public routes.
+Inactive studios: subdomain still resolves; `billing_gate` returns a privacy-preserving 404 on public routes and redirects protected admin routes to login.
 
 ---
 
@@ -79,7 +81,7 @@ eos/
 ├── platform_admin.py    # Suspend, plan override, impersonation audit
 │
 ├── routes/              # FastAPI routers (thin — logic in eos/*.py)
-├── migrations/          # 0001–0016+, append only
+├── migrations/          # Numbered SQL migrations, append only
 └── templates/         # Jinja2 (admin/, site/, public/)
 ```
 
@@ -144,7 +146,7 @@ Use `stripe_checkout.payments_configured()` for UI `payments_on` flags — not r
 ### 1. Schema change
 
 ```bash
-# Create eos/migrations/0017_your_feature.sql
+# Create eos/migrations/00NN_your_feature.sql using the next available number
 # Use ALTER TABLE / CREATE TABLE IF NOT EXISTS
 # Include studio_id on all tenant-owned rows
 make migrate   # or boot app (auto-migrates)
@@ -261,8 +263,8 @@ EOS_SAAS_MODE=true EOS_SIGNUP_ENABLED=true EOS_BASE_DOMAIN=localhost:8410 make r
 |---------|------------------|
 | `db.one("SELECT ... WHERE id=?", (id,))` without studio | Add `AND studio_id=?` + `STUDIO_ID` |
 | `config.BASE_URL` in tenant emails/links | `tenant.get_base_url()` |
-| New migration editing old file | Append `0017_*.sql` |
-| Open signup without rate limits | Use `security.signup_throttled()` |
+| New migration editing old file | Append the next numbered `00NN_*.sql` file |
+| Open signup without rate limits | Call `security.claim_signup_attempt()` before validation; it atomically consumes every allowed POST |
 | Storage upload without cap check | `usage.enforce_storage_limit()` |
 | Platform admin without audit | `platform_admin.audit()` |
 
@@ -283,4 +285,4 @@ EOS_SAAS_MODE=true EOS_SIGNUP_ENABLED=true EOS_BASE_DOMAIN=localhost:8410 make r
 | `EOS_EMAIL_PROVIDER` | postmark/smtp | Transactional email |
 | `EOS_SIGNUP_INVITE_ONLY` | beta | Require invite code at signup |
 
-*Last updated: Phase 18 (v1.8.0). Update this file when architecture or invariants change.*
+*Last updated: beta journey integrity pass (v1.9.0). Update this file when architecture or invariants change.*

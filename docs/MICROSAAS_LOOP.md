@@ -25,6 +25,19 @@ Non-negotiables:
 - Prefer existing FastAPI, Jinja/HTMX, SQLite, and helper-module patterns.
 - No secrets, no data commits, no destructive commands without human approval.
 
+Acceptance expectations:
+- Tenant: malformed and unknown Hosts fail closed; activation/readiness gates stay ahead of
+  public booking; tests prove one studio cannot read or mutate another studio's state.
+- Replay: any externally retryable command has a stable tenant-bound key or receipt; repeat and
+  concurrent execution produce one business transition and one set of downstream intents.
+- Delivery: publication remains blocked until the linked shoot is closed and every asset is ready.
+- Recovery: outbound email, webhook, and delivery work is persisted before I/O and exposes status
+  and attempts. Stale or ambiguous claims stay blocked until a tenant-scoped operator action records
+  the provider check and either reconciles the effect or explicitly retries it.
+- Payments: route-level signature verification precedes exact invoice/session/amount/currency/
+  studio/rail/destination matching; processed event IDs do not repeat payment effects, while a
+  failed transactional effect can be replayed from its durable receipt.
+
 Loop:
 1. Inspect the repo state and recent commits.
 2. Pick one high-leverage MicroSaaS slice from activation, retention, revenue,
