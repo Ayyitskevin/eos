@@ -34,7 +34,7 @@ def _loop() -> None:
         if _tick * config.SEQUENCE_TICK_SECONDS >= config.INTEGRATION_TICK_SECONDS:
             _tick = 0
             try:
-                from . import jobs, sms
+                from . import jobs, monitoring, sms
 
                 bucket = int(time.time() // max(config.INTEGRATION_TICK_SECONDS, 1))
                 jobs.enqueue(
@@ -43,6 +43,7 @@ def _loop() -> None:
                     idempotency_key=f"integration_sweep:{bucket}",
                 )
                 sms.shoot_day_reminders()
+                monitoring.report_health()
             except Exception:
                 log.exception("integration sweep enqueue failed")
 

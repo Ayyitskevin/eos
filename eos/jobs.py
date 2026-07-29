@@ -2,6 +2,8 @@
 
 import json
 import logging
+import random
+import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -12,6 +14,9 @@ log = logging.getLogger("eos.jobs")
 
 _pool: ThreadPoolExecutor | None = None
 MAX_ATTEMPTS = 3
+RETRY_BASE_SECONDS = 5.0
+RETRY_MAX_SECONDS = 120.0
+DRAIN_TIMEOUT_SECONDS = 30.0
 
 
 def _set_studio_for_gallery(gallery_id: int) -> str | None:
@@ -292,6 +297,20 @@ def _submit(job_id: int) -> None:
         _pool.submit(_execute, job_id)
 
 
+def _retry_delay(attempts: int) -> float:
+    """Exponential backoff with jitter so retries don't thunder-herd."""
+    delay = min(RETRY_BASE_SECONDS * (2 ** max(attempts - 1, 0)), RETRY_MAX_SECONDS)
+    return delay + random.uniform(0, RETRY_BASE_SECONDS)
+
+
+def _schedule_retry(job_id: int, attempts: int) -> None:
+    delay = _retry_delay(attempts)
+    log.info("job %s retry in %.1fs (attempt %s)", job_id, delay, attempts)
+    timer = threading.Timer(delay, _submit, args=(job_id,))
+    timer.daemon = True  # no-op once stop() clears the pool
+    timer.start()
+
+
 def _payload_studio_candidates(payload: dict) -> set[str]:
     candidates: set[str] = set()
     explicit = str(payload.get("studio_id") or "").strip()
@@ -460,7 +479,7 @@ def _execute(job_id: int) -> None:
     finally:
         tenant.set_studio(previous_studio)
     if retry:
-        _submit(job_id)
+        _schedule_retry(job_id, job["attempts"])
 
 
 def _backfill_failed_job_owners(limit: int = 200) -> None:
@@ -534,8 +553,19 @@ def start() -> None:
         log.info("re-queued %d jobs from previous run", len(backlog))
 
 
-def stop() -> None:
+def stop(timeout: float = DRAIN_TIMEOUT_SECONDS) -> None:
+    """Drain gracefully: stop accepting work, wait for in-flight jobs, then cancel.
+
+    Queued-but-unstarted jobs stay status='queued' in the DB and are re-submitted
+    by start() on the next boot, so nothing is lost by cancelling them here.
+    """
     global _pool
-    if _pool:
-        _pool.shutdown(wait=False, cancel_futures=True)
-        _pool = None
+    pool, _pool = _pool, None
+    if pool is None:
+        return
+    pool.shutdown(wait=False, cancel_futures=True)
+    drain = threading.Thread(target=pool.shutdown, kwargs={"wait": True}, daemon=True)
+    drain.start()
+    drain.join(timeout)
+    if drain.is_alive():
+        log.warning("job pool drain timed out after %.0fs with jobs still running", timeout)

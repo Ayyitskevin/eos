@@ -47,6 +47,11 @@ def media_key(*, studio_id: str, gallery_id: int, sub: str, filename: str) -> st
     return "/".join(parts)
 
 
+def backup_key(filename: str) -> str:
+    prefix = config.S3_PREFIX.strip("/")
+    return "/".join(p for p in (prefix, "backups", filename) if p)
+
+
 def upload_file(local_path: Path, key: str) -> bool:
     if not enabled() or not local_path.is_file():
         return False

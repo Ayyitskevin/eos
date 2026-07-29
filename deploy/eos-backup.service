@@ -1,0 +1,8 @@
+[Unit]
+Description=Eos daily backup (SQLite + media, optional offsite S3 copy)
+
+[Service]
+Type=oneshot
+WorkingDirectory=@INSTALL_DIR@/current
+EnvironmentFile=@INSTALL_DIR@/.env
+ExecStart=@INSTALL_DIR@/current/deploy/cron-backup.sh

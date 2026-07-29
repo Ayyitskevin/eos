@@ -1,6 +1,9 @@
-/var/log/eos/*.log {
-    daily
-    rotate 14
+# App logs go to journald (systemd units capture stdout) — retention is
+# journald-native; tune SystemMaxUse / MaxRetentionSec in journald.conf.
+# This file only covers the backup cron output written by /etc/cron.d/eos-backup.
+/var/log/eos-backup.log {
+    weekly
+    rotate 12
     compress
     delaycompress
     missingok

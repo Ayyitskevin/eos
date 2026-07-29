@@ -7,11 +7,11 @@ Wants=network-online.target
 Type=simple
 User=eos
 Group=eos
-WorkingDirectory=/opt/eos
+WorkingDirectory=/opt/eos/current
 EnvironmentFile=/opt/eos/.env
 Environment=EOS_CHECK_MODE=production
-ExecStartPre=/opt/eos/.venv/bin/python /opt/eos/scripts/check-env.py
-ExecStart=/opt/eos/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 1
+ExecStartPre=/opt/eos/current/.venv/bin/python /opt/eos/current/scripts/check-env.py
+ExecStart=/opt/eos/current/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 1
 Restart=on-failure
 RestartSec=5
 

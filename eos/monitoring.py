@@ -1,11 +1,37 @@
 """Production monitoring — optional Sentry, structured health checks."""
 
 import logging
+import os
 import shutil
 
 from . import config, db, jobs
 
 log = logging.getLogger("eos.monitoring")
+
+
+def healthcheck_url() -> str:
+    """healthchecks.io-style ping URL (kept here to avoid config.py churn)."""
+    return os.environ.get("EOS_HEALTHCHECK_URL", "").strip()
+
+
+def ping_healthcheck(*, ok: bool, note: str = "") -> None:
+    """POST to EOS_HEALTHCHECK_URL (or its /fail suffix) — no-op when unset."""
+    url = healthcheck_url()
+    if not url:
+        return
+    target = url if ok else f"{url.rstrip('/')}/fail"
+    try:
+        import httpx
+
+        httpx.post(target, content=note or ("ok" if ok else "failed"), timeout=10)
+    except Exception as exc:
+        log.warning("healthcheck ping failed: %s", exc)
+
+
+def report_health() -> None:
+    """Periodic dead-man ping — alerts when jobs are dead-lettered or the app dies."""
+    failed = jobs.failed_count()
+    ping_healthcheck(ok=failed == 0, note=f"jobs_failed={failed}")
 
 
 def init() -> None:

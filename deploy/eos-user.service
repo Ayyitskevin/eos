@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=@INSTALL_DIR@
+WorkingDirectory=@INSTALL_DIR@/current
 EnvironmentFile=@INSTALL_DIR@/.env
 Environment=EOS_CHECK_MODE=production
-ExecStartPre=@INSTALL_DIR@/.venv/bin/python @INSTALL_DIR@/scripts/check-env.py
-ExecStart=@INSTALL_DIR@/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 1
+ExecStartPre=@INSTALL_DIR@/current/.venv/bin/python @INSTALL_DIR@/current/scripts/check-env.py
+ExecStart=@INSTALL_DIR@/current/.venv/bin/uvicorn eos.main:app --host 127.0.0.1 --port 8410 --workers 1
 Restart=on-failure
 RestartSec=5
 

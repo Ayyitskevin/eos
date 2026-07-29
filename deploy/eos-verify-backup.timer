@@ -1,0 +1,9 @@
+[Unit]
+Description=Eos weekly backup restore drill timer
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

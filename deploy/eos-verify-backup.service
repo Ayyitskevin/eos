@@ -1,0 +1,8 @@
+[Unit]
+Description=Eos weekly backup restore drill
+
+[Service]
+Type=oneshot
+WorkingDirectory=@INSTALL_DIR@/current
+EnvironmentFile=@INSTALL_DIR@/.env
+ExecStart=@INSTALL_DIR@/current/deploy/cron-verify-backup.sh
