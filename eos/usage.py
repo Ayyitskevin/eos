@@ -37,6 +37,8 @@ def snapshot(*, period: str | None = None) -> dict:
         "SELECT * FROM studio_usage WHERE studio_id=? AND period=?",
         (STUDIO_ID, p),
     )
+    if row is None:  # pragma: no cover - _ensure_row guarantees the row exists
+        raise RuntimeError("studio_usage row missing after ensure")
     limits = plan_limits.limits_for()
     storage = studio_storage_bytes()
     return {

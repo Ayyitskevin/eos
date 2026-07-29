@@ -180,12 +180,12 @@ def all_(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
 def run(sql: str, params: tuple = ()) -> int:
     active = _connection.get()
     if active is not None:
-        return active.execute(sql, params).lastrowid
+        return active.execute(sql, params).lastrowid or 0
     con = connect()
     try:
         cur = con.execute(sql, params)
         con.commit()
-        return cur.lastrowid
+        return cur.lastrowid or 0
     finally:
         con.close()
 

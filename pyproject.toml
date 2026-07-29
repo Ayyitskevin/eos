@@ -1,6 +1,6 @@
 [project]
 name = "eos"
-version = "1.9.0"
+version = "1.10.0"
 description = "Multi-tenant SaaS for real estate photography studios — Aryeo-class alternative"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -26,9 +26,31 @@ source = ["eos"]
 omit = ["eos/migrations/*"]
 
 [tool.coverage.report]
-fail_under = 55
+fail_under = 70
 show_missing = true
 skip_empty = true
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+follow_imports = "skip"
+warn_unused_ignores = true
+# Scoped ratchet: only money/security-adjacent core modules gate CI today.
+# TODO: widen `files` module-by-module (routes/ and the Stripe/webhook layers
+# are the worst offenders) until the whole eos/ package type-checks.
+files = [
+    "eos/db.py",
+    "eos/vocab.py",
+    "eos/tenant.py",
+    "eos/usage.py",
+    "eos/plan_limits.py",
+    "eos/billing_gate.py",
+    "eos/paywall.py",
+    "eos/payments.py",
+    "eos/photographer_pay.py",
+    "eos/stripe_connect.py",
+    "eos/scheduler.py",
+]
 
 [tool.bandit]
 # Dynamic UPDATE/IN clauses use code-controlled columns + bound params.

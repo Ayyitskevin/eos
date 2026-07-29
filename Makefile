@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke lint format run dogfood migrate check-env check-stripe coverage security stripe-listen beta-smoke
+.PHONY: install dev test smoke lint format run dogfood migrate check-env check-stripe coverage security stripe-listen beta-smoke typecheck
 
 install:
 	python3 -m venv .venv
@@ -22,6 +22,9 @@ coverage:
 lint:
 	.venv/bin/ruff check eos scripts tests
 	.venv/bin/ruff format --check eos scripts tests
+
+typecheck:
+	.venv/bin/mypy
 
 format:
 	.venv/bin/ruff format eos scripts tests

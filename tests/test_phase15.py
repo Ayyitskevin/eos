@@ -105,7 +105,7 @@ def test_monitoring_health(app_env):
     details = monitoring.health_details()
     assert "disk_free_gb" in details
     assert details["jobs_failed"] == 0
-    assert details["version"] == "1.9.0"
+    assert details["version"] == "1.10.0"
 
 
 def test_platform_admin_email_check(app_env):
