@@ -26,7 +26,7 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
     g = galleries.get_gallery_by_slug(slug)
     galleries.require_public_gallery(g)
     ip = security.client_ip(request)
-    if security.pin_locked(ip, g["id"]):
+    if security.pin_locked(ip, g["id"]) or security.gallery_pin_locked(g["id"]):
         return templates.TemplateResponse(
             request,
             "public/pin.html",
@@ -42,6 +42,7 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
             status_code=401,
         )
     security.pin_clear(ip, g["id"])
+    security.gallery_pin_clear(g["id"])
     resp = RedirectResponse(f"/g/{slug}", status_code=303)
     name, value = security.set_gallery_cookie(g)
     resp.set_cookie(

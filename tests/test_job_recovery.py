@@ -40,14 +40,18 @@ def _seed_studio(studio_id: str) -> None:
     db.run("INSERT INTO studio_profiles (studio_id) VALUES (?)", (studio_id,))
 
 
-def _user_cookie(studio_id: str = "default") -> str:
+def _user_cookie(studio_id: str = "default") -> dict[str, str]:
     uid = db.run(
         """INSERT INTO users (studio_id, email, password_hash, name, role)
            VALUES (?,?,?,?,?)""",
         (studio_id, f"owner@{studio_id}.test", "unused", "Owner", "owner"),
     )
     name, value = security.set_session_cookie(uid)
-    return f"{name}={value}"
+    csrf = security.new_token()
+    return {
+        "cookie": f"{name}={value}; {security.CSRF_COOKIE}={security.sign(csrf)}",
+        "x-eos-csrf": csrf,
+    }
 
 
 def test_enqueue_scopes_deduplication_and_worker_context(app_env, monkeypatch):
@@ -150,7 +154,7 @@ async def test_admin_recovery_is_tenant_scoped_and_expires_only_elapsed_holds(ap
 
     transport = ASGITransport(app=app_env)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        page = await client.get("/admin/studio", headers={"cookie": cookie})
+        page = await client.get("/admin/studio", headers=cookie)
         assert page.status_code == 200
         assert "Operator recovery" in page.text
         assert "visible failure" in page.text
@@ -160,20 +164,20 @@ async def test_admin_recovery_is_tenant_scoped_and_expires_only_elapsed_holds(ap
 
         blocked = await client.post(
             f"/admin/studio/jobs/{other_job}/retry",
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert blocked.status_code == 404
         retried = await client.post(
             f"/admin/studio/jobs/{own_job}/retry",
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert retried.status_code == 303
 
         released = await client.post(
             "/admin/studio/pending-bookings/expire",
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert released.status_code == 303
@@ -207,7 +211,7 @@ async def test_one_time_secrets_never_enter_redirect_urls_and_numeric_inputs_fai
         token_page = await client.post(
             "/admin/studio/api-tokens",
             data={"label": "One time"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert token_page.status_code == 200
@@ -216,13 +220,13 @@ async def test_one_time_secrets_never_enter_redirect_urls_and_numeric_inputs_fai
         assert "New API token (copy now" in token_page.text
         assert "token=" not in str(token_page.url)
 
-        clean_page = await client.get("/admin/studio", headers={"cookie": cookie})
+        clean_page = await client.get("/admin/studio", headers=cookie)
         assert "New API token (copy now" not in clean_page.text
 
         hook_page = await client.post(
             "/admin/studio/webhooks",
             data={"label": "Test", "url": "https://example.invalid/hook"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert hook_page.status_code == 200
@@ -230,7 +234,7 @@ async def test_one_time_secrets_never_enter_redirect_urls_and_numeric_inputs_fai
         assert "no-store" in hook_page.headers["cache-control"]
         assert "one-time-hook-secret" in hook_page.text
         assert "one-time-hook-secret" not in str(hook_page.url)
-        clean_page = await client.get("/admin/studio", headers={"cookie": cookie})
+        clean_page = await client.get("/admin/studio", headers=cookie)
         assert "one-time-hook-secret" not in clean_page.text
 
         package = db.one("SELECT id, name FROM service_packages WHERE studio_id='default' LIMIT 1")
@@ -242,13 +246,13 @@ async def test_one_time_secrets_never_enter_redirect_urls_and_numeric_inputs_fai
                 "deposit_dollars": "101",
                 "turnaround_hours": "24",
             },
-            headers={"cookie": cookie},
+            headers=cookie,
         )
         assert bad_package.status_code == 400
         bad_referral = await client.post(
             "/admin/studio/referrals",
             data={"code": "BAD", "credit_dollars": "-1"},
-            headers={"cookie": cookie},
+            headers=cookie,
         )
         assert bad_referral.status_code == 400
 

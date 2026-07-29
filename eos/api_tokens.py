@@ -43,11 +43,18 @@ def revoke_token(token_id: int) -> None:
 
 
 def authenticate_request(request: Request) -> str:
+    from . import security
+
+    ip = security.client_ip(request)
+    if security.api_token_locked(ip):
+        raise HTTPException(status_code=429, detail="too many invalid tokens")
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer "):
+        security.api_token_fail(ip)
         raise HTTPException(status_code=401, detail="missing bearer token")
     raw = auth[7:].strip()
     if not raw:
+        security.api_token_fail(ip)
         raise HTTPException(status_code=401, detail="missing bearer token")
     digest = _hash(raw)
     row = db.one(
@@ -59,6 +66,7 @@ def authenticate_request(request: Request) -> str:
         (digest,),
     )
     if not row:
+        security.api_token_fail(ip)
         raise HTTPException(status_code=401, detail="invalid token")
 
     from . import billing_gate, config, tenant, usage
@@ -80,6 +88,7 @@ def authenticate_request(request: Request) -> str:
         raise HTTPException(status_code=403, detail="API access is unavailable")
 
     tenant.set_studio(studio_id)
+    security.api_token_clear(ip)
     with db.tx(immediate=True):
         db.run(
             "UPDATE api_tokens SET last_used_at=datetime('now') WHERE token_hash=?",

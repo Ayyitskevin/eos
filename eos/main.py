@@ -99,8 +99,24 @@ logging.basicConfig(
 log = logging.getLogger("eos.app")
 
 
+def enforce_saas_startup_security() -> None:
+    """Refuse to boot a SaaS deployment with transport/secret protections off."""
+    if not config.SAAS_MODE:
+        return
+    problems = []
+    if not config.COOKIE_SECURE:
+        problems.append("EOS_COOKIE_SECURE must be true when EOS_SAAS_MODE is on")
+    if not config.TOKEN_ENCRYPTION_KEY:
+        problems.append(
+            "EOS_TOKEN_ENCRYPTION_KEY (or EOS_SECRET_KEY) is required when EOS_SAAS_MODE is on"
+        )
+    if problems:
+        raise RuntimeError("Insecure SaaS configuration: " + "; ".join(problems))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    enforce_saas_startup_security()
     db.migrate()
     monitoring.init()
     bootstrap.maybe_bootstrap()

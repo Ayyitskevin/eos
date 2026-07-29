@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from PIL import Image
 
 from .. import config, db, galleries, jobs, security
 from ..imaging import PHOTO_EXTS, VIDEO_EXTS
@@ -17,6 +18,17 @@ _SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]")
 
 def _free_gb() -> float:
     return shutil.disk_usage(config.DATA_DIR).free / 1e9
+
+
+def _is_decodable_image(path: Path) -> bool:
+    """Content-sniff a stored photo: extension alone proves nothing."""
+    try:
+        with Image.open(path) as img:
+            img.verify()
+        return True
+    except Exception:
+        log.warning("rejected upload %s: not a decodable image", path.name)
+        return False
 
 
 @router.post("/galleries/{gallery_id}/upload")
@@ -57,8 +69,19 @@ async def upload(gallery_id: int, files: list[UploadFile], section_id: int | Non
         size = 0
         with dest.open("wb") as out:
             while chunk := await f.read(1 << 20):
-                out.write(chunk)
                 size += len(chunk)
+                if size > config.UPLOAD_MAX_BYTES:
+                    break
+                out.write(chunk)
+        if size > config.UPLOAD_MAX_BYTES:
+            dest.unlink(missing_ok=True)
+            rejected.append(name)
+            log.warning("rejected upload %s: exceeds %d byte cap", name, config.UPLOAD_MAX_BYTES)
+            continue
+        if not is_video and not _is_decodable_image(dest):
+            dest.unlink(missing_ok=True)
+            rejected.append(name)
+            continue
         kind = "video" if is_video else "photo"
         asset_id = db.run(
             """INSERT INTO assets (gallery_id, section_id, kind, filename, stored, bytes, status)

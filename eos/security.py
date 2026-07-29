@@ -32,7 +32,7 @@ def new_slug(n: int = 14) -> str:
 
 
 def new_pin() -> str:
-    return f"{secrets.randbelow(10000):04d}"
+    return f"{secrets.randbelow(1000000):06d}"
 
 
 def new_token() -> str:
@@ -88,6 +88,16 @@ def pin_locked(ip: str, gallery_id: int) -> bool:
     return row["n"] >= config.PIN_MAX_FAILS
 
 
+def gallery_pin_locked(gallery_id: int) -> bool:
+    """IP-independent lockout: distributed guessing trips a per-gallery counter."""
+    cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE gallery_id=? AND ts>?",
+        (gallery_id, cutoff),
+    )
+    return row["n"] >= config.GALLERY_PIN_MAX_FAILS
+
+
 def pin_fail(ip: str, gallery_id: int) -> None:
     db.run(
         "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
@@ -99,6 +109,11 @@ def pin_fail(ip: str, gallery_id: int) -> None:
 
 def pin_clear(ip: str, gallery_id: int) -> None:
     db.run("DELETE FROM pin_attempts WHERE ip=? AND gallery_id=?", (ip, gallery_id))
+
+
+def gallery_pin_clear(gallery_id: int) -> None:
+    """A correct PIN proves the legitimate client; reset all counters for the gallery."""
+    db.run("DELETE FROM pin_attempts WHERE gallery_id=?", (gallery_id,))
 
 
 GALLERY_COOKIE_PREFIX = "eos_g"
@@ -125,40 +140,102 @@ def set_gallery_cookie(gallery) -> tuple[str, str]:
 
 
 ADMIN_COOKIE = "eos_admin"
+_SESSION_PREFIX = "sess:"
+_SESSION_CACHE_MISS = object()
 
 
-def _session_value(request: Request) -> str | None:
+def _hash_session_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _create_session(user_id: int | None, *, ip: str = "") -> str:
+    from . import tenant
+
+    now = time.time()
+    db.run(
+        "DELETE FROM admin_sessions WHERE expires_at<? OR revoked_at<?",
+        (now, now - 86400),
+    )
+    token = secrets.token_urlsafe(32)
+    db.run(
+        """INSERT INTO admin_sessions (token_hash, user_id, studio_id, ip, expires_at)
+           VALUES (?,?,?,?,?)""",
+        (
+            _hash_session_token(token),
+            user_id,
+            tenant.get_studio_id(),
+            ip,
+            now + config.SESSION_MAX_AGE,
+        ),
+    )
+    return token
+
+
+def _session_token(request: Request) -> str | None:
     raw = request.cookies.get(ADMIN_COOKIE)
     if not raw:
         return None
-    return unsign(raw)
+    val = unsign(raw)
+    if not val or not val.startswith(_SESSION_PREFIX):
+        return None
+    return val[len(_SESSION_PREFIX) :]
+
+
+def _lookup_session_row(request: Request):
+    token = _session_token(request)
+    if not token:
+        return None
+    row = db.one(
+        "SELECT * FROM admin_sessions WHERE token_hash=?",
+        (_hash_session_token(token),),
+    )
+    if not row or row["revoked_at"] is not None or row["expires_at"] < time.time():
+        return None
+    return row
+
+
+def _session_row(request: Request):
+    cached = getattr(request.state, "eos_admin_session", _SESSION_CACHE_MISS)
+    if cached is _SESSION_CACHE_MISS:
+        cached = _lookup_session_row(request)
+        request.state.eos_admin_session = cached
+    return cached
 
 
 def is_admin(request: Request) -> bool:
-    val = _session_value(request)
-    return bool(val) and (val == "admin" or val.startswith("user:"))
+    return _session_row(request) is not None
 
 
 def current_user_id(request: Request) -> int | None:
-    val = _session_value(request)
-    if val and val.startswith("user:"):
-        try:
-            return int(val.split(":", 1)[1])
-        except ValueError:
-            return None
-    return None
+    row = _session_row(request)
+    return row["user_id"] if row else None
 
 
-def set_session_cookie(user_id: int | None = None) -> tuple[str, str]:
-    if user_id is None:
-        return ADMIN_COOKIE, sign("admin")
-    return ADMIN_COOKIE, sign(f"user:{user_id}")
+def set_session_cookie(user_id: int | None = None, *, ip: str = "") -> tuple[str, str]:
+    return ADMIN_COOKIE, sign(f"{_SESSION_PREFIX}{_create_session(user_id, ip=ip)}")
+
+
+def revoke_session(request: Request) -> None:
+    token = _session_token(request)
+    if not token:
+        return
+    db.run(
+        "UPDATE admin_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL",
+        (time.time(), _hash_session_token(token)),
+    )
+
+
+def revoke_user_sessions(user_id: int) -> None:
+    db.run(
+        "UPDATE admin_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",
+        (time.time(), user_id),
+    )
 
 
 def legacy_admin_allowed() -> bool:
     from . import config, db
 
-    if config.SAAS_MODE or config.SIGNUP_ENABLED:
+    if config.SAAS_MODE or config.SIGNUP_ENABLED or config.COOKIE_SECURE:
         return False
     n = db.one("SELECT COUNT(*) AS n FROM studio WHERE active=1")
     return (n["n"] if n else 0) <= 1
@@ -231,7 +308,8 @@ async def validate_csrf(request: Request) -> PlainTextResponse | None:
     site = request.headers.get("sec-fetch-site", "")
     if site and site not in ("same-origin", "same-site", "none"):
         return PlainTextResponse("cross-site request blocked", status_code=403)
-    if not site:
+    if not site and not request.cookies.get(ADMIN_COOKIE):
+        # No browser metadata and no authenticated session at stake — nothing to forge.
         return None
     cookie = request.cookies.get(CSRF_COOKIE)
     if not cookie:
@@ -246,6 +324,55 @@ async def validate_csrf(request: Request) -> PlainTextResponse | None:
 
 
 SIGNUP_BUCKET = -5
+LOGIN_EMAIL_BUCKET = -6
+API_TOKEN_BUCKET = -7
+
+
+def email_login_locked(email: str) -> bool:
+    """Per-account lockout: IP rotation must not reset login throttling."""
+    cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (email, LOGIN_EMAIL_BUCKET, cutoff),
+    )
+    return row["n"] >= config.LOGIN_EMAIL_MAX_FAILS
+
+
+def email_login_fail(email: str) -> None:
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+        (email, LOGIN_EMAIL_BUCKET, time.time()),
+    )
+
+
+def email_login_clear(email: str) -> None:
+    db.run(
+        "DELETE FROM pin_attempts WHERE ip=? AND gallery_id=?",
+        (email, LOGIN_EMAIL_BUCKET),
+    )
+
+
+def api_token_locked(ip: str) -> bool:
+    cutoff = time.time() - config.PIN_LOCKOUT_MIN * 60
+    row = db.one(
+        "SELECT COUNT(*) AS n FROM pin_attempts WHERE ip=? AND gallery_id=? AND ts>?",
+        (ip, API_TOKEN_BUCKET, cutoff),
+    )
+    return row["n"] >= config.API_TOKEN_MAX_FAILS
+
+
+def api_token_fail(ip: str) -> None:
+    db.run(
+        "INSERT INTO pin_attempts (ip, gallery_id, ts) VALUES (?,?,?)",
+        (ip, API_TOKEN_BUCKET, time.time()),
+    )
+
+
+def api_token_clear(ip: str) -> None:
+    db.run(
+        "DELETE FROM pin_attempts WHERE ip=? AND gallery_id=?",
+        (ip, API_TOKEN_BUCKET),
+    )
 
 
 def claim_signup_attempt(ip: str) -> bool:

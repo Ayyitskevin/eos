@@ -101,6 +101,18 @@ def authenticate(email: str, password: str, *, studio_id: str | None = None):
     return user
 
 
+def set_password(user_id: int, password: str) -> None:
+    """Change a user's password and rotate (revoke) all of their sessions."""
+    from . import security
+
+    db.run(
+        "UPDATE users SET password_hash=? WHERE id=? AND studio_id=?",
+        (hash_password(password), user_id, STUDIO_ID),
+    )
+    security.revoke_user_sessions(user_id)
+    db.audit("admin", "user.set_password", f"id={user_id}")
+
+
 def bootstrap_owner(email: str, password: str) -> None:
     if get_by_email(email):
         return

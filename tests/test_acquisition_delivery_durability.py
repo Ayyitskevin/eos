@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from eos import acquisition, clients, db, tenant
+from eos import acquisition, clients, db, security, tenant
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
@@ -312,8 +312,13 @@ async def test_operator_can_see_and_reconcile_unknown_acquisition_delivery(app_e
             data={"password": "test-admin-pass"},
             follow_redirects=False,
         )
-        cookie = login.headers["set-cookie"]
-        page = await client.get("/admin/reports/acquisition", headers={"cookie": cookie})
+        session = login.cookies.get(security.ADMIN_COOKIE)
+        csrf = login.cookies.get(security.CSRF_COOKIE)
+        auth = {
+            "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+            "x-eos-csrf": csrf,
+        }
+        page = await client.get("/admin/reports/acquisition", headers=auth)
         assert page.status_code == 200
         assert "Email delivery review" in page.text
         assert "Operator Agent" in page.text
@@ -322,7 +327,7 @@ async def test_operator_can_see_and_reconcile_unknown_acquisition_delivery(app_e
         reconcile = await client.post(
             f"/admin/reports/acquisition/{client_id}/intents/{intent_id}/reconcile",
             data={"outcome": "delivered"},
-            headers={"cookie": cookie},
+            headers=auth,
             follow_redirects=False,
         )
     assert reconcile.status_code == 303

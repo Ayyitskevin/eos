@@ -29,7 +29,7 @@ def _b(name: str, default: str = "false") -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.10.0"
 
 HOST = os.environ.get("EOS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EOS_PORT", "8410"))
@@ -66,10 +66,12 @@ SIGNUP_AUTO_VERIFY_LOCAL = _b("EOS_SIGNUP_AUTO_VERIFY_LOCAL", "false")
 DEFAULT_TURNAROUND_HOURS = int(os.environ.get("EOS_DEFAULT_TURNAROUND_HOURS", "24"))
 PIN_MAX_FAILS = int(os.environ.get("EOS_PIN_MAX_FAILS", "5"))
 PIN_LOCKOUT_MIN = int(os.environ.get("EOS_PIN_LOCKOUT_MIN", "15"))
-SESSION_MAX_AGE = int(os.environ.get("EOS_SESSION_MAX_AGE", str(60 * 60 * 24 * 90)))
+GALLERY_PIN_MAX_FAILS = int(os.environ.get("EOS_GALLERY_PIN_MAX_FAILS", "20"))
+SESSION_MAX_AGE = int(os.environ.get("EOS_SESSION_MAX_AGE", str(60 * 60 * 24 * 14)))
 COOKIE_SECURE = _b("EOS_COOKIE_SECURE", "false")
 
 WEB_MAX_PX = int(os.environ.get("EOS_WEB_MAX_PX", "2400"))
+UPLOAD_MAX_BYTES = int(os.environ.get("EOS_UPLOAD_MAX_BYTES", str(50 * 1024 * 1024)))
 THUMB_MAX_PX = int(os.environ.get("EOS_THUMB_MAX_PX", "480"))
 JPEG_QUALITY = int(os.environ.get("EOS_JPEG_QUALITY", "88"))
 JOB_WORKERS = int(os.environ.get("EOS_JOB_WORKERS", "2"))
@@ -119,6 +121,8 @@ TOKEN_ENCRYPTION_KEY = os.environ.get("EOS_TOKEN_ENCRYPTION_KEY", "") or SECRET_
 BILLING_ENFORCE = _b("EOS_BILLING_ENFORCE", "false") or SAAS_MODE
 SIGNUP_RATE_LIMIT = int(os.environ.get("EOS_SIGNUP_RATE_LIMIT", "5"))
 SIGNUP_RATE_WINDOW_SEC = int(os.environ.get("EOS_SIGNUP_RATE_WINDOW_SEC", "3600"))
+LOGIN_EMAIL_MAX_FAILS = int(os.environ.get("EOS_LOGIN_EMAIL_MAX_FAILS", "10"))
+API_TOKEN_MAX_FAILS = int(os.environ.get("EOS_API_TOKEN_MAX_FAILS", "20"))
 
 TWILIO_ACCOUNT_SID = os.environ.get("EOS_TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("EOS_TWILIO_AUTH_TOKEN", "")

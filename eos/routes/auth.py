@@ -54,11 +54,22 @@ async def login(
             status_code=429,
         )
     email = email.strip().lower()
+    if email and security.email_login_locked(email):
+        return templates.TemplateResponse(
+            request,
+            "admin/login.html",
+            {
+                "error": "Too many attempts for this account. Try again later.",
+                "saas_mode": saas_mode,
+            },
+            status_code=429,
+        )
     user = None
     if email:
         user = users.authenticate(email, password, studio_id=tenant.get_studio_id())
         if not user:
             security.pin_fail(ip, security.ADMIN_BUCKET)
+            security.email_login_fail(email)
             return templates.TemplateResponse(
                 request,
                 "admin/login.html",
@@ -85,6 +96,7 @@ async def login(
 
     security.pin_clear(ip, security.ADMIN_BUCKET)
     if user:
+        security.email_login_clear(user["email"])
         tenant.set_studio(user["studio_id"])
     from .. import onboarding_wizard
 
@@ -92,7 +104,7 @@ async def login(
     if user and onboarding_wizard.should_redirect() and not onboarding_wizard.status()["done"]:
         dest = "/admin/onboarding"
     resp = RedirectResponse(dest, status_code=303)
-    name, value = security.set_session_cookie(user["id"] if user else None)
+    name, value = security.set_session_cookie(user["id"] if user else None, ip=ip)
     resp.set_cookie(
         name,
         value,
@@ -108,7 +120,8 @@ async def login(
 
 
 @router.post("/logout")
-async def logout():
+async def logout(request: Request):
+    security.revoke_session(request)
     resp = RedirectResponse("/admin/login", status_code=303)
     resp.delete_cookie(security.ADMIN_COOKIE, path="/")
     return resp

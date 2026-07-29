@@ -15,9 +15,19 @@ import eos.referrals as referrals
 import eos.reports as reports
 import eos.reports_export as reports_export
 import eos.revenue_optimizer as revenue_optimizer
+import eos.security as security
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
+
+
+def _auth_headers(login) -> dict[str, str]:
+    session = login.cookies.get(security.ADMIN_COOKIE)
+    csrf = login.cookies.get(security.CSRF_COOKIE)
+    return {
+        "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+        "x-eos-csrf": csrf,
+    }
 
 
 @pytest.fixture()
@@ -431,8 +441,8 @@ async def test_reports_dashboard_shows_revenue(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/reports", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/reports", headers=cookie)
         assert r.status_code == 200
         assert "250" in r.text
         assert "Top agents" in r.text
@@ -473,15 +483,15 @@ async def test_reports_dashboard_shows_repeat_agent_revenue(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/reports", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/reports", headers=cookie)
         assert r.status_code == 200
         assert "Repeat agent revenue" in r.text
         assert "Repeat Agent" in r.text
         assert "Big Broker" in r.text
         assert "$500" in r.text
 
-        export = await client.get("/admin/reports/repeat-agents.csv", headers={"cookie": cookie})
+        export = await client.get("/admin/reports/repeat-agents.csv", headers=cookie)
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-repeat-agents.csv" in export.headers["content-disposition"]
@@ -543,8 +553,8 @@ async def test_brokerage_dashboard_and_csv_routes(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/brokerages", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/brokerages", headers=cookie)
         assert r.status_code == 200
         assert "Brokerage accounts" in r.text
         assert "Big Broker" in r.text
@@ -557,7 +567,7 @@ async def test_brokerage_dashboard_and_csv_routes(app_env):
         assert "Agent Kay" in r.text
         assert "Cedar Portfolio" in r.text
 
-        export = await client.get("/admin/brokerages.csv", headers={"cookie": cookie})
+        export = await client.get("/admin/brokerages.csv", headers=cookie)
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-brokerages.csv" in export.headers["content-disposition"]
@@ -608,8 +618,8 @@ async def test_revenue_optimizer_dashboard_and_csv_routes(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/reports/revenue-optimizer", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/reports/revenue-optimizer", headers=cookie)
         assert r.status_code == 200
         assert "Revenue optimizer" in r.text
         assert "Package performance" in r.text
@@ -619,9 +629,7 @@ async def test_revenue_optimizer_dashboard_and_csv_routes(app_env):
         assert "Maple Standard" in r.text
         assert "Aerial / drone photos" in r.text
 
-        export = await client.get(
-            "/admin/reports/revenue-optimizer.csv", headers={"cookie": cookie}
-        )
+        export = await client.get("/admin/reports/revenue-optimizer.csv", headers=cookie)
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-revenue-optimizer.csv" in export.headers["content-disposition"]
@@ -907,8 +915,8 @@ async def test_acquisition_dashboard_and_csv_routes(app_env, monkeypatch):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/reports/acquisition", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/reports/acquisition", headers=cookie)
         assert r.status_code == 200
         assert "Agent acquisition" in r.text
         assert "Intro ask queue" in r.text
@@ -927,7 +935,7 @@ async def test_acquisition_dashboard_and_csv_routes(app_env, monkeypatch):
         assert "Zero Use Agent" in r.text
         assert "Send follow-up" in r.text
 
-        agent = await client.get(f"/admin/clients/{ids['referrer_id']}", headers={"cookie": cookie})
+        agent = await client.get(f"/admin/clients/{ids['referrer_id']}", headers=cookie)
         assert agent.status_code == 200
         assert "Agent growth" in agent.text
         assert "Referral advocate" in agent.text
@@ -938,17 +946,17 @@ async def test_acquisition_dashboard_and_csv_routes(app_env, monkeypatch):
         follow = await client.post(
             f"/admin/reports/acquisition/{ids['zero_use_id']}/follow-up",
             data={"redirect": "/admin/reports/acquisition"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert follow.status_code == 303
         assert "acquisition=draft" in follow.headers["location"]
         assert "follow_up=1" in follow.headers["location"]
-        draft = await client.get(follow.headers["location"], headers={"cookie": cookie})
+        draft = await client.get(follow.headers["location"], headers=cookie)
         assert "Referral follow-up email draft" in draft.text
         assert "Quick follow-up on agent introductions" in draft.text
 
-        export = await client.get("/admin/reports/acquisition.csv", headers={"cookie": cookie})
+        export = await client.get("/admin/reports/acquisition.csv", headers=cookie)
         assert export.status_code == 200
         assert export.headers["content-type"].startswith("text/csv")
         assert "eos-acquisition.csv" in export.headers["content-disposition"]
@@ -968,18 +976,18 @@ async def test_acquisition_bulk_route_drafts_visible_queue(app_env, monkeypatch)
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
         bulk = await client.post(
             "/admin/reports/acquisition/bulk-send",
             data={"queue_filter": "ready"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert bulk.status_code == 303
         assert "acquisition=bulk" in bulk.headers["location"]
         assert "draft=2" in bulk.headers["location"]
 
-        page = await client.get(bulk.headers["location"], headers={"cookie": cookie})
+        page = await client.get(bulk.headers["location"], headers=cookie)
 
     assert page.status_code == 200
     assert "Bulk intro ask complete" in page.text
@@ -1003,8 +1011,8 @@ async def test_studio_settings_show_agent_referral_performance(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/studio", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/studio", headers=cookie)
 
     assert r.status_code == 200
     assert "Agent referral performance" in r.text
@@ -1023,17 +1031,17 @@ async def test_acquisition_intro_route_drafts_and_shows_mailto(app_env, monkeypa
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
         sent = await client.post(
             f"/admin/reports/acquisition/{ids['zero_use_id']}/send",
             data={"redirect": "/admin/reports/acquisition"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert sent.status_code == 303
         assert "acquisition=draft" in sent.headers["location"]
 
-        page = await client.get(sent.headers["location"], headers={"cookie": cookie})
+        page = await client.get(sent.headers["location"], headers=cookie)
 
     assert page.status_code == 200
     assert "Referral introduction email draft" in page.text
@@ -1055,8 +1063,8 @@ async def test_kanban_lists_pipeline_columns(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
-        r = await client.get("/admin/kanban", headers={"cookie": cookie})
+        cookie = _auth_headers(login)
+        r = await client.get("/admin/kanban", headers=cookie)
         assert r.status_code == 200
         assert "Kanban Lead" in r.text
         assert "Kanban Booked" in r.text
@@ -1096,9 +1104,9 @@ async def test_listing_advance_via_kanban(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
         r = await client.post(
-            f"/admin/listings/{lid}/advance", headers={"cookie": cookie}, follow_redirects=False
+            f"/admin/listings/{lid}/advance", headers=cookie, follow_redirects=False
         )
         assert r.status_code == 303
     row = listings.get_listing(lid)

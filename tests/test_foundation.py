@@ -3,7 +3,17 @@
 from unittest.mock import patch
 
 import pytest
+from eos import security
 from httpx import ASGITransport, AsyncClient
+
+
+def _auth_headers(login) -> dict[str, str]:
+    session = login.cookies.get(security.ADMIN_COOKIE)
+    csrf = login.cookies.get(security.CSRF_COOKIE)
+    return {
+        "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+        "x-eos-csrf": csrf,
+    }
 
 
 @pytest.mark.asyncio
@@ -47,7 +57,7 @@ async def test_listing_and_gallery_flow(app_env):
             follow_redirects=False,
         )
         assert login.status_code == 303
-        cookie = login.headers["set-cookie"]
+        auth = _auth_headers(login)
 
         listing = await client.post(
             "/admin/listings",
@@ -59,13 +69,13 @@ async def test_listing_and_gallery_flow(app_env):
                 "zip_code": "78701",
                 "mls_id": "MLS-999",
             },
-            headers={"cookie": cookie},
+            headers=auth,
             follow_redirects=False,
         )
         assert listing.status_code == 303
         listing_id = int(listing.headers["location"].rstrip("/").split("/")[-1])
 
-        page = await client.get(f"/admin/listings/{listing_id}", headers={"cookie": cookie})
+        page = await client.get(f"/admin/listings/{listing_id}", headers=auth)
         assert page.status_code == 200
         assert "123 Oak Street" in page.text
         assert "Front elevation" in page.text
@@ -73,13 +83,13 @@ async def test_listing_and_gallery_flow(app_env):
 
         gallery = await client.post(
             f"/admin/listings/{listing_id}/gallery",
-            headers={"cookie": cookie},
+            headers=auth,
             follow_redirects=False,
         )
         assert gallery.status_code == 303
         gallery_id = int(gallery.headers["location"].rstrip("/").split("/")[-1])
 
-        gpage = await client.get(f"/admin/galleries/{gallery_id}", headers={"cookie": cookie})
+        gpage = await client.get(f"/admin/galleries/{gallery_id}", headers=auth)
         assert gpage.status_code == 200
         assert "Curb Appeal" in gpage.text
         assert "Kitchen" in gpage.text

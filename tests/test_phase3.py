@@ -1,8 +1,18 @@
 """Phase 3 — proposals, contracts, section reorder."""
 
 import eos.db as db
+import eos.security as security
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+
+def _auth_headers(login) -> dict[str, str]:
+    session = login.cookies.get(security.ADMIN_COOKIE)
+    csrf = login.cookies.get(security.CSRF_COOKIE)
+    return {
+        "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+        "x-eos-csrf": csrf,
+    }
 
 
 @pytest.mark.asyncio
@@ -12,7 +22,7 @@ async def test_proposal_accept_flow(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
 
         lid = db.run(
             "INSERT INTO listings (studio_id, title, status) VALUES ('default', '456 Elm', 'lead')"
@@ -20,14 +30,14 @@ async def test_proposal_accept_flow(app_env):
         create = await client.post(
             f"/admin/listings/{lid}/proposals",
             data={"preset": "blank"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         pid = int(create.headers["location"].rstrip("/").split("/")[-1])
         slug = db.one("SELECT slug FROM proposals WHERE id=?", (pid,))["slug"]
 
         send = await client.post(
-            f"/admin/proposals/{pid}/send", headers={"cookie": cookie}, follow_redirects=False
+            f"/admin/proposals/{pid}/send", headers=cookie, follow_redirects=False
         )
         assert send.status_code == 303
 
@@ -76,7 +86,7 @@ async def test_section_reorder(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
 
         gid = db.run(
             """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
@@ -88,7 +98,7 @@ async def test_section_reorder(app_env):
         await client.post(
             f"/admin/galleries/{gid}/sections/{s2}/move",
             data={"dir": "up"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         rows = db.all_("SELECT id FROM sections WHERE gallery_id=? ORDER BY position", (gid,))

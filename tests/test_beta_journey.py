@@ -147,8 +147,13 @@ async def _login(client: AsyncClient, slug: str) -> dict[str, str]:
     )
     assert response.status_code == 303, response.text
     session = response.cookies.get(security.ADMIN_COOKIE)
-    assert session
-    return {"host": _host(slug), "cookie": f"{security.ADMIN_COOKIE}={session}"}
+    csrf = response.cookies.get(security.CSRF_COOKIE)
+    assert session and csrf
+    return {
+        "host": _host(slug),
+        "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+        "x-eos-csrf": csrf,
+    }
 
 
 async def _quick_launch(client: AsyncClient, slug: str) -> dict[str, str]:
@@ -613,15 +618,11 @@ async def test_failed_verification_delivery_is_visible_and_resend_recovers(beta_
         assert 'name="cap"' not in pending.text
         assert "owner@verify-retry.test" not in pending.text
         assert "o***@verify-retry.test" in pending.text
-        csrf = pending.cookies.get(security.CSRF_COOKIE)
+        csrf = admin_headers["x-eos-csrf"]
         assert csrf
         resent = await client.post(
             "/admin/verify-pending/resend",
-            headers={
-                **admin_headers,
-                "cookie": (f"{admin_headers['cookie']}; {security.CSRF_COOKIE}={csrf}"),
-                "sec-fetch-site": "same-origin",
-            },
+            headers={**admin_headers, "sec-fetch-site": "same-origin"},
             data={security.CSRF_FORM: csrf},
             follow_redirects=False,
         )

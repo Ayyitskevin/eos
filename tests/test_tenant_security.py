@@ -15,9 +15,11 @@ import eos.main as main
 import eos.onboarding as onboarding
 import eos.portal as portal
 import eos.reschedule as reschedule
+import eos.secret_store as secret_store
 import eos.security as security
 import eos.sequences as sequences
 import eos.tenant as tenant
+import eos.users as users
 import eos.webhooks as webhooks
 import pytest
 from fastapi import HTTPException
@@ -171,6 +173,7 @@ async def test_upload_rejects_other_studio_gallery(app_env):
             follow_redirects=False,
         )
         cookie = login.headers["set-cookie"]
+        csrf = client.cookies.get(security.CSRF_COOKIE)
         cross_tenant_media = await client.get(
             f"/admin/galleries/{gid}/media/original/{aid}",
             headers={"host": "beta.eos.test", "cookie": cookie},
@@ -180,7 +183,11 @@ async def test_upload_rejects_other_studio_gallery(app_env):
         r = await client.post(
             f"/admin/galleries/{gid}/upload",
             files={"files": ("x.jpg", b"fake", "image/jpeg")},
-            headers={"host": "beta.eos.test", "cookie": cookie},
+            headers={
+                "host": "beta.eos.test",
+                "cookie": f"{cookie}; {security.CSRF_COOKIE}={csrf}",
+                "x-eos-csrf": csrf,
+            },
         )
         assert r.status_code == 404
 
@@ -725,3 +732,316 @@ def test_webhook_post_binds_and_restores_dispatch_studio(app_env):
     assert row["studio_id"] == "beta"
     assert row["status"] == "ok"
     assert tenant.get_studio_id() == "default"
+
+
+def _session_cookie(client) -> str:
+    return f"{security.ADMIN_COOKIE}={client.cookies.get(security.ADMIN_COOKIE)}"
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_session_server_side(app_env):
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        cookie = _session_cookie(client)
+        ok = await client.get("/admin", headers={"host": "alpha.eos.test", "cookie": cookie})
+        assert ok.status_code == 200
+
+        await client.post(
+            "/admin/logout",
+            headers={"host": "alpha.eos.test", "cookie": cookie},
+            follow_redirects=False,
+        )
+        # Replaying the same signed cookie must fail: the server-side row is revoked.
+        replay = await client.get(
+            "/admin",
+            headers={"host": "alpha.eos.test", "cookie": cookie},
+            follow_redirects=False,
+        )
+        assert replay.status_code == 303
+        assert replay.headers["location"] == "/admin/login"
+
+
+@pytest.mark.asyncio
+async def test_password_change_revokes_existing_sessions(app_env):
+    user = users.get_by_email("a@alpha.test", studio_id="alpha")
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        cookie = _session_cookie(client)
+
+        tenant.set_studio("alpha")
+        users.set_password(user["id"], "alpha-pass-rotated")
+
+        replay = await client.get(
+            "/admin",
+            headers={"host": "alpha.eos.test", "cookie": cookie},
+            follow_redirects=False,
+        )
+        assert replay.status_code == 303
+        old_password = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert old_password.status_code == 401
+        new_password = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-rotated"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert new_password.status_code == 303
+
+
+@pytest.mark.asyncio
+async def test_stateless_session_cookie_is_rejected(app_env):
+    user = users.get_by_email("a@alpha.test", studio_id="alpha")
+    forged = f"{security.ADMIN_COOKIE}={security.sign(f'user:{user["id"]}')}"
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        r = await client.get(
+            "/admin",
+            headers={"host": "alpha.eos.test", "cookie": forged},
+            follow_redirects=False,
+        )
+    assert r.status_code == 303
+    assert r.headers["location"] == "/admin/login"
+
+
+def test_session_max_age_defaults_to_fourteen_days(app_env):
+    assert config.SESSION_MAX_AGE == 60 * 60 * 24 * 14
+
+
+def test_secret_store_fails_closed_without_key_in_saas_mode(app_env, monkeypatch):
+    monkeypatch.setattr(config, "TOKEN_ENCRYPTION_KEY", "")
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        secret_store.encrypt("tok")
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        secret_store.decrypt("tok")
+
+
+def test_secret_store_rejects_undecryptable_ciphertext_in_saas_mode(app_env):
+    from cryptography.fernet import InvalidToken
+
+    with pytest.raises(InvalidToken):
+        secret_store.decrypt(secret_store.encrypt("real")[:-4] + "XXXX")
+
+
+def test_secret_store_dev_mode_still_passes_through(app_env, monkeypatch):
+    monkeypatch.setattr(config, "SAAS_MODE", False)
+    monkeypatch.setattr(config, "TOKEN_ENCRYPTION_KEY", "")
+    assert secret_store.encrypt("plain") == "plain"
+    assert secret_store.decrypt("not-a-fernet-token") == "not-a-fernet-token"
+
+
+def test_saas_startup_refuses_insecure_configuration(app_env, monkeypatch):
+    with pytest.raises(RuntimeError, match="COOKIE_SECURE"):
+        main.enforce_saas_startup_security()
+    monkeypatch.setattr(config, "COOKIE_SECURE", True)
+    monkeypatch.setattr(config, "TOKEN_ENCRYPTION_KEY", "")
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        main.enforce_saas_startup_security()
+    monkeypatch.setattr(config, "TOKEN_ENCRYPTION_KEY", "key")
+    main.enforce_saas_startup_security()
+
+
+def test_solo_startup_skips_saas_security_gate(app_env, monkeypatch):
+    monkeypatch.setattr(config, "SAAS_MODE", False)
+    monkeypatch.setattr(config, "COOKIE_SECURE", False)
+    monkeypatch.setattr(config, "TOKEN_ENCRYPTION_KEY", "")
+    main.enforce_saas_startup_security()
+
+
+@pytest.mark.asyncio
+async def test_email_send_redirect_is_local_only(app_env, monkeypatch):
+    tenant.set_studio("alpha")
+    gid = db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
+           VALUES ('alpha', 'redirect-gallery', 'G', '123456', 'tok-redirect')"""
+    )
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(mailer, "send_for_studio", lambda *_args: None)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        headers = {"host": "alpha.eos.test", "sec-fetch-site": "same-origin"}
+
+        async def send(redirect: str):
+            return await client.post(
+                f"/admin/email/galleries/{gid}",
+                data={
+                    "to": "agent@example.com",
+                    "subject": "Gallery",
+                    "message": "link",
+                    "redirect": redirect,
+                    security.CSRF_FORM: csrf,
+                },
+                headers=headers,
+                follow_redirects=False,
+            )
+
+        absolute = await send("https://evil.example/phish")
+        scheme_relative = await send("//evil.example/phish")
+        local = await send("/admin/galleries")
+
+    assert absolute.status_code == 303
+    assert absolute.headers["location"] == "/admin"
+    assert scheme_relative.status_code == 303
+    assert scheme_relative.headers["location"] == "/admin"
+    assert local.status_code == 303
+    assert local.headers["location"] == "/admin/galleries"
+
+
+@pytest.mark.asyncio
+async def test_admin_post_without_fetch_metadata_requires_csrf_token(app_env):
+    """A client that omits Sec-Fetch-Site can no longer skip CSRF verification."""
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+        assert csrf
+
+        no_token = await client.post(
+            "/admin/clients",
+            data={"name": "No Metadata Agent"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert no_token.status_code == 403
+
+        with_token = await client.post(
+            "/admin/clients",
+            data={"name": "Token Agent", security.CSRF_FORM: csrf},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert with_token.status_code == 303
+
+
+@pytest.mark.asyncio
+async def test_login_lockout_follows_email_across_ips(app_env):
+    """Rotating source IPs must not reset login throttling for an account."""
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        for i in range(config.LOGIN_EMAIL_MAX_FAILS):
+            r = await client.post(
+                "/admin/login",
+                data={"email": "a@alpha.test", "password": "wrong-password"},
+                headers={"host": "alpha.eos.test", "x-eos-client-ip": f"203.0.113.{i + 1}"},
+            )
+            assert r.status_code == 401
+        # Even the correct password is refused from a fresh IP while locked.
+        locked = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test", "x-eos-client-ip": "198.51.100.9"},
+        )
+        assert locked.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_api_token_endpoint_rate_limited(app_env):
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://eos.test") as client:
+        headers = {"host": "alpha.eos.test", "authorization": "Bearer eos_garbage_token"}
+        for _ in range(config.API_TOKEN_MAX_FAILS):
+            r = await client.get("/api/v1/listings", headers=headers)
+            assert r.status_code == 401
+        limited = await client.get("/api/v1/listings", headers=headers)
+        assert limited.status_code == 429
+
+
+def _tiny_jpeg() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), color=(120, 130, 140)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+async def _upload(client, gallery_id: int, csrf: str, filename: str, content: bytes):
+    return await client.post(
+        f"/admin/galleries/{gallery_id}/upload",
+        files={"files": (filename, content, "image/jpeg")},
+        headers={
+            "host": "alpha.eos.test",
+            "cookie": (
+                f"{security.ADMIN_COOKIE}={client.cookies.get(security.ADMIN_COOKIE)}; "
+                f"{security.CSRF_COOKIE}={csrf}"
+            ),
+            "x-eos-csrf": csrf,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_upload_enforces_byte_cap_and_content_sniffing(app_env, monkeypatch):
+    tenant.set_studio("alpha")
+    gid = db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token)
+           VALUES ('alpha', 'upload-guard', 'Upload Guard', '123456', 'tok-upload')"""
+    )
+    db.run("INSERT INTO sections (gallery_id, name, position) VALUES (?, 'Exterior', 0)", (gid,))
+    monkeypatch.setattr(config, "UPLOAD_MAX_BYTES", 128)
+
+    transport = ASGITransport(app=app_env)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/admin/login",
+            data={"email": "a@alpha.test", "password": "alpha-pass-1"},
+            headers={"host": "alpha.eos.test"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        csrf = client.cookies.get(security.CSRF_COOKIE)
+
+        oversized = await _upload(client, gid, csrf, "big.jpg", _tiny_jpeg())
+        assert oversized.status_code == 200
+        assert oversized.json() == {"accepted": 0, "rejected": ["big.jpg"]}
+
+        monkeypatch.setattr(config, "UPLOAD_MAX_BYTES", 50 * 1024 * 1024)
+        fake = await _upload(client, gid, csrf, "fake.jpg", b"<html>not an image</html>")
+        assert fake.status_code == 200
+        assert fake.json() == {"accepted": 0, "rejected": ["fake.jpg"]}
+
+        real = await _upload(client, gid, csrf, "real.jpg", _tiny_jpeg())
+        assert real.status_code == 200
+        assert real.json() == {"accepted": 1, "rejected": []}
+
+    assets = db.all_("SELECT filename, stored FROM assets WHERE gallery_id=?", (gid,))
+    assert [row["filename"] for row in assets] == ["real.jpg"]
+    from eos import media_paths
+
+    stored_dir = media_paths.gallery_subdir(gid, "original", studio_id="alpha")
+    on_disk = {p.name for p in stored_dir.iterdir()}
+    assert on_disk == {assets[0]["stored"]}

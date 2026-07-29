@@ -11,6 +11,10 @@ from . import config
 def _fernet() -> Fernet | None:
     material = config.TOKEN_ENCRYPTION_KEY
     if not material:
+        if config.SAAS_MODE:
+            raise RuntimeError(
+                "EOS_TOKEN_ENCRYPTION_KEY (or EOS_SECRET_KEY) is required in SaaS mode"
+            )
         return None
     key = base64.urlsafe_b64encode(hashlib.sha256(material.encode()).digest())
     return Fernet(key)
@@ -30,4 +34,6 @@ def decrypt(cipher: str) -> str:
     try:
         return f.decrypt(cipher.encode()).decode()
     except InvalidToken:
+        if config.SAAS_MODE:
+            raise
         return cipher

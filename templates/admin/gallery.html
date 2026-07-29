@@ -34,7 +34,7 @@
       <form method="post" action="/admin/galleries/{{ g.id }}/settings" class="form-grid compact">
         <label>Title <input name="title" value="{{ g.title }}" required></label>
         <label>Client name <input name="client_name" value="{{ g.client_name or '' }}"></label>
-        <label>PIN <input name="pin" value="{{ g.pin }}" pattern="[0-9]{4}" maxlength="4" required></label>
+        <label>PIN <input name="pin" value="{{ g.pin }}" pattern="[0-9]{4,6}" maxlength="6" required></label>
         <label>Expires <input name="expires_at" type="date" value="{{ g.expires_at or '' }}"></label>
         <label>Listing
           <select name="listing_id">

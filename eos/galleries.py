@@ -208,8 +208,8 @@ def update_gallery_settings(
             status_code=409,
             detail="A delivered gallery cannot be linked to another listing; create a new gallery.",
         )
-    if not (pin.isdigit() and len(pin) == 4):
-        raise HTTPException(status_code=400, detail="PIN must be 4 digits")
+    if not (pin.isdigit() and len(pin) in (4, 6)):
+        raise HTTPException(status_code=400, detail="PIN must be 4 or 6 digits")
     newly_published = bool(published and not old["published"])
     if newly_published:
         if target_listing_id is None:

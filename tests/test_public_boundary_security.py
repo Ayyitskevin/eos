@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock
 
 import pytest
-from eos import commerce, db, referrals, tenant, webhooks
+from eos import commerce, db, referrals, security, tenant, webhooks
 from eos.routes import site as site_routes
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
@@ -878,3 +878,53 @@ async def test_booking_and_admin_capability_pages_are_not_cacheable(app_env_http
     assert "Returning Agent" in booking.text
     assert booking.headers["cache-control"] == "private, no-store"
     assert admin.headers["cache-control"] == "private, no-store"
+
+
+def test_new_gallery_pins_are_six_digits(app_env_http):
+    pins = {security.new_pin() for _ in range(50)}
+    assert all(re.fullmatch(r"[0-9]{6}", pin) for pin in pins)
+
+
+@pytest.mark.asyncio
+async def test_gallery_pin_lockout_is_gallery_wide_not_per_ip(app_env_http):
+    db.run(
+        """INSERT INTO galleries (studio_id, slug, title, pin, delivery_token, published)
+           VALUES ('default', 'pin-lockout-gallery', 'PIN Gallery', '654321', 'tok-pin', 1)"""
+    )
+    transport = ASGITransport(app=app_env_http)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        # Distributed guessing: each source IP stays far below the per-IP limit.
+        for i in range(security.config.GALLERY_PIN_MAX_FAILS):
+            r = await client.post(
+                "/g/pin-lockout-gallery/pin",
+                data={"pin": "000000"},
+                headers={"x-eos-client-ip": f"203.0.113.{i + 1}"},
+            )
+            assert r.status_code == 401
+        # The per-gallery counter trips anyway, for a brand-new IP ...
+        locked = await client.post(
+            "/g/pin-lockout-gallery/pin",
+            data={"pin": "000000"},
+            headers={"x-eos-client-ip": "198.51.100.7"},
+        )
+        assert locked.status_code == 429
+        # ... and even the correct PIN is refused while the gallery is locked.
+        correct = await client.post(
+            "/g/pin-lockout-gallery/pin",
+            data={"pin": "654321"},
+            headers={"x-eos-client-ip": "198.51.100.8"},
+        )
+        assert correct.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_legacy_password_login_refused_in_productionish_mode(app_env_http, monkeypatch):
+    monkeypatch.setattr(security.config, "COOKIE_SECURE", True)
+    transport = ASGITransport(app=app_env_http)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        refused = await client.post(
+            "/admin/login",
+            data={"password": "test-admin-pass"},
+            follow_redirects=False,
+        )
+    assert refused.status_code == 401

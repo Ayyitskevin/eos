@@ -9,6 +9,14 @@ from ..vocab import STUDIO_ID
 log = logging.getLogger("eos.routes.emails")
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
 
+
+def _safe_redirect(path: str) -> str:
+    """Local paths only — no scheme-relative or absolute URLs."""
+    if path.startswith("/") and not path.startswith("//"):
+        return path
+    return "/admin"
+
+
 DOC_TABLES = {
     "proposals": ("proposal", "listing_id"),
     "contracts": ("contract", "listing_id"),
@@ -51,7 +59,7 @@ async def send_email(
         (STUDIO_ID, listing_id, doc_kind, doc_id, to, subject),
     )
     log.info("emailed %s %s to %s", doc_kind, doc_id, to)
-    return RedirectResponse(redirect or "/admin", status_code=303)
+    return RedirectResponse(_safe_redirect(redirect), status_code=303)
 
 
 @router.post("/galleries/{gallery_id}/email")

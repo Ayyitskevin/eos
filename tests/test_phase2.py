@@ -4,9 +4,19 @@ import io
 import time
 
 import eos.db as db
+import eos.security as security
 import pytest
 from httpx import ASGITransport, AsyncClient
 from PIL import Image
+
+
+def _auth_headers(login) -> dict[str, str]:
+    session = login.cookies.get(security.ADMIN_COOKIE)
+    csrf = login.cookies.get(security.CSRF_COOKIE)
+    return {
+        "cookie": f"{security.ADMIN_COOKIE}={session}; {security.CSRF_COOKIE}={csrf}",
+        "x-eos-csrf": csrf,
+    }
 
 
 def _tiny_jpeg() -> bytes:
@@ -22,7 +32,7 @@ async def test_upload_and_derivatives(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
 
         lid = db.run(
             "INSERT INTO listings (studio_id, title) VALUES ('default', 'Test')",
@@ -39,7 +49,7 @@ async def test_upload_and_derivatives(app_env):
         r = await client.post(
             f"/admin/galleries/{gid}/upload",
             files=[("files", ("front.jpg", _tiny_jpeg(), "image/jpeg"))],
-            headers={"cookie": cookie},
+            headers=cookie,
         )
         assert r.status_code == 200
         assert r.json()["accepted"] == 1
@@ -56,9 +66,7 @@ async def test_upload_and_derivatives(app_env):
         )
         # asset id is 1 in fresh db
         aid = db.one("SELECT id FROM assets WHERE gallery_id=?", (gid,))["id"]
-        thumb = await client.get(
-            f"/admin/galleries/{gid}/media/thumb/{aid}", headers={"cookie": cookie}
-        )
+        thumb = await client.get(f"/admin/galleries/{gid}/media/thumb/{aid}", headers=cookie)
         assert thumb.status_code == 200
 
 
@@ -69,7 +77,7 @@ async def test_invoice_and_appointment(app_env):
         login = await client.post(
             "/admin/login", data={"password": "test-admin-pass"}, follow_redirects=False
         )
-        cookie = login.headers["set-cookie"]
+        cookie = _auth_headers(login)
 
         lid = db.run(
             "INSERT INTO listings (studio_id, title) VALUES ('default', 'Invoice Test')",
@@ -78,7 +86,7 @@ async def test_invoice_and_appointment(app_env):
         inv = await client.post(
             f"/admin/listings/{lid}/invoice",
             data={"title": "Shoot fee", "amount_dollars": "199.00"},
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert inv.status_code == 303
@@ -91,11 +99,11 @@ async def test_invoice_and_appointment(app_env):
                 "starts_at": "2026-07-01T18:30",
                 "listing_id": str(lid),
             },
-            headers={"cookie": cookie},
+            headers=cookie,
             follow_redirects=False,
         )
         assert appt.status_code == 303
 
-        cal = await client.get("/admin/calendar?date=2026-07-01", headers={"cookie": cookie})
+        cal = await client.get("/admin/calendar?date=2026-07-01", headers=cookie)
         assert cal.status_code == 200
         assert "Twilight shoot" in cal.text
