@@ -2,7 +2,7 @@
 
 **Read this before changing code.** Eos is a multi-tenant RE photography SaaS (Aryeo-class). The goal is to **extend** what works, not refactor or break tenant isolation.
 
-**Version:** 1.9.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
+**Version:** 1.10.0 · **Port:** 8410 · **Repo:** https://github.com/Ayyitskevin/eos
 
 ---
 

@@ -4,7 +4,7 @@
 
 | Layer | Default | Scale path |
 |-------|---------|------------|
-| Database | SQLite WAL | `EOS_DATABASE_URL` → PostgreSQL (planned) |
+| Database | SQLite WAL | PostgreSQL (planned — not yet implemented) |
 | Media | Local disk + optional S3/R2 sync | `EOS_S3_*` env vars |
 | App | Single uvicorn worker | Horizontal replicas + shared DB/S3 |
 | Jobs | In-process thread pool (single app worker required) | Redis queue (planned) |
@@ -27,9 +27,10 @@ Uploads and image derivatives sync to `eos/media/{studio_id}/{gallery_id}/`. Usa
 
 ## PostgreSQL (roadmap)
 
-SQLite handles early SaaS (under ~25 active studios). For larger scale:
+SQLite handles early SaaS (under ~25 active studios). `EOS_DATABASE_URL` is parsed in
+`eos/config.py` but nothing consumes it yet — setting it has no effect. For larger scale:
 
-1. Set `EOS_DATABASE_URL=postgresql://...`
+1. Implement the PostgreSQL backend behind `EOS_DATABASE_URL`
 2. Run the planned schema export/migration tooling
 3. Move to connection pooling (PgBouncer)
 4. Run multiple app instances behind load balancer

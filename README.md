@@ -78,18 +78,21 @@ It uses synthetic data and Stripe test mode; it is not a production deployment o
 ## Production (hosted platform)
 
 ```bash
-sudo INSTALL_CADDY=1 deploy/install.sh
-sudo nano /opt/eos/.env       # see deploy/env.production.example
-sudo systemctl restart eos
+deploy/install-user.sh          # rootless → ~/opt/eos, user systemd unit
+nano ~/opt/eos/.env             # see deploy/env.production.example
+systemctl --user restart eos
 ```
 
 | Step | Detail |
 |------|--------|
-| DNS | `eos.yourdomain.com` + `*.eos.yourdomain.com` → server |
-| TLS | DNS-01 apex + wildcard certificate, then `deploy/Caddyfile` or nginx |
+| DNS | `eos.yourdomain.com` + `*.eos.yourdomain.com` → Cloudflare Tunnel (TLS terminated at the edge) |
 | Stripe | Platform billing + Connect; webhook → `/stripe/platform/webhook` |
 | Media | `EOS_S3_*` for scale (recommended) |
 | Readiness | `/healthz` for liveness, `/readyz` for load balancers |
+
+The rootless + Cloudflare Tunnel path above is the primary topology. A classic VPS install with
+Caddy/nginx and a DNS-01 wildcard certificate (`sudo INSTALL_CADDY=1 deploy/install.sh`) is
+documented as an appendix in the deploy guide.
 
 Guides: [docs/DEPLOY.md](docs/DEPLOY.md) · [docs/SCALE.md](docs/SCALE.md)
 
@@ -128,7 +131,7 @@ EOS_S3_BUCKET=your-bucket
   billing       Connect        storage
 ```
 
-**v1.9.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · Postmark · boto3 (prod)
+**v1.10.0** · FastAPI · Jinja2 · HTMX · SQLite WAL · Stripe · Postmark · boto3 (prod)
 
 ## Platform admin
 
@@ -164,7 +167,7 @@ Short pointer: [AGENTS.md](AGENTS.md) ·
 - [x] S3/R2 + production deploy (v1.7)
 - [x] Per-tenant email + invite-only beta (v1.8)
 - [ ] PostgreSQL
-- [ ] Per-tenant transactional email
+- [x] Per-tenant transactional email (v1.8)
 - [ ] Zillow Showcase / MLS connectors
 
 ## Links

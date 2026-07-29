@@ -2,7 +2,7 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
-## Unreleased
+## v1.10.0 — 2026-07-28 (production hardening)
 
 - Hardened the beta journey with strict tenant Host/activation gates, atomic request-key booking,
   pending offline deposits, and delivery publication gated on completed shoots and ready assets.
