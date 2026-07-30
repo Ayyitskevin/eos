@@ -33,6 +33,18 @@
   <p class="alert-banner">Downloads locked until invoice is paid.{% if pay_url and payments_on %} <a href="{{ pay_url }}">Pay now</a>{% endif %}</p>
   {% endif %}
 
+  {% if has_slideshow and not payment_locked %}
+  <section class="property-section">
+    <h2>Slideshow</h2>
+    <div class="gallery-embeds">
+      <div class="embed-card">
+        <video controls preload="metadata" style="width:100%"
+               src="/l/{{ listing.site_slug }}/video"></video>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
   {% if embeds %}
   <section class="property-section">
     <h2>Tours &amp; video</h2>

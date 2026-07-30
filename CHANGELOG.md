@@ -37,6 +37,18 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
   `/admin/listings/leads` with per-listing filtering, CSV export, and mark-as-contacted; listing
   admin shows a lead count. The read-only demo studio hides and blocks the form.
 - Fixed the microsite inquiry email regex (missing `@`), which had rejected every submission.
+- Added auto-rendered gallery slideshow / reel videos (Wave 2, item 6): a "Render video" action
+  on the gallery admin page enqueues a `gallery_video_render` job through the existing SQLite job
+  queue — replay-safe per gallery+format via the durable `gallery_video_renders` table
+  (status, error, job id, timestamps). ffmpeg renders the first `EOS_VIDEO_MAX_PHOTOS` ready
+  photos (default 30, gallery order) from the orientation/sRGB-normalized web derivatives into a
+  16:9 1080p slideshow and/or 9:16 1080x1920 vertical reel (per-image loop + xfade crossfades,
+  ~3s per photo, H.264 + faststart, no audio), written under the studio-namespaced media path so
+  optional S3/R2 sync picks them up like other derivatives. Rendering is disabled gracefully when
+  ffmpeg is not on PATH or `EOS_VIDEO_RENDER_ENABLED=false`. Ready videos surface with a player +
+  MP4 download on the gallery admin page, the PIN-gated public gallery, the agent portal delivery
+  list, and the property microsite — all behind the same publication, PIN, and pay-to-download
+  gates as other gallery assets (fail closed: 404/403/402).
 
 ## v1.10.0 — 2026-07-28 (production hardening)
 

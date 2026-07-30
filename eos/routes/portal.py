@@ -13,6 +13,7 @@ from .. import (
     stripe_checkout,
     studio,
     tenant,
+    video_render,
 )
 from .. import brokerage_portal as bp
 from ..render import templates
@@ -52,6 +53,9 @@ async def agent_portal(request: Request, token: str):
             "payments_on": stripe_checkout.payments_configured(),
             "upsell": studio.delivery_upsell(),
             "repeat": repeat,
+            "video_galleries": video_render.galleries_with_ready_videos(
+                [row["gallery_id"] for row in rows]
+            ),
             "rescheduled": request.query_params.get("rescheduled"),
         },
     )

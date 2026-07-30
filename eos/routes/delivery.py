@@ -1,7 +1,17 @@
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import config, db, galleries, listing_media, paywall, security, stripe_checkout, studio
+from .. import (
+    config,
+    db,
+    galleries,
+    listing_media,
+    paywall,
+    security,
+    stripe_checkout,
+    studio,
+    video_render,
+)
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -100,6 +110,7 @@ async def gallery_view(request: Request, slug: str):
             "upsell_addons": upsell_addons,
             "upsell_request_key": security.new_token(),
             "favorites": galleries.agent_favorites(g["id"]),
+            "videos": video_render.ready_formats(g["id"]) if not locked else set(),
         },
     )
 

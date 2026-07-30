@@ -15,6 +15,27 @@
   </div>
 </header>
 
+{% if videos %}
+<section class="gallery-embeds">
+  {% if 'slideshow' in videos %}
+  <div class="embed-card">
+    <h2>Slideshow</h2>
+    <video controls preload="metadata" style="width:100%"
+           src="/g/{{ g.slug }}/video/slideshow"></video>
+    <p><a href="/g/{{ g.slug }}/video/slideshow" download>Download slideshow (MP4)</a></p>
+  </div>
+  {% endif %}
+  {% if 'reel' in videos %}
+  <div class="embed-card">
+    <h2>Vertical reel</h2>
+    <video controls preload="metadata" style="max-width:360px;width:100%"
+           src="/g/{{ g.slug }}/video/reel"></video>
+    <p><a href="/g/{{ g.slug }}/video/reel" download>Download reel for social (MP4)</a></p>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if embeds %}
 <section class="gallery-embeds">
   {% for e in embeds %}

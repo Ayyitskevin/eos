@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 
-from .. import db, galleries, jobs, paywall
+from .. import db, galleries, jobs, paywall, video_render
 from ..jobs import zip_path
 from ..render import templates
 
@@ -48,6 +48,15 @@ async def download_zip(request: Request, slug: str):
     if not z.is_file():
         raise HTTPException(status_code=404, detail="zip not ready")
     return FileResponse(z, filename=f"{g['title']}.zip", media_type="application/zip")
+
+
+@router.get("/{slug}/video/{fmt}")
+async def download_video(request: Request, slug: str, fmt: str):
+    g = _gate(request, slug)
+    path = video_render.ready_file(g["id"], fmt)
+    if not path:
+        raise HTTPException(status_code=404, detail="video not ready")
+    return FileResponse(path, filename=f"{g['title']}-{fmt}.mp4", media_type="video/mp4")
 
 
 @router.get("/{slug}/download/asset/{asset_id}")

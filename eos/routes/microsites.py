@@ -19,6 +19,7 @@ from .. import (
     security,
     stripe_checkout,
     studio,
+    video_render,
 )
 from ..render import templates
 
@@ -46,6 +47,11 @@ def _pay_context(listing_id: int) -> dict:
     }
 
 
+def _has_slideshow(listing_id: int) -> bool:
+    gal = microsites.primary_gallery(listing_id)
+    return bool(gal and video_render.ready_file(gal["id"], "slideshow"))
+
+
 @router.get("/l/{slug}", response_class=HTMLResponse)
 async def listing_site(request: Request, slug: str):
     listing = microsites.get_published_by_slug(slug)
@@ -60,6 +66,7 @@ async def listing_site(request: Request, slug: str):
             **ctx,
             "kit": kit,
             "upsell": upsell,
+            "has_slideshow": _has_slideshow(listing["id"]),
             "lead_capture": _lead_capture_open(listing),
             "thanks": request.query_params.get("thanks") == "1",
             "error": None,
@@ -101,6 +108,7 @@ async def listing_inquire(
                 "lead_capture": True,
                 "thanks": False,
                 "error": "Invalid email.",
+                "has_slideshow": _has_slideshow(listing["id"]),
                 **_pay_context(listing["id"]),
             },
             status_code=400,
@@ -200,6 +208,26 @@ async def listing_bundle(request: Request, slug: str, kind: str):
     label = {"mls": "MLS", "zillow": "Zillow", "fullres": "Full-Res"}[kind]
     return FileResponse(
         path, filename=f"{listing['title']}-{label}.zip", media_type="application/zip"
+    )
+
+
+@router.get("/l/{slug}/video")
+async def listing_slideshow(slug: str):
+    listing = microsites.get_published_by_slug(slug)
+    if paywall.payment_required(listing["id"]):
+        inv_slug = paywall.unpaid_invoice_slug(listing["id"])
+        raise HTTPException(
+            status_code=402,
+            detail=f"payment required — pay invoice at /i/{inv_slug}"
+            if inv_slug
+            else "payment required",
+        )
+    gal = microsites.primary_gallery(listing["id"])
+    path = video_render.ready_file(gal["id"], "slideshow") if gal else None
+    if not path:
+        raise HTTPException(status_code=404, detail="slideshow not ready")
+    return FileResponse(
+        path, media_type="video/mp4", headers={"Cache-Control": "public, max-age=3600"}
     )
 
 

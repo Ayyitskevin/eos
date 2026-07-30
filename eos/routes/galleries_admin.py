@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import db, galleries, jobs, listings, security, studio, tenant
+from .. import db, galleries, jobs, listings, security, studio, tenant, video_render
 from ..render import templates
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(security.require_admin)])
@@ -47,6 +47,8 @@ async def gallery_detail(request: Request, gallery_id: int):
             "n_pending": n_pending,
             "delivery_readiness": galleries.delivery_readiness(gallery_id),
             "delivery_error": request.query_params.get("delivery_error"),
+            "video_renders": video_render.list_for_gallery(gallery_id),
+            "video_enabled": video_render.enabled(),
             "base_url": tenant.get_base_url(),
             "mailer_on": __import__("eos.mailer", fromlist=["configured"]).configured(),
         },
@@ -57,6 +59,12 @@ async def gallery_detail(request: Request, gallery_id: int):
 async def build_exports(gallery_id: int):
     galleries.get_gallery(gallery_id)
     jobs.enqueue("gallery_exports", {"gallery_id": gallery_id})
+    return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
+
+
+@router.post("/galleries/{gallery_id}/video")
+async def render_video(gallery_id: int, format: str = Form("slideshow")):
+    video_render.request_render(gallery_id, format)
     return RedirectResponse(f"/admin/galleries/{gallery_id}", status_code=303)
 
 

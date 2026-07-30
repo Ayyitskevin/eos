@@ -42,9 +42,15 @@ per-listing platform fees.
 
 ### Wave 2 — competitive differentiation
 
-6. **Auto-rendered slideshow/reel videos** — HDPhotoHub auto-renders 9:16 reels +
-   slideshows per delivery; HomeJab/Fotello too. Table stakes in delivery now.
-   Build: ffmpeg job in the existing job queue, derivatives alongside imaging. Medium.
+6. ~~**Auto-rendered slideshow/reel videos**~~ — **shipped** (2026-07-30): one-click
+   renders from the gallery admin page — 16:9 1080p slideshows and 9:16 1080x1920
+   vertical reels — built by an ffmpeg job in the existing SQLite job queue
+   (`gallery_video_render`, replay-safe per gallery+format, durable status in
+   `gallery_video_renders`, first `EOS_VIDEO_MAX_PHOTOS` ready photos, H.264 +
+   faststart MP4s under the studio-namespaced media path so S3 sync picks them
+   up). Delivered on the PIN gallery, agent portal, and property microsite
+   behind the same publication/PIN/paywall gates; disabled gracefully when
+   ffmpeg is absent or `EOS_VIDEO_RENDER_ENABLED=false`.
 7. **AI listing marketing copy** — Tonomo writes brochures/descriptions/IG posts.
    Small LLM-backed feature (optional provider key, fail-closed when unset) next
    to the existing marketing kit. Small-medium.

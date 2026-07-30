@@ -43,6 +43,7 @@
         {% if d.gallery_published %}
         <a href="{{ base_url }}/g/{{ d.gallery_slug }}" target="_blank">View gallery</a>
         <span class="muted">PIN {{ d.gallery_pin }}</span>
+        {% if d.gallery_id in video_galleries %}<span class="muted listing-sub">▶ includes video</span>{% endif %}
         {% else %}<span class="muted">—</span>{% endif %}
       </td>
       <td>

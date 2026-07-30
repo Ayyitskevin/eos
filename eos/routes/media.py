@@ -52,6 +52,23 @@ async def admin_media(
     return FileResponse(path, media_type=media_type)
 
 
+@router.get("/admin/galleries/{gallery_id}/video/{fmt}")
+async def admin_gallery_video(
+    gallery_id: int,
+    fmt: str,
+    _: None = Depends(security.require_admin),
+):
+    from .. import video_render
+
+    galleries.get_gallery(gallery_id)
+    path = video_render.ready_file(gallery_id, fmt)
+    if not path:
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path, media_type="video/mp4", headers={"Cache-Control": "private, no-store"}
+    )
+
+
 @router.get("/media/{slug}/{variant}/{asset_id}")
 async def public_media(request: Request, slug: str, variant: str, asset_id: int):
     if variant not in ("thumb", "web", "original"):

@@ -80,6 +80,10 @@ JPEG_QUALITY = int(os.environ.get("EOS_JPEG_QUALITY", "88"))
 JOB_WORKERS = int(os.environ.get("EOS_JOB_WORKERS", "2"))
 MIN_FREE_GB = float(os.environ.get("EOS_MIN_FREE_GB", "2"))
 
+# Gallery slideshow/reel rendering — additionally requires ffmpeg on PATH at runtime
+VIDEO_RENDER_ENABLED = _b("EOS_VIDEO_RENDER_ENABLED", "true")
+VIDEO_MAX_PHOTOS = int(os.environ.get("EOS_VIDEO_MAX_PHOTOS", "30"))
+
 SAAS_MODE = _b("EOS_SAAS_MODE", "false")
 SIGNUP_ENABLED = _b("EOS_SIGNUP_ENABLED", "false") or SAAS_MODE
 BASE_DOMAIN = os.environ.get("EOS_BASE_DOMAIN", "")

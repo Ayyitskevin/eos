@@ -236,6 +236,19 @@ def _h_video_ready(p: dict) -> None:
     )
 
 
+def _h_gallery_video_render(p: dict) -> None:
+    from . import video_render
+
+    gid, fmt = p["gallery_id"], p["format"]
+    if not _set_studio_for_gallery(gid):
+        return
+    try:
+        video_render.render_gallery_video(gid, fmt)
+    except Exception as e:
+        video_render.mark_failed(gid, fmt, str(e))
+        raise
+
+
 def _h_ai_cull(p: dict) -> None:
     """Stub AI cull — pick first photo per section as agent favorite."""
     gid = p["gallery_id"]
@@ -288,6 +301,7 @@ HANDLERS = {
     "dropbox_scan": _h_dropbox_scan,
     "integration_sweep": _h_integration_sweep,
     "video_ready": _h_video_ready,
+    "gallery_video_render": _h_gallery_video_render,
     "ai_cull": _h_ai_cull,
 }
 
