@@ -37,6 +37,45 @@ PIN: {pin}
     return subject, body
 
 
+def agent_view_digest(*, client_name: str, rows: list[dict], total_views: int) -> tuple[str, str]:
+    """Weekly per-agent traffic digest — one line + link per active listing."""
+    noun = "view" if total_views == 1 else "views"
+    subject = f"Your listings got {total_views} {noun} this week"
+    lines = [
+        f"Hi {_first(client_name)},",
+        "",
+        "Here's how your listings performed over the last 7 days:",
+        "",
+    ]
+    for row in rows:
+        lines.append(
+            f"{row['address']} — {row['views']} views · {row['unique_visitors']} unique visitors"
+        )
+        lines.append(row["url"])
+        lines.append("")
+    lines.append(f"Thank you!\n{tenant.get_site_name()}")
+    return subject, "\n".join(lines)
+
+
+def lead_notification(
+    *, name: str, email: str, phone: str, message: str, address: str, site_url: str
+) -> tuple[str, str]:
+    subject = f"New property lead — {address}"
+    lines = [
+        "Someone asked about your listing on the property site:",
+        "",
+        f"Property: {address}",
+        f"Name: {name}",
+        f"Email: {email}",
+    ]
+    if phone:
+        lines.append(f"Phone: {phone}")
+    if message:
+        lines += ["", "Message:", message]
+    lines += ["", site_url, "", f"Thank you!\n{tenant.get_site_name()}"]
+    return subject, "\n".join(lines)
+
+
 def gallery_mls_ready(*, client_name: str, title: str, link: str, pin: str) -> tuple[str, str]:
     subject = f"MLS-ready exports included — {title}"
     body = f"""Hi {_first(client_name)},

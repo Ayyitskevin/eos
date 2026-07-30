@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Listing analytics · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Listing analytics</h1>
+    <nav>
+      {% for w in windows %}
+      <a href="/admin/reports/analytics?days={{ w }}"{% if w == days %} class="active"{% endif %}>{{ w }}d</a>{% if not loop.last %} · {% endif %}
+      {% endfor %} ·
+      <a href="/admin/reports/analytics.csv?days={{ days }}">Export CSV</a> ·
+      <a href="/admin/reports">Reports</a> ·
+      <a href="/admin">Pipeline</a>
+    </nav>
+  </header>
+
+  <section class="pipeline-strip">
+    <div class="pipeline-card {% if summary.views %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.views }}</span>
+      <span class="pipeline-label">Views ({{ days }}d)</span>
+    </div>
+    <div class="pipeline-card {% if summary.unique_visitors %}has-items{% endif %}">
+      <span class="pipeline-count">{{ summary.unique_visitors }}</span>
+      <span class="pipeline-label">Unique visitors</span>
+    </div>
+    <div class="pipeline-card {% if summary.trend_pct is not none and summary.trend_pct > 0 %}has-items{% endif %}">
+      <span class="pipeline-count">
+        {% if summary.trend_pct is none %}—{% else %}{{ "+" if summary.trend_pct > 0 }}{{ summary.trend_pct }}%{% endif %}
+      </span>
+      <span class="pipeline-label">vs prior {{ days }}d</span>
+    </div>
+  </section>
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Per listing</h2>
+      {% if listings %}
+      <table class="list compact">
+        <tr><th>Listing</th><th>Gallery</th><th>Site</th><th>Views</th><th>Unique</th><th>Trend</th></tr>
+        {% for l in listings %}
+        <tr>
+          <td><a href="{{ l.listing_href }}">{{ l.address }}</a></td>
+          <td>{{ l.gallery_views }}</td>
+          <td>{{ l.microsite_views }}</td>
+          <td>{{ l.views }}</td>
+          <td>{{ l.unique_visitors }}</td>
+          <td class="muted">
+            {% if l.trend_pct is none %}—{% else %}{{ "+" if l.trend_pct > 0 }}{{ l.trend_pct }}%{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">Views appear after a public gallery or property site is visited.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Per gallery</h2>
+      {% if galleries %}
+      <table class="list compact">
+        <tr><th>Gallery</th><th>Views</th><th>Unique</th></tr>
+        {% for g in galleries %}
+        <tr>
+          <td><a href="{{ g.gallery_href }}">{{ g.title }}</a></td>
+          <td>{{ g.views }}</td>
+          <td>{{ g.unique_visitors }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No gallery views in this window.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Top referrers</h2>
+      {% if referrers %}
+      <table class="list compact">
+        <tr><th>Domain</th><th>Views</th></tr>
+        {% for r in referrers %}
+        <tr><td>{{ r.domain }}</td><td>{{ r.views }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="muted">No referrer data yet — direct visits are not listed.</p>{% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

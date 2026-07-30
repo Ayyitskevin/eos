@@ -62,6 +62,9 @@ from .routes import (
     kanban as kanban_routes,
 )
 from .routes import (
+    leads as leads_routes,
+)
+from .routes import (
     microsites as microsite_routes,
 )
 from .routes import (
@@ -226,7 +229,13 @@ async def common_headers(request: Request, call_next):
         resp.headers["Cache-Control"] = "private, no-store"
     if not (p in site.INDEXABLE or p.startswith(("/static/", "/q/", "/l/", "/api/", "/oauth/"))):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
-    resp.headers["X-Frame-Options"] = "DENY"
+    # The embeddable booking widget must be frameable on studio websites; those
+    # routes send a CSP frame-ancestors allowlist instead of X-Frame-Options.
+    embeddable = p == "/book/embed" or (
+        request.query_params.get("embed") == "1" and p.startswith(("/booking/", "/i/"))
+    )
+    if not embeddable:
+        resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = (
         "no-referrer" if p == "/oauth/google/admin/complete" else "same-origin"
@@ -262,6 +271,7 @@ for r in (
     auth.router,
     dashboard.router,
     clients.router,
+    leads_routes.router,
     listings.router,
     galleries_admin.router,
     uploads.router,

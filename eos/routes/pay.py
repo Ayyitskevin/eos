@@ -31,7 +31,7 @@ async def view_invoice(request: Request, slug: str):
             "SELECT title, address_line1, city FROM listings WHERE id=? AND studio_id=?",
             (inv["listing_id"], STUDIO_ID),
         )
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         request,
         "public/invoice.html",
         {
@@ -43,6 +43,13 @@ async def view_invoice(request: Request, slug: str):
             "thanks": request.query_params.get("thanks"),
         },
     )
+    if request.query_params.get("embed") == "1":
+        from .. import studio
+
+        resp.headers["Content-Security-Policy"] = (
+            f"frame-ancestors {studio.embed_frame_ancestors()}"
+        )
+    return resp
 
 
 @router.post("/i/{slug}/pay")

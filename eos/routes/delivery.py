@@ -58,10 +58,17 @@ async def gallery_pin(request: Request, slug: str, pin: str = Form(...)):
 
 
 async def gallery_view(request: Request, slug: str):
+    from .. import analytics
     from .. import upsell as upsell_mod
 
     g = galleries.get_gallery_by_slug(slug)
     galleries.require_public_gallery(g)
+    analytics.track_view(
+        request,
+        event_type=analytics.EVENT_GALLERY,
+        listing_id=g["listing_id"],
+        gallery_id=g["id"],
+    )
     sections, by_section, unsectioned = galleries.assets_by_section(g["id"])
     locked = paywall.payment_required(g["listing_id"])
     inv_slug = paywall.unpaid_invoice_slug(g["listing_id"]) if locked else None

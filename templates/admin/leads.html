@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Property leads · {{ site_name }}{% endblock %}
+{% block content %}
+<main class="admin-main">
+  <header class="admin-bar">
+    <h1>Property leads</h1>
+    <nav>
+      <a href="/admin/listings/leads.csv">Export CSV</a> ·
+      <a href="/admin/reports">Reports</a> ·
+      <a href="/admin">Pipeline</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    {% if listing_filter %}
+    <p class="muted">Filtered to <a href="/admin/listings/{{ listing_filter }}">listing #{{ listing_filter }}</a> — <a href="/admin/listings/leads">show all</a></p>
+    {% endif %}
+    {% if leads %}
+    <table class="list compact">
+      <tr><th>When</th><th>Listing</th><th>Name</th><th>Email</th><th>Phone</th><th>Message</th><th>Contacted</th></tr>
+      {% for lead in leads %}
+      <tr>
+        <td class="muted">{{ lead.created_at[:16] }}</td>
+        <td>
+          {% if lead.listing_id %}
+          <a href="/admin/listings/leads?listing={{ lead.listing_id }}">{{ lead.address_line1 or lead.listing_title or "#" ~ lead.listing_id }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ lead.name }}</td>
+        <td><a href="mailto:{{ lead.email }}">{{ lead.email }}</a></td>
+        <td>{{ lead.phone or "—" }}</td>
+        <td class="muted">{{ lead.message[:80] }}{% if lead.message|length > 80 %}…{% endif %}</td>
+        <td>
+          <form method="post" action="/admin/listings/leads/{{ lead.id }}/contacted" class="inline-form">
+            <input type="hidden" name="contacted" value="{{ '0' if lead.contacted else '1' }}">
+            <button type="submit" class="link">{{ "✓ contacted" if lead.contacted else "mark contacted" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No leads yet — publish a property site with the lead-capture form enabled.</p>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

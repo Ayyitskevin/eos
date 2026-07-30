@@ -425,3 +425,54 @@ def inquiry_record(ip: str, bucket: int) -> None:
         (ip, bucket, time.time()),
     )
     db.run("DELETE FROM pin_attempts WHERE ts < ?", (time.time() - max(86400, INQUIRY_WINDOW_SEC),))
+
+
+# --- In-process rate limiting -------------------------------------------
+# Eos runs as a single application worker by design (docs/SCALE.md), so
+# process-local sliding-window buckets are correct shared state. If the app
+# ever scales to multiple workers, move these buckets to a shared store
+# (Redis/DB) instead.
+
+RATE_WINDOW_SEC = 60
+_RATE_EVICT_THRESHOLD = 10000
+_rate_hits: dict[str, list[float]] = {}
+
+
+def rate_limit_retry_after(key: str, limit_per_min: int) -> int:
+    """Consume one slot for key; return Retry-After seconds when over the limit.
+
+    A return value of 0 means the request is allowed. A non-positive limit
+    disables limiting entirely.
+    """
+    if limit_per_min <= 0:
+        return 0
+    now = time.monotonic()
+    cutoff = now - RATE_WINDOW_SEC
+    hits = [t for t in _rate_hits.get(key, []) if t > cutoff]
+    if len(hits) >= limit_per_min:
+        _rate_hits[key] = hits
+        return max(1, int(RATE_WINDOW_SEC - (now - hits[0])) + 1)
+    hits.append(now)
+    _rate_hits[key] = hits
+    if len(_rate_hits) > _RATE_EVICT_THRESHOLD:
+        stale = [k for k, v in _rate_hits.items() if not v or v[-1] <= cutoff]
+        for k in stale:
+            del _rate_hits[k]
+    return 0
+
+
+def check_rate_limit(key: str, limit_per_min: int, detail: str = "rate limit exceeded") -> None:
+    """Raise HTTP 429 with Retry-After when the key is over its per-minute limit."""
+    retry = rate_limit_retry_after(key, limit_per_min)
+    if retry:
+        log.warning("rate limit hit for %s (retry after %ss)", key, retry)
+        raise HTTPException(
+            status_code=429,
+            detail=detail,
+            headers={"Retry-After": str(retry)},
+        )
+
+
+def reset_rate_limits() -> None:
+    """Test hook: drop all in-process rate-limit state."""
+    _rate_hits.clear()

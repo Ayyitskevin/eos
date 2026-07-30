@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Booking confirmed · {{ site_name }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 1rem;
+         color: #1c1c1e; background: #fff; font-size: 14px; line-height: 1.45; }
+  main { max-width: 480px; margin: 2rem auto; text-align: center; }
+  h1 { font-size: 1.2rem; margin: .5rem 0; }
+  .muted { color: #6b6b70; } .small { font-size: .82rem; }
+  .ok { color: #146c2e; font-weight: 600; font-size: 1.05rem; }
+  .warn { color: #8a5a00; font-weight: 600; }
+  button { margin-top: .75rem; padding: .6rem 1.25rem; font: inherit; font-weight: 600;
+    color: #fff; background: #1c1c1e; border: 0; border-radius: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  {% if thanks or order.status == 'confirmed' %}
+  <p class="ok">You're booked!</p>
+  {% elif order.status == 'pending_payment' %}
+  <p class="warn">Deposit required to confirm your slot.</p>
+  {% endif %}
+
+  <h1>{{ listing.title if listing else order.property_address }}</h1>
+  {% if package_name %}<p>{{ package_name }}</p>{% endif %}
+  {% if order.scheduled_at %}<p class="muted">Shoot: {{ order.scheduled_at[:16] }}</p>{% endif %}
+  <p class="muted small">Signed by {{ order.signer_name }}</p>
+
+  {% if order.deposit_cents and order.status == 'pending_payment' and invoice and payments_on %}
+  <p>Deposit due: <strong>${{ "%.2f"|format(order.deposit_cents / 100) }}</strong></p>
+  <form method="post" action="/i/{{ invoice.slug }}/pay">
+    <button type="submit">Pay deposit</button>
+  </form>
+  {% elif order.status == 'confirmed' %}
+  <p class="muted">We'll send pre-shoot intake details before your appointment.</p>
+  {% endif %}
+</main>
+</body>
+</html>

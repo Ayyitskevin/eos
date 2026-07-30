@@ -2,6 +2,42 @@
 
 All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
+## Unreleased — 2026-07-30
+
+- Added public platform legal pages at `/terms` and `/privacy` (apex and tenant hosts), with
+  operator name/contact configurable via `EOS_OPERATOR_NAME` / `EOS_CONTACT_EMAIL`; linked from
+  the marketing footer and the signup form.
+- Added an in-process sliding-window rate limiter: per-token limits on `/api/v1` bearer
+  endpoints (`EOS_RATE_LIMIT_API_PER_MIN`, default 120/min) and per-IP limits on unauthenticated
+  public endpoints — agent/brokerage portals and referral short links
+  (`EOS_RATE_LIMIT_PUBLIC_PER_MIN`, default 30/min; 0 disables). Over-limit requests get HTTP 429
+  with `Retry-After`; `/healthz` and `/readyz` are exempt. Gallery PIN and booking inquiries keep
+  their existing dedicated throttles.
+- Added gallery-view analytics: privacy-preserving view events on public PIN galleries and
+  property microsites (hashed visitor keys, referrer domains only, Do Not Track honored), a new
+  `/admin/reports/analytics` report with 7/30/90-day windows, unique visitors, top referrers,
+  prior-period trends, and CSV export, plus view counts on the agent portal delivery view.
+- Added scheduled weekly agent traffic digest emails ("Your listings got N views this week")
+  sent only to agents with activity, through durable per-week intents persisted before provider
+  I/O and drained by the in-process scheduler; studios can opt out in studio settings.
+- Added an embeddable booking widget: `GET /book/embed` renders a chrome-free, compact booking
+  form for iframes on the studio's own website. Embed submissions go through the same atomic,
+  replay-keyed `POST /book` path (a hidden `embed=1` flag keeps error pages and the booking
+  confirmation chrome-free inside the frame), respect the same activation/readiness gates, and
+  send CSP `frame-ancestors` from a studio-configured allowlist (`embed_allowed_domains`,
+  default `*`) instead of the global `X-Frame-Options: DENY`; the regular `/book` page stays
+  unframeable. Studio settings show a copy-paste iframe snippet with the tenant URL.
+- Added buyer lead capture on property microsites: the `/l/{slug}` inquiry form is now gated by
+  a studio-level toggle (`lead_capture_enabled`, default on) alongside the per-listing toggle,
+  gains a hidden honeypot field and a per-IP public rate limit, and stores leads tenant-scoped
+  with the listing link and a hashed submitter IP (never a raw IP). Each lead persists a durable
+  notification intent before any provider I/O — emailed to the listing's agent, or the studio
+  contact when no agent is attached — drained by the scheduler with the same claim/fencing
+  discipline as delivery notifications. New RBAC-protected leads inbox at
+  `/admin/listings/leads` with per-listing filtering, CSV export, and mark-as-contacted; listing
+  admin shows a lead count. The read-only demo studio hides and blocks the form.
+- Fixed the microsite inquiry email regex (missing `@`), which had rejected every submission.
+
 ## v1.10.0 — 2026-07-28 (production hardening)
 
 - Hardened the beta journey with strict tenant Host/activation gates, atomic request-key booking,

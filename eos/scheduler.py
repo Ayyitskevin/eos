@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 
-from . import commerce, config, delivery_notify, sequences, webhooks
+from . import analytics, commerce, config, delivery_notify, leads, sequences, webhooks
 
 log = logging.getLogger("eos.scheduler")
 
@@ -22,6 +22,8 @@ def _loop() -> None:
             ("sequence", sequences.process_due),
             ("webhook", webhooks.process_pending),
             ("delivery notification", delivery_notify.process_pending),
+            ("lead notification", leads.process_pending),
+            ("analytics digest", analytics.process_pending),
             ("booking payment reconciliation", commerce.expire_all_pending_bookings),
         ):
             try:
@@ -44,6 +46,9 @@ def _loop() -> None:
                 )
                 sms.shoot_day_reminders()
                 monitoring.report_health()
+                n = analytics.enqueue_weekly_digests()
+                if n:
+                    log.info("analytics digest enqueued %d intents", n)
             except Exception:
                 log.exception("integration sweep enqueue failed")
 

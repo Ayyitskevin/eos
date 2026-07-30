@@ -18,6 +18,7 @@
     <label class="checkbox"><input type="checkbox" name="published" value="true" {% if profile.published %}checked{% endif %}> Publish marketing site</label>
     <h2>Online booking</h2>
     <label class="checkbox"><input type="checkbox" name="booking_enabled" value="true" {% if profile.booking_enabled %}checked{% endif %}> Enable self-serve booking at /book</label>
+    <label>Embed allowed domains <input name="embed_allowed_domains" value="{{ profile.embed_allowed_domains or '*' }}" placeholder="* or photos.mystudio.com, www.mystudio.com"></label>
     <label>Min notice (hours) <input name="min_notice_hours" type="number" value="{{ profile.min_notice_hours or 24 }}"></label>
     <label>Buffer between shoots (min) <input name="buffer_minutes" type="number" value="{{ profile.buffer_minutes or 30 }}"></label>
     <label class="checkbox"><input type="checkbox" name="drive_time_enabled" value="true" {% if profile.drive_time_enabled %}checked{% endif %}> Drive-time aware scheduling (geocode listings, block travel gaps)</label>
@@ -31,6 +32,8 @@
     <label class="checkbox"><input type="checkbox" name="watermark_until_paid" value="true" {% if profile.watermark_until_paid %}checked{% endif %}> Watermark gallery previews until paid</label>
     <label class="checkbox"><input type="checkbox" name="auto_deliver_email" value="true" {% if profile.auto_deliver_email %}checked{% endif %}> Auto-email gallery link on publish (Gmail required)</label>
     <label class="checkbox"><input type="checkbox" name="auto_publish_site" value="true" {% if profile.auto_publish_site %}checked{% endif %}> Auto-publish property site when gallery goes live</label>
+    <label class="checkbox"><input type="checkbox" name="analytics_digest_enabled" value="true" {% if profile.analytics_digest_enabled %}checked{% endif %}> Email agents a weekly listing-traffic digest</label>
+    <label class="checkbox"><input type="checkbox" name="lead_capture_enabled" value="true" {% if profile.lead_capture_enabled %}checked{% endif %}> Buyer lead-capture form on property sites</label>
     <h2>Twilight booking</h2>
     <label>Twilight window start (min from midnight) <input name="twilight_start_min" type="number" value="{{ profile.twilight_start_min or 1020 }}"></label>
     <label>Twilight window end (min from midnight) <input name="twilight_end_min" type="number" value="{{ profile.twilight_end_min or 1140 }}"></label>
@@ -58,6 +61,13 @@
     {% endif %}
     <button type="submit">Save domain</button>
   </form>
+
+  <section class="card compact" id="embed">
+    <h2>Embed booking widget</h2>
+    <p class="muted small">Take bookings inside your own website — paste this iframe where you want the order form:</p>
+    <pre class="small"><code>&lt;iframe src="{{ embed_url }}" style="width:100%;max-width:640px;height:860px;border:1px solid #ddd;border-radius:8px" title="Book a shoot" loading="lazy"&gt;&lt;/iframe&gt;</code></pre>
+    <p class="muted small">Only the “Embed allowed domains” list above may frame it (<code>*</code> = anywhere). The form is the same atomic booking flow as <a href="/book">/book</a>.</p>
+  </section>
 
   <section class="card compact">
     <h2>Client payments</h2>

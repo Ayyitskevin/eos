@@ -191,6 +191,9 @@
         <label class="checkbox"><input type="checkbox" name="site_lead_capture" value="true" {% if l.site_lead_capture %}checked{% endif %}> Show lead-capture form on property site</label>
         <button type="submit">Save site settings</button>
       </form>
+      <p class="muted">Leads captured: <strong>{{ lead_count }}</strong>
+        {% if lead_count %} — <a href="/admin/listings/leads?listing={{ l.id }}">view inbox</a>{% endif %}
+      </p>
       <p class="muted">Marketing kit: <strong>{{ marketing_kit.status }}</strong>
         {% if marketing_kit.status == 'ready' %} — IG + flyer ready on property site{% endif %}
       </p>

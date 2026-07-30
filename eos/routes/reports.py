@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
     acquisition,
+    analytics,
     brokerage,
     brokerage_reports,
     clients,
@@ -98,6 +99,29 @@ async def brokerage_accounts_csv(_: None = Depends(security.require_admin)):
         content=body,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="eos-brokerages.csv"'},
+    )
+
+
+@router.get("/reports/analytics", response_class=HTMLResponse)
+async def analytics_dashboard(request: Request):
+    raw = request.query_params.get("days", "30")
+    days = int(raw) if raw.isdigit() else 30
+    return templates.TemplateResponse(
+        request,
+        "admin/analytics.html",
+        analytics.dashboard(days),
+    )
+
+
+@router.get("/reports/analytics.csv")
+async def analytics_csv(request: Request):
+    raw = request.query_params.get("days", "30")
+    days = int(raw) if raw.isdigit() else 30
+    body = analytics.analytics_csv(days)
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="eos-analytics.csv"'},
     )
 
 

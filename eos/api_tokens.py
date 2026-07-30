@@ -89,6 +89,12 @@ def authenticate_request(request: Request) -> str:
 
     tenant.set_studio(studio_id)
     security.api_token_clear(ip)
+    # Generous per-token burst cap; invalid-token guessing is throttled separately above.
+    security.check_rate_limit(
+        f"api-token:{digest[:16]}",
+        config.RATE_LIMIT_API_PER_MIN,
+        detail="API rate limit exceeded",
+    )
     with db.tx(immediate=True):
         db.run(
             "UPDATE api_tokens SET last_used_at=datetime('now') WHERE token_hash=?",

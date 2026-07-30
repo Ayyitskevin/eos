@@ -3,25 +3,49 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from .. import (
+    analytics,
+    config,
+    portal,
+    reschedule,
+    scheduling,
+    security,
+    stripe_checkout,
+    studio,
+    tenant,
+)
 from .. import brokerage_portal as bp
-from .. import portal, reschedule, scheduling, stripe_checkout, studio, tenant
 from ..render import templates
 
 router = APIRouter()
 
 
+def _check_public_rate(request: Request) -> None:
+    """Burst-cap unauthenticated magic-link views (per client IP)."""
+    security.check_rate_limit(
+        f"portal:{security.client_ip(request)}",
+        config.RATE_LIMIT_PUBLIC_PER_MIN,
+        detail="too many requests",
+    )
+
+
 @router.get("/portal/{token}", response_class=HTMLResponse)
 async def agent_portal(request: Request, token: str):
+    _check_public_rate(request)
     client = portal.get_client_by_token(token)
     rows = portal.deliveries(client["id"])
     upcoming = reschedule.upcoming_for_client(client["id"])
     repeat = portal.repeat_links(client["id"], portal_token=token)
+    view_counts = analytics.portal_counts(
+        [row["listing_id"] for row in rows], studio_id=tenant.get_studio_id()
+    )
     return templates.TemplateResponse(
         request,
         "public/portal.html",
         {
             "client": client,
             "deliveries": rows,
+            "view_counts": view_counts,
             "upcoming": upcoming,
             "portal_token": token,
             "base_url": tenant.get_base_url(),
@@ -71,6 +95,7 @@ async def reschedule_submit(
 
 @router.get("/portal/brokerage/{token}", response_class=HTMLResponse)
 async def brokerage_portal_view(request: Request, token: str):
+    _check_public_rate(request)
     client = bp.get_brokerage_by_token(token)
     data = bp.portal_summary(client["id"])
     return templates.TemplateResponse(

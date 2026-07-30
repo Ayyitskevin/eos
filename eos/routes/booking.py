@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .. import commerce, db, stripe_checkout
+from .. import commerce, db, stripe_checkout, studio
 from ..render import templates
 from ..vocab import STUDIO_ID
 
@@ -37,9 +37,10 @@ async def booking_confirm(request: Request, token: str):
         if order["invoice_id"]
         else None
     )
-    return templates.TemplateResponse(
+    embed = request.query_params.get("embed") == "1"
+    resp = templates.TemplateResponse(
         request,
-        "public/booking_confirm.html",
+        "public/booking_confirm_embed.html" if embed else "public/booking_confirm.html",
         {
             "order": order,
             "package_name": pkg["name"] if pkg else "",
@@ -49,3 +50,8 @@ async def booking_confirm(request: Request, token: str):
             "thanks": request.query_params.get("thanks"),
         },
     )
+    if embed:
+        resp.headers["Content-Security-Policy"] = (
+            f"frame-ancestors {studio.embed_frame_ancestors()}"
+        )
+    return resp

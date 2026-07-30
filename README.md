@@ -16,12 +16,18 @@ Studios get `{slug}.yourdomain.com`, branded booking and delivery, agent portals
 ## What studios get
 
 - **Signup & subdomain** — 14-day trial, Starter/Pro plans, billing enforcement
-- **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow, public referral links
+- **Booking** — packages, deposits, e-sign, twilight slots, homeowner flow, public referral links,
+  embeddable iframe booking widget (`/book/embed`) with a per-studio frame allowlist
 - **Pipeline** — listing tasks, Kanban, calendar, photographer assignment
 - **Retention** — agent rebooking cockpit, agent growth panels, brokerage portfolio dashboard/portal, brokerage growth map, revenue optimizer, filtered acquisition tracking with referral attribution, intro/follow-up emails, per-agent summaries, follow-up queue, and repeat-agent reports
 - **Delivery** — PIN galleries, property sites, agent portal, MLS/Zillow crops
+- **Lead capture** — buyer lead form on property sites (honeypot + rate limited), durable
+  agent/studio notification emails, admin leads inbox with CSV export and contacted tracking
+- **Analytics** — privacy-preserving gallery/property-site view tracking, per-listing admin
+  report with CSV export, portal view counts, and weekly agent traffic digest emails
 - **Payments** — Connect onboarding at `/admin/stripe/connect`
 - **Integrations** — Google Calendar, Dropbox ingest, API v1, webhooks
+- **Platform trust** — public `/terms` + `/privacy` pages, per-token API and public-endpoint rate limiting
 
 ## Quick start
 

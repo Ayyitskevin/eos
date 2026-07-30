@@ -49,6 +49,9 @@ SITE_NAME = os.environ.get("EOS_SITE_NAME", "Eos Photography")
 CONTACT_EMAIL = os.environ.get("EOS_CONTACT_EMAIL", "")
 TIMEZONE = os.environ.get("EOS_TIMEZONE", "America/New_York")
 
+# Legal pages: operator identity/contact with safe defaults
+OPERATOR_NAME = os.environ.get("EOS_OPERATOR_NAME", SITE_NAME)
+
 STRIPE_SECRET_KEY = os.environ.get("EOS_STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("EOS_STRIPE_WEBHOOK_SECRET", "")
 
@@ -123,6 +126,10 @@ SIGNUP_RATE_LIMIT = int(os.environ.get("EOS_SIGNUP_RATE_LIMIT", "5"))
 SIGNUP_RATE_WINDOW_SEC = int(os.environ.get("EOS_SIGNUP_RATE_WINDOW_SEC", "3600"))
 LOGIN_EMAIL_MAX_FAILS = int(os.environ.get("EOS_LOGIN_EMAIL_MAX_FAILS", "10"))
 API_TOKEN_MAX_FAILS = int(os.environ.get("EOS_API_TOKEN_MAX_FAILS", "20"))
+
+# In-process sliding-window rate limits (requests/minute; 0 disables)
+RATE_LIMIT_API_PER_MIN = int(os.environ.get("EOS_RATE_LIMIT_API_PER_MIN", "120"))
+RATE_LIMIT_PUBLIC_PER_MIN = int(os.environ.get("EOS_RATE_LIMIT_PUBLIC_PER_MIN", "30"))
 
 TWILIO_ACCOUNT_SID = os.environ.get("EOS_TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("EOS_TWILIO_AUTH_TOKEN", "")

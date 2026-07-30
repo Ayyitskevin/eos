@@ -1,5 +1,7 @@
 """Studio profile and service packages."""
 
+import re
+
 from . import db
 from .vocab import STUDIO_ID
 
@@ -51,6 +53,9 @@ def update_profile(**fields) -> None:
         "watermark_until_paid",
         "auto_deliver_email",
         "auto_publish_site",
+        "analytics_digest_enabled",
+        "lead_capture_enabled",
+        "embed_allowed_domains",
         "twilight_start_min",
         "twilight_end_min",
         "delivery_upsell_title",
@@ -78,6 +83,8 @@ def update_profile(**fields) -> None:
             "watermark_until_paid",
             "auto_deliver_email",
             "auto_publish_site",
+            "analytics_digest_enabled",
+            "lead_capture_enabled",
             "google_calendar_enabled",
             "dropbox_enabled",
             "drive_time_enabled",
@@ -88,6 +95,19 @@ def update_profile(**fields) -> None:
     params.append(STUDIO_ID)
     db.run(f"UPDATE studio_profiles SET {', '.join(parts)} WHERE studio_id=?", tuple(params))
     db.audit("admin", "studio.profile", None)
+
+
+_FRAME_SOURCE = re.compile(r"^[a-zA-Z0-9.*:/-]{1,200}$")
+
+
+def embed_frame_ancestors() -> str:
+    """CSP frame-ancestors sources for the embeddable booking widget."""
+    raw = (get_profile()["embed_allowed_domains"] or "*").strip()
+    if raw == "*":
+        return "*"
+    hosts = [h.strip() for h in raw.replace("\n", ",").split(",") if h.strip()]
+    safe = [h for h in hosts if _FRAME_SOURCE.match(h)]
+    return " ".join(safe) if safe else "*"
 
 
 def list_packages(*, active_only: bool = False):

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Book a shoot · {{ site_name }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 1rem;
+         color: #1c1c1e; background: #fff; font-size: 14px; line-height: 1.45; }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  h2 { font-size: .95rem; margin: 1.25rem 0 .5rem; }
+  .muted { color: #6b6b70; } .small { font-size: .82rem; }
+  .error { color: #b3261e; }
+  .ok { color: #146c2e; }
+  form { display: block; }
+  label { display: block; margin: .4rem 0; }
+  input[type=text], input[type=email], input[type=tel], input[type=number], select, textarea {
+    width: 100%; padding: .45rem .55rem; border: 1px solid #c9c9cf; border-radius: 6px;
+    font: inherit; margin-top: .15rem; }
+  .radio-card { display: flex; gap: .5rem; align-items: flex-start; border: 1px solid #c9c9cf;
+    border-radius: 8px; padding: .55rem .7rem; margin: .4rem 0; }
+  .radio-card input { margin-top: .2rem; }
+  .checkbox { display: flex; gap: .45rem; align-items: center; }
+  .checkbox input { width: auto; }
+  button { margin-top: 1rem; width: 100%; padding: .6rem 1rem; font: inherit; font-weight: 600;
+    color: #fff; background: #1c1c1e; border: 0; border-radius: 8px; cursor: pointer; }
+  button[disabled] { opacity: .5; cursor: default; }
+  .terms { border-top: 1px solid #e4e4e8; padding-top: .5rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Book a listing shoot</h1>
+  {% if profile.service_area %}<p class="muted small">Serving {{ profile.service_area }}</p>{% endif %}
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if referral_context %}
+  <p class="ok small">Referral code <strong>{{ referral_context.code }}</strong> applied —
+    {{ referral_context.credit_display }} credit at checkout.</p>
+  {% endif %}
+  {% if not slots %}<p class="muted">Online scheduling is temporarily unavailable — contact us directly.</p>{% endif %}
+
+  <form method="post" action="/book">
+    <input type="hidden" name="embed" value="1">
+    <input type="hidden" name="request_key" value="{{ request_key }}">
+    <input type="hidden" name="returning_token" value="{{ returning_token }}">
+    <h2>Package</h2>
+    {% for p in packages %}
+    <label class="radio-card">
+      <input type="radio" name="package_id" value="{{ p.id }}" required {% if loop.first %}checked{% endif %}>
+      <span><strong>{{ p.name }}</strong> — ${{ "%.0f"|format(p.price_cents / 100) }}
+        {% if p.deposit_cents %}<span class="muted">(${{ "%.0f"|format(p.deposit_cents / 100) }} deposit)</span>{% endif %}
+        <br><span class="muted small">{{ p.description }}</span>
+      </span>
+    </label>
+    {% endfor %}
+
+    {% if addons %}
+    <h2>Add-ons</h2>
+    {% for a in addons %}
+    <label class="checkbox"><input type="checkbox" name="addon_ids" value="{{ a.id }}"> {{ a.name }} (+${{ "%.0f"|format(a.price_cents / 100) }})</label>
+    {% endfor %}
+    {% endif %}
+
+    <h2>Property &amp; contact</h2>
+    <label>Name <input type="text" name="name" value="{{ returning_client.name if returning_client else '' }}" required></label>
+    <label>Email <input name="email" type="email" value="{{ returning_client.email if returning_client else '' }}" required></label>
+    <label>Phone <input name="phone" type="tel" value="{{ returning_client.phone if returning_client else '' }}"></label>
+    <label>Property address <input type="text" name="property_address" required placeholder="123 Oak St, Austin TX"></label>
+    <label>Square feet <input name="sqft" type="number" min="0" placeholder="Optional"></label>
+    <label>Promo code <input type="text" name="promo_code" value="{{ promo_code }}" placeholder="Optional"></label>
+    <label>Notes <textarea name="message" rows="2" placeholder="Gate code, MLS deadline…"></textarea></label>
+
+    <h2>Shoot time</h2>
+    {% if twilight_addon %}<p class="muted small">Twilight add-on? Pick an evening slot labeled <em>Twilight</em>.</p>{% endif %}
+    {% if slots %}
+    <label>Available slot
+      <select name="scheduled_at" required>
+        {% if day_slots %}
+        <optgroup label="Day shoots">
+          {% for s in day_slots %}
+          <option value="{{ s.value }}">{{ s.label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+        {% if twilight_slots %}
+        <optgroup label="Twilight shoots">
+          {% for s in twilight_slots %}
+          <option value="{{ s.value }}">{{ s.label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+      </select>
+    </label>
+    {% else %}
+    <input type="hidden" name="scheduled_at" value="">
+    {% endif %}
+
+    <h2>Agreement</h2>
+    <p class="muted small terms">{{ terms }}</p>
+    <label>Type your full name to sign <input type="text" name="signer_name" value="{{ returning_client.name if returning_client else '' }}" required placeholder="Jane Agent"></label>
+
+    <button type="submit" {% if not slots %}disabled{% endif %}>
+      {% if payments_on %}Book &amp; pay deposit{% else %}Confirm booking{% endif %}
+    </button>
+  </form>
+  <p class="muted small">Powered by {{ site_name }}</p>
+</main>
+</body>
+</html>

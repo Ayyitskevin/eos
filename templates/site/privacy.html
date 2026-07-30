@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Privacy Policy · {{ operator_name }}{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Privacy Policy</h1>
+  <p class="muted">Last updated: 2026-07-30 · Operated by {{ operator_name }}</p>
+
+  <section class="card">
+    <h2>1. Who is responsible for your data</h2>
+    <p>{{ operator_name }} operates this platform and is the data controller for studio account
+    and billing data. Each studio is the data controller for the data they collect about their
+    own clients (booking details, galleries, invoices); we process that data on the studio's
+    instructions as a data processor.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. What we collect</h2>
+    <ul class="check-list small">
+      <li>Account data: studio name, owner name, email, password hash, plan and billing status.</li>
+      <li>Operational data studios enter: listings, clients, appointments, invoices, galleries.</li>
+      <li>Media uploaded by studios on behalf of their clients.</li>
+      <li>Technical data: IP addresses and timestamps for security, rate limiting, and abuse prevention.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>3. How we use it</h2>
+    <p>We use data to provide and secure the service, process subscriptions, send transactional
+    email (account verification, delivery notifications, receipts), and meet legal obligations.
+    We do not sell personal data and do not use studio media for advertising or model training.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Subprocessors</h2>
+    <p>Payments are processed by Stripe (subscription billing and studio payouts); Stripe's own
+    privacy policy applies to payment data. Transactional email is sent through the configured
+    email provider. Media may be stored in encrypted object storage (S3-compatible) when enabled
+    by the operator. We do not otherwise share personal data with third parties except as
+    required by law.</p>
+  </section>
+
+  <section class="card">
+    <h2>5. Cookies</h2>
+    <p>We use strictly-necessary cookies only: session sign-in, CSRF protection, and gallery
+    access tokens. No advertising or cross-site tracking cookies are set.</p>
+  </section>
+
+  <section class="card">
+    <h2>6. Retention &amp; deletion</h2>
+    <p>Account and studio data is kept while the account is active and deleted within a
+    reasonable window after termination. Security logs and rate-limit records are kept briefly
+    and then purged. Studios can delete listings, clients, and media at any time from their
+    admin area.</p>
+  </section>
+
+  <section class="card">
+    <h2>7. Your rights</h2>
+    <p>Depending on your jurisdiction (including the GDPR/UK GDPR), you may have rights to
+    access, correct, export, restrict, or delete your personal data, and to object to processing.
+    Studio owners can exercise most rights directly in the admin area; for anything else, contact
+    us. Clients of a studio should contact that studio first — we act on the studio's
+    instructions for their data.</p>
+  </section>
+
+  <section class="card">
+    <h2>8. Contact</h2>
+    <p>Privacy questions and data requests:
+    {% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}the
+    platform operator{% endif %}.</p>
+  </section>
+
+  <p class="muted small center"><a href="/terms">Terms of Service</a> · <a href="/">Home</a></p>
+</main>
+{% endblock %}

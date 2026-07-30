@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block title %}Terms of Service · {{ operator_name }}{% endblock %}
+{% block bodyclass %}site-body{% endblock %}
+{% block content %}
+<main class="site-main narrow">
+  <p class="brand-mark">Eos</p>
+  <h1>Terms of Service</h1>
+  <p class="muted">Last updated: 2026-07-30 · Operated by {{ operator_name }}</p>
+
+  <section class="card">
+    <h2>1. The service</h2>
+    <p>{{ operator_name }} ("we", "the platform") provides Eos, a hosted platform for real-estate
+    photography studios: online booking, listing pipeline management, branded gallery delivery,
+    property sites, agent portals, invoicing, and related tooling. Studios ("tenants") use the
+    platform to run their own business and serve their own clients.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Subscriptions &amp; billing</h2>
+    <p>Studio subscriptions are billed in advance on a recurring basis through Stripe. Trials,
+    plan tiers, and usage limits are described on the pricing page and may change with notice.
+    Fees are non-refundable except where required by law. Failure to pay may result in suspension
+    or termination of the studio account. Studios are responsible for any taxes applicable to
+    their subscription and to the services they sell to their own clients.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. Studio responsibilities</h2>
+    <p>Studios are responsible for: the accuracy and legality of the content they upload; their
+    relationships, contracts, and payments with their own clients; complying with applicable
+    photography, drone, privacy, and consumer-protection laws; and keeping account credentials
+    confidential. Studios must not use the platform for unlawful content, spam, or activity that
+    degrades the service for other tenants.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Your content stays yours</h2>
+    <p>Studios retain full ownership of the photos, videos, and other media they upload. We claim
+    no license to studio content beyond what is needed to store, process, and deliver it on the
+    studio's behalf. Studios can export and delete their data; on termination, media is removed
+    after a reasonable retention window.</p>
+  </section>
+
+  <section class="card">
+    <h2>5. Payments between studios and their clients</h2>
+    <p>Payments from a studio's clients are processed by Stripe directly into the studio's own
+    connected Stripe account. {{ operator_name }} is not a party to those transactions and does
+    not hold client funds. Disputes, refunds, and chargebacks between studios and their clients
+    are the studio's responsibility.</p>
+  </section>
+
+  <section class="card">
+    <h2>6. Termination</h2>
+    <p>Either party may end a subscription at any time; cancellation takes effect at the end of
+    the current billing period. We may suspend or terminate accounts that breach these terms,
+    fail to pay, or create security or legal risk. Studios may request an export of their data
+    before or shortly after termination.</p>
+  </section>
+
+  <section class="card">
+    <h2>7. Liability</h2>
+    <p>The service is provided "as is" without warranties of any kind. To the maximum extent
+    permitted by law, {{ operator_name }} is not liable for indirect, incidental, or consequential
+    damages, lost profits, or lost data, and aggregate liability is limited to the fees paid by
+    the studio in the twelve months preceding the claim. Studios are responsible for maintaining
+    their own backups of delivered work.</p>
+  </section>
+
+  <section class="card">
+    <h2>8. Contact</h2>
+    <p>Questions about these terms:
+    {% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}the
+    platform operator{% endif %}.</p>
+  </section>
+
+  <p class="muted small center"><a href="/privacy">Privacy Policy</a> · <a href="/">Home</a></p>
+</main>
+{% endblock %}

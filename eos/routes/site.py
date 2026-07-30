@@ -10,7 +10,7 @@ from ..render import templates
 from ..vocab import STUDIO_ID
 
 router = APIRouter()
-INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo", "/pricing"}
+INDEXABLE = {"/", "/book", "/book/homeowner", "/signup", "/demo", "/pricing", "/terms", "/privacy"}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -197,11 +197,55 @@ async def book_form(request: Request):
     )
 
 
+@router.get("/book/embed", response_class=HTMLResponse)
+async def book_embed_form(request: Request):
+    """Chrome-free booking form for iframes on the studio's own website."""
+    _require_bookable()
+    promo_code = request.query_params.get("ref") or request.query_params.get("promo_code") or ""
+    resp = templates.TemplateResponse(
+        request,
+        "site/book_embed.html",
+        _book_context(
+            promo_code=promo_code, returning_token=request.query_params.get("returning", "")
+        ),
+    )
+    resp.headers["Content-Security-Policy"] = f"frame-ancestors {studio.embed_frame_ancestors()}"
+    return resp
+
+
 @router.get("/r/{code}")
-async def referral_shortlink(code: str):
+async def referral_shortlink(request: Request, code: str):
+    security.check_rate_limit(
+        f"ref:{security.client_ip(request)}",
+        config.RATE_LIMIT_PUBLIC_PER_MIN,
+        detail="too many requests",
+    )
     clean_code = _clean_booking_code(code)
     target = f"/book?ref={quote(clean_code)}" if clean_code else "/book"
     return RedirectResponse(target, status_code=303)
+
+
+def _legal_context() -> dict:
+    """Operator identity/contact for platform legal pages, with safe defaults."""
+    contact = config.CONTACT_EMAIL or next(
+        (e.strip() for e in config.PLATFORM_ADMIN_EMAILS.split(",") if e.strip()),
+        "",
+    )
+    return {
+        "operator_name": config.OPERATOR_NAME,
+        "contact_email": contact,
+        "base_domain": config.BASE_DOMAIN,
+    }
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms(request: Request):
+    return templates.TemplateResponse(request, "site/terms.html", _legal_context())
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request):
+    return templates.TemplateResponse(request, "site/privacy.html", _legal_context())
 
 
 @router.post("/book")
@@ -220,8 +264,11 @@ async def book_submit(
     addon_ids: list[int] = Form(default=[]),
     request_key: str = Form(""),
     returning_token: str = Form(""),
+    embed: str = Form(""),
 ):
     _require_bookable()
+    is_embed = embed == "1"
+    template = "site/book_embed.html" if is_embed else "site/book.html"
     ip = security.client_ip(request)
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_BOOK):
         raise HTTPException(status_code=429, detail="too many requests")
@@ -232,7 +279,7 @@ async def book_submit(
     if not _EMAIL.match(email):
         return templates.TemplateResponse(
             request,
-            "site/book.html",
+            template,
             _book_context(
                 error="Invalid email.",
                 promo_code=promo_code,
@@ -244,7 +291,7 @@ async def book_submit(
     if not property_address.strip():
         return templates.TemplateResponse(
             request,
-            "site/book.html",
+            template,
             _book_context(
                 error="Property address is required.",
                 promo_code=promo_code,
@@ -276,7 +323,7 @@ async def book_submit(
         detail = e.detail if isinstance(e.detail, str) else "Booking failed."
         return templates.TemplateResponse(
             request,
-            "site/book.html",
+            template,
             _book_context(
                 error=detail,
                 promo_code=promo_code,
@@ -286,9 +333,10 @@ async def book_submit(
             status_code=e.status_code,
         )
 
+    suffix = "?embed=1" if is_embed else ""
     if result["pay_slug"] and stripe_checkout.payments_configured():
-        return RedirectResponse(f"/i/{result['pay_slug']}", status_code=303)
-    return RedirectResponse(f"/booking/{result['order_token']}", status_code=303)
+        return RedirectResponse(f"/i/{result['pay_slug']}{suffix}", status_code=303)
+    return RedirectResponse(f"/booking/{result['order_token']}{suffix}", status_code=303)
 
 
 @router.get("/book/homeowner", response_class=HTMLResponse)

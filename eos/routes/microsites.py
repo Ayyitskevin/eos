@@ -6,13 +6,34 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from .. import bundles, db, marketing_kit, microsites, paywall, security, stripe_checkout, studio
+from .. import (
+    analytics,
+    bundles,
+    config,
+    db,
+    demo_sandbox,
+    leads,
+    marketing_kit,
+    microsites,
+    paywall,
+    security,
+    stripe_checkout,
+    studio,
+)
 from ..render import templates
-from ..vocab import STUDIO_ID
 
 router = APIRouter()
 INDEXABLE_PREFIX = "/l/"
-_EMAIL = re.compile(r"^[^@\s]+\.[^@\s]+\.[^@\s]+$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _lead_capture_open(listing) -> bool:
+    """Studio toggle + per-listing toggle + demo sandbox all gate the lead form."""
+    if not listing["site_lead_capture"]:
+        return False
+    if demo_sandbox.is_read_only():
+        return False
+    return bool(studio.get_profile()["lead_capture_enabled"])
 
 
 def _pay_context(listing_id: int) -> dict:
@@ -28,6 +49,7 @@ def _pay_context(listing_id: int) -> dict:
 @router.get("/l/{slug}", response_class=HTMLResponse)
 async def listing_site(request: Request, slug: str):
     listing = microsites.get_published_by_slug(slug)
+    analytics.track_view(request, event_type=analytics.EVENT_MICROSITE, listing_id=listing["id"])
     ctx = microsites.site_context(listing)
     kit = marketing_kit.get_status(listing["id"])
     upsell = studio.delivery_upsell() if listing["status"] == "delivered" else None
@@ -38,7 +60,7 @@ async def listing_site(request: Request, slug: str):
             **ctx,
             "kit": kit,
             "upsell": upsell,
-            "lead_capture": bool(listing["site_lead_capture"]),
+            "lead_capture": _lead_capture_open(listing),
             "thanks": request.query_params.get("thanks") == "1",
             "error": None,
             **_pay_context(listing["id"]),
@@ -54,11 +76,18 @@ async def listing_inquire(
     email: str = Form(...),
     phone: str = Form(""),
     message: str = Form(""),
+    website: str = Form(""),
 ):
     listing = microsites.get_published_by_slug(slug)
-    if not listing["site_lead_capture"]:
+    if not _lead_capture_open(listing):
         raise HTTPException(status_code=404)
+    if website.strip():
+        # Honeypot: bots that fill the hidden field are silently dropped.
+        return RedirectResponse(f"/l/{slug}?thanks=1", status_code=303)
     ip = security.client_ip(request)
+    security.check_rate_limit(
+        f"lead:{ip}", config.RATE_LIMIT_PUBLIC_PER_MIN, detail="too many requests"
+    )
     if security.inquiry_throttled(ip, security.INQUIRY_BUCKET_SITE):
         raise HTTPException(status_code=429, detail="too many requests")
     email = email.strip().lower()
@@ -77,13 +106,16 @@ async def listing_inquire(
             status_code=400,
         )
     security.inquiry_record(ip, security.INQUIRY_BUCKET_SITE)
-    address = microsites.site_context(listing)["address"]
-    db.run(
-        """INSERT INTO inquiries (studio_id, name, email, phone, message, property_address)
-           VALUES (?,?,?,?,?,?)""",
-        (STUDIO_ID, name.strip(), email, phone.strip(), message.strip(), address),
+    ctx = microsites.site_context(listing)
+    leads.capture_lead(
+        listing=listing,
+        name=name,
+        email=email,
+        phone=phone,
+        message=message,
+        ip=ip,
+        address=ctx["address"],
     )
-    db.audit("public", "site.lead", f"listing={listing['id']}")
     return RedirectResponse(f"/l/{slug}?thanks=1", status_code=303)
 
 
