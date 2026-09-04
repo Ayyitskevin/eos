@@ -1,2 +1,2 @@
 -r requirements.txt
-boto3==1.43.58
+boto3==1.43.85
