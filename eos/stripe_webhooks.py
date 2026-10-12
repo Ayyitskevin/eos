@@ -5,15 +5,21 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
+import stripe
+
 from . import automations, config, db, tenant, upsell
+from .stripe_objects import as_dict
 
 log = logging.getLogger("eos.stripe_webhooks")
 _CHECKOUT_COMPLETED = "checkout.session.completed"
 _RECEIPT_SOURCE = "stripe"
 
 
-def handle_invoice_checkout_event(event: dict, *, source: str = _RECEIPT_SOURCE) -> bool:
+def handle_invoice_checkout_event(
+    event: dict | stripe.Event, *, source: str = _RECEIPT_SOURCE
+) -> bool:
     """Process one verified Stripe Checkout event with its immutable event ID."""
+    event = as_dict(event)
     if event.get("type") != _CHECKOUT_COMPLETED:
         return False
     data = event.get("data") or {}
@@ -40,7 +46,7 @@ def _reject_receipt(con, *, source: str, event_id: str, reason: str, studio_id: 
 
 
 def handle_invoice_checkout_completed(
-    session: dict,
+    session: dict | stripe.checkout.Session,
     *,
     event_id: str | None = None,
     event_type: str = _CHECKOUT_COMPLETED,
@@ -48,6 +54,7 @@ def handle_invoice_checkout_completed(
     source: str = _RECEIPT_SOURCE,
 ) -> bool:
     """Atomically claim a verified event and pay its exactly-bound invoice once."""
+    session = as_dict(session)
     event_id = str(event_id or "").strip()
     if not event_id:
         log.warning("stripe invoice checkout rejected without event id")

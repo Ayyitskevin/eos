@@ -8,6 +8,7 @@ import stripe
 from fastapi import HTTPException
 
 from . import config, db
+from .stripe_objects import as_dict
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.stripe_connect")
@@ -130,7 +131,8 @@ def disconnect() -> None:
     db.audit("admin", "stripe_connect.disconnect", f"studio={STUDIO_ID}")
 
 
-def handle_account_updated(account: dict) -> None:
+def handle_account_updated(account: dict | stripe.Account) -> None:
+    account = as_dict(account)
     acct_id = account.get("id")
     if not acct_id:
         return

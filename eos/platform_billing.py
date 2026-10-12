@@ -8,6 +8,7 @@ import logging
 import stripe
 
 from . import config, db, tenant
+from .stripe_objects import as_dict
 from .vocab import STUDIO_ID
 
 log = logging.getLogger("eos.platform_billing")
@@ -137,7 +138,9 @@ def create_checkout(plan: str) -> str:
     previous_session_id = studio_row["platform_checkout_session_id"] or ""
     if previous_session_id:
         try:
-            previous = stripe.checkout.Session.retrieve(previous_session_id, api_key=_api_key())
+            previous = as_dict(
+                stripe.checkout.Session.retrieve(previous_session_id, api_key=_api_key())
+            )
         except Exception as exc:
             raise RuntimeError(
                 "Unable to verify the existing subscription checkout; retry shortly."
@@ -152,7 +155,7 @@ def create_checkout(plan: str) -> str:
         if not bound:
             raise RuntimeError("stored subscription checkout binding mismatch")
         if previous.get("status") == "open" and previous.get("url"):
-            return previous.url
+            return previous["url"]
         if previous.get("status") == "complete":
             raise RuntimeError("subscription checkout is still processing")
         if previous.get("status") != "expired":
@@ -299,9 +302,10 @@ def apply_subscription(
         tenant.set_studio(previous_studio)
 
 
-def handle_webhook_event(event: dict) -> None:
+def handle_webhook_event(event: dict | stripe.Event) -> None:
     from . import stripe_webhooks
 
+    event = as_dict(event)
     etype = event["type"]
     obj = event["data"]["object"]
     event_id = str(event.get("id") or "")
