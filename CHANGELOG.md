@@ -4,6 +4,9 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
 ## Unreleased — 2026-07-30
 
+- Fixed Stripe SDK object handling for checkout reuse, payment reconciliation, and signed
+  invoice, subscription, and Connect account webhooks by converting resource data recursively
+  before dictionary access; checkout redirects retain SDK resource attributes.
 - Added public platform legal pages at `/terms` and `/privacy` (apex and tenant hosts), with
   operator name/contact configurable via `EOS_OPERATOR_NAME` / `EOS_CONTACT_EMAIL`; linked from
   the marketing footer and the signup form.

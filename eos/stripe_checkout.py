@@ -10,6 +10,7 @@ import stripe
 from fastapi import HTTPException
 
 from . import config, db, stripe_connect, tenant
+from .stripe_objects import as_dict
 
 log = logging.getLogger("eos.stripe_checkout")
 
@@ -309,7 +310,8 @@ def create_payment_session(
                 existing_session_id,
                 api_key=api_key,
             )
-            _validate_retrieved_paid_hold_timing(session)
+            session_data = as_dict(session)
+            _validate_retrieved_paid_hold_timing(session_data)
         except PaymentTimingUnproven as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except Exception as exc:
@@ -318,15 +320,15 @@ def create_payment_session(
                 detail="Unable to verify the existing checkout. Retry shortly.",
             ) from exc
         if not _session_matches_binding(
-            session,
+            session_data,
             amount_cents=amount_cents,
             currency=currency,
             metadata=metadata,
             session_id=existing_session_id,
         ):
             raise HTTPException(status_code=409, detail="stored checkout binding mismatch")
-        provider_status = session.get("status")
-        payment_status = session.get("payment_status")
+        provider_status = session_data.get("status")
+        payment_status = session_data.get("payment_status")
         if payment_status == "paid":
             raise HTTPException(
                 status_code=409,
@@ -335,10 +337,10 @@ def create_payment_session(
                     "event or ask an operator to reconcile it."
                 ),
             )
-        if provider_status == "open" and session.get("url"):
+        if provider_status == "open" and session_data.get("url"):
             _persist_invoice_binding(
                 metadata,
-                session_id=session.get("id"),
+                session_id=session_data.get("id"),
                 destination=destination,
                 currency=currency,
             )
@@ -426,7 +428,7 @@ def retrieve_payment_session(session_id: str, *, destination: str | None = None)
     api_key = _api_key_for_retrieve(rail)
     if not api_key:
         raise RuntimeError("payment provider is unavailable")
-    session = stripe.checkout.Session.retrieve(session_id, api_key=api_key)
+    session = as_dict(stripe.checkout.Session.retrieve(session_id, api_key=api_key))
     _validate_retrieved_paid_hold_timing(session)
     return session
 
@@ -436,7 +438,7 @@ def expire_payment_session(session_id: str, *, destination: str | None = None):
     api_key = _api_key_for_retrieve(rail)
     if not api_key:
         raise RuntimeError("payment provider is unavailable")
-    return stripe.checkout.Session.expire(session_id, api_key=api_key)
+    return as_dict(stripe.checkout.Session.expire(session_id, api_key=api_key))
 
 
 def _reconcile_paid_for_manual_payment(invoice, session) -> tuple[str, str]:
