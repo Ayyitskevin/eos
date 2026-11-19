@@ -4,6 +4,7 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
 ## Unreleased — 2026-07-30
 
+- Fixed shared MLS picks when two gallery visitors star or unstar the same photo. Repeating either action now preserves the selection shown by the button.
 - Added **Download MLS picks** to public galleries so agents can download their starred photos together at the studio’s MLS export dimensions.
 
 - Added public platform legal pages at `/terms` and `/privacy` (apex and tenant hosts), with
