@@ -20,7 +20,7 @@ def bundle_path(listing_id: int, kind: str, gallery_id: int, rev: int) -> Path:
     return config.ZIP_DIR / f"l{listing_id}-{kind}-g{gallery_id}-r{rev}.zip"
 
 
-def _preset_for_kind(kind: str):
+def preset_for_kind(kind: str):
     slug = _PRESET_SLUGS.get(kind)
     if not slug:
         return None
@@ -70,7 +70,7 @@ def build_bundle(listing_id: int, kind: str) -> Path | None:
                 if path.is_file():
                     zf.write(path, arcname=name)
         else:
-            preset = _preset_for_kind(kind)
+            preset = preset_for_kind(kind)
             if not preset:
                 return None
             stem_slug = preset["slug"]

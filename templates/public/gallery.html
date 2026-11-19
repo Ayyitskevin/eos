@@ -64,9 +64,11 @@
         {% for a in by_section[s.id] %}
         {% if a.status == 'ready' %}
         <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
+          {% if a.kind == 'photo' %}
           <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
             <button type="submit" class="fav-btn" title="Star for MLS" aria-label="Favorite">{{ "★" if a.agent_favorite else "☆" }}</button>
           </form>
+          {% endif %}
           {% if payment_locked %}
           <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
           {% else %}
@@ -86,9 +88,11 @@
       {% for a in unsectioned %}
       {% if a.status == 'ready' %}
       <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
+        {% if a.kind == 'photo' %}
         <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
           <button type="submit" class="fav-btn" title="Star for MLS" aria-label="Favorite">{{ "★" if a.agent_favorite else "☆" }}</button>
         </form>
+        {% endif %}
         {% if payment_locked %}
         <img src="/media/{{ g.slug }}/thumb/{{ a.id }}" alt="{{ a.filename }}" loading="lazy">
         {% else %}
@@ -132,6 +136,9 @@
   <section class="card" style="margin-top:1.5rem">
     <h2>Your MLS picks ({{ favorites|length }})</h2>
     <p class="muted small">Starred photos are highlighted for your photographer.</p>
+    {% if not payment_locked %}
+    <a class="btn" href="/g/{{ g.slug }}/download/mls-picks">Download MLS picks</a>
+    {% endif %}
   </section>
   {% endif %}
 </main>

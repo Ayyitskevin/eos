@@ -4,6 +4,8 @@ All notable Eos releases. Version numbers match `eos/config.py` `APP_VERSION`.
 
 ## Unreleased — 2026-07-30
 
+- Added **Download MLS picks** to public galleries so agents can download their starred photos together at the studio’s MLS export dimensions.
+
 - Added public platform legal pages at `/terms` and `/privacy` (apex and tenant hosts), with
   operator name/contact configurable via `EOS_OPERATOR_NAME` / `EOS_CONTACT_EMAIL`; linked from
   the marketing footer and the signup form.

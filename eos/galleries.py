@@ -282,6 +282,16 @@ def agent_favorites(gallery_id: int) -> list:
     )
 
 
+def ready_photo_picks(gallery_id: int) -> list:
+    return db.all_(
+        """SELECT a.* FROM assets a JOIN galleries g ON g.id=a.gallery_id
+           WHERE g.id=? AND g.studio_id=? AND a.agent_favorite=1
+             AND a.kind='photo' AND a.status='ready'
+           ORDER BY a.section_id, a.position, a.id""",
+        (gallery_id, STUDIO_ID),
+    )
+
+
 def assets_by_section(gallery_id: int) -> tuple[list, dict, list]:
     sections = gallery_sections(gallery_id)
     assets = gallery_assets(gallery_id)

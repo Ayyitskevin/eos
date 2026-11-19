@@ -1,11 +1,15 @@
 """Gallery downloads — originals ZIP and single-asset (PIN cookie gate)."""
 
 import logging
+import os
+from functools import partial
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from starlette.background import BackgroundTask
 
-from .. import db, galleries, jobs, paywall, video_render
+from .. import db, galleries, jobs, mls_picks, paywall, video_render
 from ..jobs import zip_path
 from ..render import templates
 
@@ -48,6 +52,41 @@ async def download_zip(request: Request, slug: str):
     if not z.is_file():
         raise HTTPException(status_code=404, detail="zip not ready")
     return FileResponse(z, filename=f"{g['title']}.zip", media_type="application/zip")
+
+
+@router.get("/{slug}/download/mls-picks")
+def download_mls_picks(request: Request, slug: str):
+    g = _gate(request, slug)
+    try:
+        picks = mls_picks.selection(g)
+        stream = mls_picks.open_ready(g["id"], picks.signature)
+        if stream is None:
+            mls_picks.request_build(g["id"], picks.signature)
+            return templates.TemplateResponse(
+                request,
+                "public/zip_wait.html",
+                {
+                    "g": g,
+                    "retry_url": request.url.path,
+                    "wait_message": "We're preparing your starred photos as MLS-ready JPEGs.",
+                },
+                status_code=202,
+                headers={"Retry-After": "3"},
+            )
+    except mls_picks.PicksUnavailable as exc:
+        return templates.TemplateResponse(
+            request, "public/error.html", {"message": str(exc)}, status_code=409
+        )
+    filename = quote(f"{g['slug']}-mls-picks.zip", safe="")
+    return StreamingResponse(
+        iter(partial(stream.read, 64 * 1024), b""),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename*=utf-8''{filename}",
+            "Content-Length": str(os.fstat(stream.fileno()).st_size),
+        },
+        background=BackgroundTask(stream.close),
+    )
 
 
 @router.get("/{slug}/video/{fmt}")

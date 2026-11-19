@@ -102,6 +102,22 @@ def _h_image(p: dict) -> None:
     _sync_derivatives(asset["gallery_id"], dirs, base)
 
 
+def export_options(listing_id: int | None) -> dict:
+    overlay = brand_kits.overlay_for_listing(listing_id)
+    metadata = None
+    if listing_id:
+        from .tenant import get_site_name
+
+        listing = db.one(
+            """SELECT l.*, c.name AS client_name FROM listings l
+               LEFT JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
+               WHERE l.id=? AND l.studio_id=?""",
+            (listing_id, tenant.get_studio_id()),
+        )
+        metadata = imaging.listing_export_metadata(listing, site_name=get_site_name())
+    return {"overlay": overlay, "metadata": metadata}
+
+
 def _h_exports(p: dict) -> None:
     asset = _asset(p["asset_id"], kind="photo", status="ready")
     if not asset:
@@ -117,28 +133,20 @@ def _h_exports(p: dict) -> None:
         "SELECT listing_id FROM galleries WHERE id=? AND studio_id=?",
         (asset["gallery_id"], asset["studio_id"]),
     )
-    listing_id = gal["listing_id"] if gal else None
-    overlay = brand_kits.overlay_for_listing(listing_id)
-    metadata = None
-    if listing_id:
-        from .tenant import get_site_name
-
-        listing = db.one(
-            """SELECT l.*, c.name AS client_name FROM listings l
-               LEFT JOIN clients c ON c.id=l.client_id AND c.studio_id=l.studio_id
-               WHERE l.id=? AND l.studio_id=?""",
-            (listing_id, asset["studio_id"]),
-        )
-        metadata = imaging.listing_export_metadata(listing, site_name=get_site_name())
     imaging.make_crops(
         str(src),
         out,
         stem,
         config.JPEG_QUALITY,
         active,
-        overlay=overlay,
-        metadata=metadata,
+        **export_options(gal["listing_id"] if gal else None),
     )
+
+
+def _h_mls_picks(p: dict) -> None:
+    from . import mls_picks
+
+    mls_picks.build(p["gallery_id"], p["signature"])
 
 
 def _h_zip(p: dict) -> None:
@@ -293,6 +301,7 @@ HANDLERS = {
     "image_derivatives": _h_image,
     "export_crops": _h_exports,
     "gallery_exports": _h_gallery_exports,
+    "mls_picks": _h_mls_picks,
     "zip_build": _h_zip,
     "bundle_build": _h_bundle,
     "marketing_kit": _h_marketing_kit,

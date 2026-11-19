@@ -109,7 +109,7 @@ async def gallery_view(request: Request, slug: str):
             "upsell": upsell_banner,
             "upsell_addons": upsell_addons,
             "upsell_request_key": security.new_token(),
-            "favorites": galleries.agent_favorites(g["id"]),
+            "favorites": galleries.ready_photo_picks(g["id"]),
             "videos": video_render.ready_formats(g["id"]) if not locked else set(),
         },
     )
