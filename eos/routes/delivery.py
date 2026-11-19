@@ -116,10 +116,17 @@ async def gallery_view(request: Request, slug: str):
 
 
 @router.post("/g/{slug}/favorite/{asset_id}")
-async def gallery_favorite(request: Request, slug: str, asset_id: int):
+async def gallery_favorite(request: Request, slug: str, asset_id: int, action: str = Form("")):
     g = galleries.get_gallery_by_slug(slug)
     galleries.require_public_gallery(g)
     if not security.gallery_unlocked(request, g):
         raise HTTPException(status_code=403)
-    galleries.toggle_agent_favorite(asset_id, gallery_id=g["id"])
+    if action not in ("star", "unstar"):
+        return templates.TemplateResponse(
+            request,
+            "public/error.html",
+            {"message": "Go back and refresh the gallery, then choose Star or Unstar again."},
+            status_code=400,
+        )
+    galleries.set_agent_favorite(asset_id, gallery_id=g["id"], favorite=action == "star")
     return RedirectResponse(f"/g/{slug}", status_code=303)

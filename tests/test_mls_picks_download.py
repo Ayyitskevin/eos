@@ -2,6 +2,7 @@
 
 import io
 import zipfile
+from html.parser import HTMLParser
 from pathlib import Path
 from uuid import uuid4
 
@@ -52,8 +53,8 @@ async def _unlock(client, slug="interiors"):
     assert resp.status_code == 303
 
 
-async def _toggle(client, asset_id, slug="interiors"):
-    resp = await client.post(f"/g/{slug}/favorite/{asset_id}")
+async def _set_favorite(client, asset_id, action, slug="interiors"):
+    resp = await client.post(f"/g/{slug}/favorite/{asset_id}", data={"action": action})
     assert resp.status_code == 303
 
 
@@ -95,24 +96,86 @@ def _assert_photos(members, expected):
         assert matches[0] == pytest.approx(color, abs=6)
 
 
+class _FavoriteForm(HTMLParser):
+    """Capture the submitted controls from one asset's form on an already-loaded page."""
+
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self.active = False
+        self.fields = {}
+        self.label = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "form":
+            self.active = attrs.get("action") == self.url
+            if self.active:
+                assert attrs.get("method", "get").lower() == "post"
+        elif self.active and tag in {"input", "button"}:
+            if "name" in attrs:
+                self.fields[attrs["name"]] = attrs.get("value", "")
+            if tag == "button":
+                self.label = attrs.get("aria-label")
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self.active = False
+
+
+@pytest.mark.parametrize("sectioned", [False, True], ids=["unsectioned", "sectioned"])
+async def test_two_open_pages_agree_on_mls_picks(client, app_env_http, sectioned):
+    gid = _gallery()
+    kitchen = _photo(gid, "kitchen", (80, 60), RED)
+    porch = _photo(gid, "porch", (60, 80), GREEN)
+    if sectioned:
+        section = db.run("INSERT INTO sections (gallery_id, name) VALUES (?, 'Interior')", (gid,))
+        db.run("UPDATE assets SET section_id=? WHERE id=?", (section, kitchen))
+    await _unlock(client)
+    await _set_favorite(client, porch, "star")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app_env_http), base_url="https://testserver"
+    ) as other:
+        await _unlock(other)
+        for label, expected in [
+            ("Star kitchen.png", {"kitchen": RED, "porch": GREEN}),
+            ("Unstar kitchen.png", {"porch": GREEN}),
+        ]:
+            # Both visitors have already seen the same button before either submits it.
+            forms = []
+            for visitor in (client, other):
+                page = await visitor.get("/g/interiors")
+                assert page.status_code == 200
+                form = _FavoriteForm(f"/g/interiors/favorite/{kitchen}")
+                form.feed(page.text)
+                assert form.label == label
+                forms.append((visitor, form))
+
+            for visitor, form in forms:
+                response = await visitor.post(form.url, data=form.fields)
+                assert response.status_code == 303
+                _assert_photos(_members(await _download(visitor), (2048, 1365)), expected)
+
+
 async def test_starred_photos_and_current_preset_round_trip(client):
     gid = _gallery()
     kitchen = _photo(gid, "kitchen", (320, 180), RED)
     porch = _photo(gid, "porch", (100, 225), GREEN)
     den = _photo(gid, "den", (160, 160), BLUE)
     await _unlock(client)
-    await _toggle(client, kitchen)
-    await _toggle(client, porch)
+    await _set_favorite(client, kitchen, "star")
+    await _set_favorite(client, porch, "star")
     result = await _download(client)
     _assert_photos(_members(result, (2048, 1365)), {"kitchen": RED, "porch": GREEN})
 
-    await _toggle(client, porch)
-    await _toggle(client, den)
+    await _set_favorite(client, porch, "unstar")
+    await _set_favorite(client, den, "star")
     result = await _download(client)
     _assert_photos(_members(result, (2048, 1365)), {"kitchen": RED, "den": BLUE})
 
-    await _toggle(client, den)
-    await _toggle(client, porch)
+    await _set_favorite(client, den, "unstar")
+    await _set_favorite(client, porch, "star")
     result = await _download(client)
     _assert_photos(_members(result, (2048, 1365)), {"kitchen": RED, "porch": GREEN})
 
@@ -128,7 +191,7 @@ async def test_crop_centering_change_refreshes_download(client):
     gid = _gallery()
     photo = _photo(gid, "panorama", (300, 100), RED, right_color=BLUE)
     await _unlock(client)
-    await _toggle(client, photo)
+    await _set_favorite(client, photo, "star")
     db.run(
         """UPDATE crop_presets SET width=100, height=100, centering_x=0
            WHERE studio_id='default' AND slug='mls-3x2'"""
@@ -152,16 +215,43 @@ async def test_excludes_other_galleries_videos_and_unready_photos(client):
         (gid, gid, gid),
     )
     await _unlock(client, "exteriors")
-    await _toggle(client, yard, "exteriors")
+    await _set_favorite(client, yard, "star", "exteriors")
     await _unlock(client)
     empty = await _download(client)
     assert empty.status_code == 409
     assert any(word in empty.text.lower() for word in ("star", "pick", "select"))
 
-    await _toggle(client, kitchen)
+    await _set_favorite(client, kitchen, "star")
     _assert_photos(_members(await _download(client), (2048, 1365)), {"kitchen": RED})
-    await _toggle(client, kitchen)
+    await _set_favorite(client, kitchen, "unstar")
     assert (await _download(client)).status_code == 409
+
+
+async def test_favorite_action_requires_gallery_access_and_explicit_intent(client):
+    gid = _gallery()
+    photo = _photo(gid, "kitchen", (80, 60), RED)
+    other_gallery = _gallery("exteriors")
+    other_photo = _photo(other_gallery, "porch", (60, 80), GREEN)
+    url = f"/g/interiors/favorite/{photo}"
+
+    assert (await client.post(url, data={"action": "star"})).status_code == 403
+    await _unlock(client)
+    assert (await _download(client)).status_code == 409
+
+    # A legacy page or unknown action cannot reverse an existing selection.
+    await _set_favorite(client, photo, "star")
+    for fields in [{}, {"action": "toggle"}]:
+        response = await client.post(url, data=fields)
+        assert 400 <= response.status_code < 500
+        assert "refresh" in response.text.lower()
+        _assert_photos(_members(await _download(client), (2048, 1365)), {"kitchen": RED})
+
+    response = await client.post(f"/g/interiors/favorite/{other_photo}", data={"action": "star"})
+    assert response.status_code == 404
+    assert (
+        db.one("SELECT agent_favorite FROM assets WHERE id=?", (other_photo,))["agent_favorite"]
+        == 0
+    )
 
 
 async def test_duplicate_original_filenames_produce_two_distinct_jpegs(client):
@@ -169,8 +259,8 @@ async def test_duplicate_original_filenames_produce_two_distinct_jpegs(client):
     first = _photo(gid, "balcony", (38, 30), RED)
     second = _photo(gid, "balcony", (34, 25), BLUE)
     await _unlock(client)
-    await _toggle(client, first)
-    await _toggle(client, second)
+    await _set_favorite(client, first, "star")
+    await _set_favorite(client, second, "star")
     members = _members(await _download(client), (2048, 1365))
     assert len(members) == 2
     assert all("balcony" in name.lower() for name in members)
@@ -183,7 +273,7 @@ async def test_disabling_mls_preset_prevents_cached_download(client):
     gid = _gallery()
     photo = _photo(gid, "study", (47, 61), GREEN)
     await _unlock(client)
-    await _toggle(client, photo)
+    await _set_favorite(client, photo, "star")
     _assert_photos(_members(await _download(client), (2048, 1365)), {"study": GREEN})
     db.run("UPDATE crop_presets SET active=0 WHERE studio_id='default' AND slug='mls-3x2'")
     result = await _download(client)
@@ -205,8 +295,8 @@ async def test_unavailable_source_cannot_produce_partial_download(client, monkey
         (gid, stored),
     )
     await _unlock(client)
-    await _toggle(client, ready)
-    await _toggle(client, unavailable)
+    await _set_favorite(client, ready, "star")
+    await _set_favorite(client, unavailable, "star")
     # This test drains queued retries inline. Keep their timers out of later fixtures.
     monkeypatch.setattr(jobs, "_schedule_retry", lambda job_id, attempts: None)
     response = await _download(client)
@@ -220,7 +310,7 @@ async def test_long_unicode_photo_name_can_be_extracted(client, tmp_path):
     stem = "é" * 125 + "a"  # 255 UTF-8 bytes, including the original .png extension.
     photo = _photo(gid, stem, (60, 40), BLUE)
     await _unlock(client)
-    await _toggle(client, photo)
+    await _set_favorite(client, photo, "star")
     result = await _download(client)
     assert result.status_code == 200
     with zipfile.ZipFile(io.BytesIO(result.content)) as archive:
