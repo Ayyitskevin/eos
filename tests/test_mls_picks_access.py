@@ -55,7 +55,10 @@ async def test_mls_picks_link_and_archive_follow_gallery_access(app_env_http):
 
         job = db.one("SELECT id FROM jobs WHERE studio_id='default' AND kind='mls_picks'")
         jobs._execute(job["id"])
-        assert (await client.get(download)).status_code == 200
+        ready = await client.get(download)
+        assert ready.status_code == 200
+        assert ready.headers["Content-Disposition"] == 'attachment; filename="mls-picks.zip"'
+        assert ready.headers["Cache-Control"] == "private, no-store"
         db.run("UPDATE invoices SET status='sent' WHERE id=?", (invoice,))
         assert (await client.get(download)).status_code == 402
         db.run("UPDATE invoices SET status='paid' WHERE id=?", (invoice,))

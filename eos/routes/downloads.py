@@ -3,7 +3,6 @@
 import logging
 import os
 from functools import partial
-from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
@@ -77,12 +76,11 @@ def download_mls_picks(request: Request, slug: str):
         return templates.TemplateResponse(
             request, "public/error.html", {"message": str(exc)}, status_code=409
         )
-    filename = quote(f"{g['slug']}-mls-picks.zip", safe="")
     return StreamingResponse(
         iter(partial(stream.read, 64 * 1024), b""),
         media_type="application/zip",
         headers={
-            "Content-Disposition": f"attachment; filename*=utf-8''{filename}",
+            "Content-Disposition": 'attachment; filename="mls-picks.zip"',
             "Content-Length": str(os.fstat(stream.fileno()).st_size),
         },
         background=BackgroundTask(stream.close),
