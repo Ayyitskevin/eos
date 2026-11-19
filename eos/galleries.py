@@ -257,20 +257,17 @@ def redeliver_listing(listing_id: int) -> int:
     return gallery["id"]
 
 
-def toggle_agent_favorite(asset_id: int, *, gallery_id: int) -> bool:
-    get_gallery(gallery_id)
-    row = db.one(
-        "SELECT agent_favorite FROM assets WHERE id=? AND gallery_id=?",
-        (asset_id, gallery_id),
-    )
-    if not row:
-        raise HTTPException(status_code=404)
-    new_val = 0 if row["agent_favorite"] else 1
-    db.run(
-        "UPDATE assets SET agent_favorite=? WHERE id=? AND gallery_id=?",
-        (new_val, asset_id, gallery_id),
-    )
-    return bool(new_val)
+def set_agent_favorite(asset_id: int, *, gallery_id: int, favorite: bool) -> None:
+    with db.tx() as con:
+        updated = con.execute(
+            """UPDATE assets SET agent_favorite=?
+               WHERE id=? AND gallery_id IN (
+                   SELECT id FROM galleries WHERE id=? AND studio_id=?
+               )""",
+            (favorite, asset_id, gallery_id, STUDIO_ID),
+        )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=404)
 
 
 def agent_favorites(gallery_id: int) -> list:

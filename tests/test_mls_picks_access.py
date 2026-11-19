@@ -42,9 +42,13 @@ async def test_mls_picks_link_and_archive_follow_gallery_access(app_env_http):
         page = await client.get(url)
         assert 'aria-label="Unstar tour.mp4"' in page.text
         assert download not in page.text
-        assert (await client.post(f"{url}/favorite/{video}")).status_code == 303
+        assert (
+            await client.post(f"{url}/favorite/{video}", data={"action": "unstar"})
+        ).status_code == 303
         assert f'{url}/favorite/{video}"' not in (await client.get(url)).text
-        assert (await client.post(f"{url}/favorite/{photo}")).status_code == 303
+        assert (
+            await client.post(f"{url}/favorite/{photo}", data={"action": "star"})
+        ).status_code == 303
         page = await client.get(url)
         assert f'href="{download}">Download MLS picks</a>' in page.text
         assert "Your MLS picks (1)" in page.text

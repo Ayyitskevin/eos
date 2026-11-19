@@ -83,7 +83,7 @@ async def test_plan_limit_blocks_extra_tokens(env):
         api_tokens.create_token(label="overflow")
 
 
-def test_agent_favorite_toggle(env):
+def test_agent_favorite_selection(env):
     tenant.set_studio("default")
     lid = listings.create_listing("Fav test")
     gid = galleries.create_gallery("G", listing_id=lid)
@@ -92,7 +92,7 @@ def test_agent_favorite_toggle(env):
            VALUES (?,?,?,?,?)""",
         (gid, "a.jpg", "a.jpg", "ready", "photo"),
     )
-    assert galleries.toggle_agent_favorite(aid, gallery_id=gid) is True
+    galleries.set_agent_favorite(aid, gallery_id=gid, favorite=True)
     assert len(galleries.agent_favorites(gid)) == 1
 
 

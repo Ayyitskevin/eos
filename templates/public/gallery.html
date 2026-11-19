@@ -66,7 +66,7 @@
         <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
           {% if a.kind == 'photo' or a.agent_favorite %}
           <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
-            <button type="submit" class="fav-btn" title="{{ 'Remove star' if a.agent_favorite else 'Star for MLS' }}" aria-label="{{ 'Unstar' if a.agent_favorite else 'Star' }} {{ a.filename }}">{{ "★" if a.agent_favorite else "☆" }}</button>
+            <button type="submit" name="action" value="{{ 'unstar' if a.agent_favorite else 'star' }}" class="fav-btn" title="{{ 'Remove star' if a.agent_favorite else 'Star for MLS' }}" aria-label="{{ 'Unstar' if a.agent_favorite else 'Star' }} {{ a.filename }}">{{ "★" if a.agent_favorite else "☆" }}</button>
           </form>
           {% endif %}
           {% if payment_locked %}
@@ -90,7 +90,7 @@
       <figure class="tile{% if a.agent_favorite %} favorited{% endif %}">
         {% if a.kind == 'photo' or a.agent_favorite %}
         <form method="post" action="/g/{{ g.slug }}/favorite/{{ a.id }}" class="inline-form">
-          <button type="submit" class="fav-btn" title="{{ 'Remove star' if a.agent_favorite else 'Star for MLS' }}" aria-label="{{ 'Unstar' if a.agent_favorite else 'Star' }} {{ a.filename }}">{{ "★" if a.agent_favorite else "☆" }}</button>
+          <button type="submit" name="action" value="{{ 'unstar' if a.agent_favorite else 'star' }}" class="fav-btn" title="{{ 'Remove star' if a.agent_favorite else 'Star for MLS' }}" aria-label="{{ 'Unstar' if a.agent_favorite else 'Star' }} {{ a.filename }}">{{ "★" if a.agent_favorite else "☆" }}</button>
         </form>
         {% endif %}
         {% if payment_locked %}
