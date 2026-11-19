@@ -58,7 +58,11 @@ def selection(gallery) -> Selection:
             source = original / stored
             stem = Path(asset["filename"].replace("\\", "/")).stem
             stem = re.sub(r"[^\w .-]", "_", stem).strip(" .") or "photo"
-            member = f"{asset['id']}-{stem}.jpg"
+            prefix = f"{asset['id']}-"
+            # Leave room for the ID and extension within a 255-byte filesystem name.
+            stem_bytes = 255 - len(prefix) - len(".jpg")
+            stem = stem.encode("utf-8")[:stem_bytes].decode("utf-8", errors="ignore")
+            member = f"{prefix}{stem}.jpg"
             members.append((source, member))
             inputs.append((stored, member, _version(source)))
     except OSError:

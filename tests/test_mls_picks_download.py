@@ -213,3 +213,20 @@ async def test_unavailable_source_cannot_produce_partial_download(client, monkey
     assert 400 <= response.status_code < 600
     assert not zipfile.is_zipfile(io.BytesIO(response.content))
     assert any(word in response.text.lower() for word in ("photo", "prepar", "source", "image"))
+
+
+async def test_long_unicode_photo_name_can_be_extracted(client, tmp_path):
+    gid = _gallery()
+    stem = "é" * 125 + "a"  # 255 UTF-8 bytes, including the original .png extension.
+    photo = _photo(gid, stem, (60, 40), BLUE)
+    await _unlock(client)
+    await _toggle(client, photo)
+    result = await _download(client)
+    assert result.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(result.content)) as archive:
+        (name,) = archive.namelist()
+        assert "é" in name and name.endswith(".jpg")
+        extracted = archive.extract(name, path=tmp_path)
+    with Image.open(extracted) as image:
+        assert image.size == (2048, 1365)
+        assert image.getpixel((100, 100)) == pytest.approx(BLUE, abs=6)

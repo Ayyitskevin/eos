@@ -36,6 +36,14 @@ async def test_mls_picks_link_and_archive_follow_gallery_access(app_env_http):
         assert f'{url}/favorite/{photo}"' in page.text
         assert f'{url}/favorite/{video}"' not in page.text
         assert download not in page.text
+
+        # Visitors can still clear a video star saved by an earlier version.
+        db.run("UPDATE assets SET agent_favorite=1 WHERE id=?", (video,))
+        page = await client.get(url)
+        assert 'aria-label="Unstar tour.mp4"' in page.text
+        assert download not in page.text
+        assert (await client.post(f"{url}/favorite/{video}")).status_code == 303
+        assert f'{url}/favorite/{video}"' not in (await client.get(url)).text
         assert (await client.post(f"{url}/favorite/{photo}")).status_code == 303
         page = await client.get(url)
         assert f'href="{download}">Download MLS picks</a>' in page.text
