@@ -4,9 +4,11 @@ import json
 import logging
 import random
 import threading
+import unicodedata
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from . import brand_kits, config, db, imaging, presets, tenant
 
@@ -65,7 +67,8 @@ def crops_dir(gallery_id: int) -> Path:
 
 
 def zip_path(gallery_id: int, rev: int) -> Path:
-    return config.ZIP_DIR / f"g{gallery_id}-r{rev}.zip"
+    # v1 archives may contain duplicate member names at this same revision.
+    return config.ZIP_DIR / f"g{gallery_id}-r{rev}-v2.zip"
 
 
 def _sync_derivatives(gallery_id: int, dirs: dict[str, Path], base: str) -> None:
@@ -149,6 +152,45 @@ def _h_mls_picks(p: dict) -> None:
     mls_picks.build(p["gallery_id"], p["signature"])
 
 
+def _zip_name(filename: str, tag: str = "") -> str:
+    path = Path(filename)
+    # Even a legacy name with an unusually long extension keeps a visible stem.
+    ending_budget = 255 - len(path.stem[:1].encode())
+    ending = (tag + path.suffix).encode()[:ending_budget].decode("utf-8", errors="ignore")
+    stem = path.stem.encode()[: 255 - len(ending.encode())].decode("utf-8", errors="ignore")
+    return stem + ending
+
+
+def _zip_name_key(name: str) -> str:
+    # Canonical caseless matching: folding can turn combining marks into letters.
+    decomposed = unicodedata.normalize("NFD", name)
+    return unicodedata.normalize("NFD", decomposed.casefold())
+
+
+def _original_zip_names(assets) -> dict[int, str]:
+    # Preserve fitting originals before shortening long names. Asset ID breaks ties.
+    ordered = sorted(assets, key=lambda a: (len(a["filename"].encode()) > 255, a["id"]))
+    names = {a["id"]: _zip_name(a["filename"]) for a in assets}
+    reserved = {_zip_name_key(name) for name in names.values()}
+    seen = set()
+    for asset in ordered:
+        asset_id = asset["id"]
+        original = asset["filename"]
+        key = _zip_name_key(names[asset_id])
+        if key not in seen:
+            seen.add(key)
+            continue
+
+        candidate = _zip_name(original, f"_{asset_id}")
+        sequence = 2
+        while _zip_name_key(candidate) in reserved:
+            candidate = _zip_name(original, f"_{asset_id}_{sequence}")
+            sequence += 1
+        names[asset_id] = candidate
+        reserved.add(_zip_name_key(candidate))
+    return names
+
+
 def _h_zip(p: dict) -> None:
     gid, rev = p["gallery_id"], p["rev"]
     if not _set_studio_for_gallery(gid):
@@ -156,18 +198,20 @@ def _h_zip(p: dict) -> None:
     final = zip_path(gid, rev)
     if final.exists():
         return
-    assets = db.all_("SELECT * FROM assets WHERE gallery_id=? AND status='ready'", (gid,))
+    assets = db.all_(
+        """SELECT a.id, a.filename, a.stored FROM assets a JOIN galleries g ON g.id=a.gallery_id
+           WHERE a.gallery_id=? AND g.studio_id=? AND a.status='ready'
+           ORDER BY a.section_id, a.position, a.id""",
+        (gid, tenant.get_studio_id()),
+    )
     src_dir = _gallery_dirs(gid)["original"]
-    tmp = final.with_suffix(".part")
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
-        names: set[str] = set()
-        for a in assets:
-            name = a["filename"]
-            if name in names:
-                name = f"{Path(name).stem}_{a['id']}{Path(name).suffix}"
-            names.add(name)
-            zf.write(src_dir / a["stored"], arcname=name)
-    tmp.rename(final)
+    names = _original_zip_names(assets)
+    with TemporaryDirectory(dir=config.ZIP_DIR) as scratch:
+        tmp = Path(scratch) / final.name
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
+            for asset in assets:
+                zf.write(src_dir / asset["stored"], arcname=names[asset["id"]])
+        tmp.replace(final)
     for old in config.ZIP_DIR.glob(f"g{gid}-r*.zip"):
         if old != final:
             old.unlink(missing_ok=True)
