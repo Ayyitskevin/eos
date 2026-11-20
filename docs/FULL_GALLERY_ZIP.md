@@ -10,7 +10,8 @@ when they already look like generated names. Treat case variants and
 canonically equivalent Unicode spellings as collisions, so the ZIP also
 extracts on case-insensitive filesystems. Keep names within 255 UTF-8 bytes.
 If shortening a long name would take another photo's original name, give the
-shortened name a suffix. Use the same names on rebuild.
+shortened name a suffix. Preserve the extension as far as the byte limit
+allows. Use the same names on rebuild.
 
 A gallery with an archive from the previous naming scheme uses the existing
 preparation screen to rebuild it on the next **Download all** request.

@@ -154,10 +154,9 @@ def _h_mls_picks(p: dict) -> None:
 
 def _zip_name(filename: str, tag: str = "") -> str:
     path = Path(filename)
-    ending = tag + path.suffix
-    budget = 255 - len(ending.encode())
-    stem = path.stem.encode()[:budget].decode("utf-8", errors="ignore")
-    return stem + ending
+    ending = (tag + path.suffix).encode()[:255]
+    stem = path.stem.encode()[: 255 - len(ending)]
+    return stem.decode("utf-8", errors="ignore") + ending.decode("utf-8", errors="ignore")
 
 
 def _zip_name_key(name: str) -> str:

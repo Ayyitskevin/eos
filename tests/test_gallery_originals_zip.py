@@ -128,3 +128,18 @@ def test_zip_names_distinguish_canonically_reordered_greek_marks(app_env_http):
             for name in archive.namelist()
         }
     assert len(keys) == 2
+
+
+def test_duplicate_with_long_stored_extension_extracts(app_env_http, tmp_path):
+    gid = _gallery()
+    filename = "a." + "b" * 253
+    first = _photo(gid, 1, filename, "red")
+    second = _photo(gid, 2, filename, "green")
+    jobs._h_zip({"gallery_id": gid, "rev": 7})
+
+    extracted = tmp_path / "extracted"
+    with zipfile.ZipFile(jobs.zip_path(gid, 7)) as archive:
+        assert max(len(name.encode()) for name in archive.namelist()) <= 255
+        archive.extractall(extracted)
+    assert (extracted / filename).read_bytes() == first
+    assert sorted(path.read_bytes() for path in extracted.iterdir()) == sorted([first, second])
