@@ -154,9 +154,11 @@ def _h_mls_picks(p: dict) -> None:
 
 def _zip_name(filename: str, tag: str = "") -> str:
     path = Path(filename)
-    ending = (tag + path.suffix).encode()[:255]
-    stem = path.stem.encode()[: 255 - len(ending)]
-    return stem.decode("utf-8", errors="ignore") + ending.decode("utf-8", errors="ignore")
+    # Even a legacy name with an unusually long extension keeps a visible stem.
+    ending_budget = 255 - len(path.stem[:1].encode())
+    ending = (tag + path.suffix).encode()[:ending_budget].decode("utf-8", errors="ignore")
+    stem = path.stem.encode()[: 255 - len(ending.encode())].decode("utf-8", errors="ignore")
+    return stem + ending
 
 
 def _zip_name_key(name: str) -> str:
@@ -168,11 +170,13 @@ def _zip_name_key(name: str) -> str:
 def _original_zip_names(assets) -> dict[int, str]:
     # Preserve fitting originals before shortening long names. Asset ID breaks ties.
     ordered = sorted(assets, key=lambda a: (len(a["filename"].encode()) > 255, a["id"]))
-    names = {a["id"]: _zip_name(a["filename"]) for a in ordered}
+    names = {a["id"]: _zip_name(a["filename"]) for a in assets}
     reserved = {_zip_name_key(name) for name in names.values()}
     seen = set()
-    for asset_id, original in names.items():
-        key = _zip_name_key(original)
+    for asset in ordered:
+        asset_id = asset["id"]
+        original = asset["filename"]
+        key = _zip_name_key(names[asset_id])
         if key not in seen:
             seen.add(key)
             continue
