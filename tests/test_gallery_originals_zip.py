@@ -89,6 +89,8 @@ async def test_download_all_extracts_every_original(app_env_http, tmp_path, lega
 def test_zip_names_survive_case_unicode_and_byte_limits_on_rebuild(app_env_http):
     gid = _gallery()
     long_name = "é" * 125 + "x.jpg"  # Exactly 255 UTF-8 bytes before adding a suffix.
+    # Truncating this earlier upload must leave the later, already valid name available.
+    overlong = _photo(gid, 10, "é" * 125 + "xy.jpg", "orange")
     first = _photo(gid, 11, "Café.jpg", "white")
     variant = _photo(gid, 12, "CAFE\u0301.JPG", "black")
     reserved = _photo(gid, 13, "Café_12.jpg", "gray")
@@ -101,14 +103,28 @@ def test_zip_names_survive_case_unicode_and_byte_limits_on_rebuild(app_env_http)
             return {archive.read(info): info.filename for info in archive.infolist()}
 
     names = build(7)
-    assert set(names) == {first, variant, reserved, long_first, long_copy}
+    assert set(names) == {overlong, first, variant, reserved, long_first, long_copy}
     assert names[first] == "Café.jpg"
     assert names[reserved] == "Café_12.jpg"
     assert names[long_first] == long_name
-    assert len({unicodedata.normalize("NFC", name).casefold() for name in names.values()}) == 5
+    assert len({unicodedata.normalize("NFC", name).casefold() for name in names.values()}) == 6
     assert all(
         name.lower().endswith(".jpg") and len(name.encode()) <= 255 for name in names.values()
     )
 
     db.run("UPDATE assets SET position=-position WHERE gallery_id=?", (gid,))
     assert build(8) == names
+
+
+def test_zip_names_distinguish_canonically_reordered_greek_marks(app_env_http):
+    gid = _gallery()
+    # Casefold turns the combining iota into a letter, so mark order matters.
+    _photo(gid, 1, "α\u0345\u0301.jpg", "orange")
+    _photo(gid, 2, "ά\u0345.jpg", "brown")
+    jobs._h_zip({"gallery_id": gid, "rev": 7})
+    with zipfile.ZipFile(jobs.zip_path(gid, 7)) as archive:
+        keys = {
+            unicodedata.normalize("NFD", unicodedata.normalize("NFD", name).casefold())
+            for name in archive.namelist()
+        }
+    assert len(keys) == 2

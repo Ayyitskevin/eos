@@ -161,12 +161,15 @@ def _zip_name(filename: str, tag: str = "") -> str:
 
 
 def _zip_name_key(name: str) -> str:
-    return unicodedata.normalize("NFC", name.casefold())
+    # Canonical caseless matching: folding can turn combining marks into letters.
+    decomposed = unicodedata.normalize("NFD", name)
+    return unicodedata.normalize("NFD", decomposed.casefold())
 
 
 def _original_zip_names(assets) -> dict[int, str]:
-    # Allocate in ID order so rearranging a gallery doesn't rename a duplicate.
-    names = {a["id"]: _zip_name(a["filename"]) for a in sorted(assets, key=lambda a: a["id"])}
+    # Preserve fitting originals before shortening long names. Asset ID breaks ties.
+    ordered = sorted(assets, key=lambda a: (len(a["filename"].encode()) > 255, a["id"]))
+    names = {a["id"]: _zip_name(a["filename"]) for a in ordered}
     reserved = {_zip_name_key(name) for name in names.values()}
     seen = set()
     for asset_id, original in names.items():
